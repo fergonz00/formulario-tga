@@ -1399,19 +1399,26 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     const pageW = 210, pageH = 297, margin = 18, contentW = pageW - margin * 2;
     let y = margin;
 
-    // Header
+    // Header with logo
     doc.setFillColor(0, 30, 80);
-    doc.rect(0, 0, pageW, 36, 'F');
+    doc.rect(0, 0, pageW, 42, 'F');
+
+    // Add logo centered
+    const logoEl = document.querySelector('.header img.logo');
+    if (logoEl) {
+      try {
+        const logoW = 30, logoH = 22;
+        doc.addImage(logoEl.src, 'PNG', (pageW - logoW) / 2, 3, logoW, logoH, undefined, 'MEDIUM');
+      } catch(e) { console.log('Logo error:', e); }
+    }
+
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(16);
-    doc.setFont('helvetica', 'bold');
-    doc.text('TITO GONZÁLEZ AUTOMOTORES', pageW/2, 15, { align: 'center' });
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text('Formulario F01 — ' + tipoLabel, pageW/2, 23, { align: 'center' });
+    doc.text('Formulario F01 — ' + tipoLabel, pageW/2, 30, { align: 'center' });
     doc.setFontSize(8);
-    doc.text('Fecha: ' + new Date().toLocaleDateString('es-AR'), pageW/2, 30, { align: 'center' });
-    y = 44;
+    doc.text('Fecha: ' + new Date().toLocaleDateString('es-AR'), pageW/2, 36, { align: 'center' });
+    y = 50;
 
     const allData = formType === 'fisica' ? getPFData() : getPJData();
     doc.setTextColor(0, 30, 80);
