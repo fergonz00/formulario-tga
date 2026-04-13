@@ -732,6 +732,8 @@
     <div class="success-icon">📄</div>
     <h2>¡PDF generado!</h2>
     <p>Tu formulario está listo para descargar.</p>
+    <div id="uploadStatus" style="margin-top:12px; font-size:13px; color:var(--vw-green); display:none;">✓ Formulario enviado correctamente</div>
+    <div id="uploadError" style="margin-top:12px; font-size:13px; color:var(--vw-red); display:none;"></div>
     <div style="margin-top:24px; max-width:320px; margin-left:auto; margin-right:auto;">
       <button class="btn btn-send" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:16px 20px; font-size:16px;" onclick="downloadPDF()">
         <span style="font-size:20px">⬇️</span> Descargar PDF
@@ -740,12 +742,41 @@
     <p style="margin-top:16px; font-size:12px; color:#8899AA;">Una vez descargado, podés enviarlo por WhatsApp, email o como prefieras.</p>
   </div>
 
+  <!-- ═══════ ADMIN PANEL ═══════ -->
+  <div class="step" id="adminLogin" style="display:none">
+    <div class="section-card" style="max-width:360px; margin:40px auto;">
+      <div class="section-title"><div class="icon">🔒</div> Panel de Administración</div>
+      <div class="field"><label>Usuario</label><input type="text" id="adminUser" placeholder="usuario" autocomplete="username"></div>
+      <div class="field"><label>Contraseña</label><input type="password" id="adminPass" placeholder="contraseña" autocomplete="current-password"></div>
+      <div id="adminLoginError" style="color:var(--vw-red); font-size:13px; margin-bottom:12px; display:none;">Usuario o contraseña incorrectos</div>
+      <button class="btn btn-primary" style="width:100%" onclick="adminLogin()">Ingresar</button>
+    </div>
+  </div>
+
+  <div class="step" id="adminPanel" style="display:none">
+    <div class="section-card">
+      <div class="section-title" style="justify-content:space-between;">
+        <div style="display:flex;align-items:center;gap:8px"><div class="icon">📋</div> Formularios recibidos</div>
+        <button onclick="adminLogout()" style="background:none;border:1px solid var(--vw-new-horizon);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--vw-dark-blue)">Salir</button>
+      </div>
+      <div style="margin-bottom:14px">
+        <input type="text" id="adminSearch" placeholder="Buscar por nombre..." oninput="filterFormularios()" style="width:100%;padding:10px 14px;border:1.5px solid var(--vw-new-horizon);border-radius:var(--radius-sm);font-family:inherit;font-size:14px;">
+      </div>
+      <div id="adminList" style="font-size:13px;">Cargando...</div>
+    </div>
+  </div>
+
 </div>
 
 <!-- Navigation -->
 <div class="nav-bar" id="navBar">
   <button class="btn btn-secondary" id="btnBack" onclick="prevStep()" style="display:none">← Atrás</button>
   <button class="btn btn-primary" id="btnNext" onclick="nextStep()">Siguiente →</button>
+</div>
+
+<!-- Admin link -->
+<div id="adminLink" style="text-align:center;padding:20px;font-size:12px;">
+  <a href="#admin" onclick="showAdminLogin()" style="color:#8899AA;text-decoration:none;">Acceso administración</a>
 </div>
 
 <script>/** @license
@@ -1195,6 +1226,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     // Hide everything, show selector
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
     document.getElementById('successScreen').classList.remove('active');
+    document.getElementById('adminLogin').style.display = 'none';
+    document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('adminLink').style.display = '';
+    document.getElementById('uploadStatus').style.display = 'none';
+    document.getElementById('uploadError').style.display = 'none';
     document.getElementById('selectorScreen').style.display = '';
     document.getElementById('progressBar').classList.remove('visible');
     document.getElementById('navBar').classList.remove('visible');
@@ -1493,8 +1529,84 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       document.getElementById('successScreen').classList.add('active');
       document.getElementById('navBar').classList.remove('visible');
       document.getElementById('progressBar').classList.remove('visible');
+
+      // Upload to Supabase in background
+      uploadToSupabase(doc, clientName);
     }
     addImagesAndFinish();
+  }
+
+  // ═══════ SUPABASE CONFIG ═══════
+  const SUPABASE_URL = 'https://wjfglsafgaltusmbnccl.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqZmdsc2FmZ2FsdHVzbWJuY2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MzM2OTksImV4cCI6MjA4OTAwOTY5OX0.OOwgyKDNQsbBaGDaL0OhJfc8eOsCClvvAPW0VFBKrOA';
+
+  async function supaFetch(path, options = {}) {
+    const res = await fetch(SUPABASE_URL + path, {
+      ...options,
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        ...options.headers
+      }
+    });
+    return res;
+  }
+
+  async function uploadToSupabase(doc, clientName) {
+    try {
+      const blob = doc.output('blob');
+      const nombre = clientName || 'Sin nombre';
+      const tipo = formType === 'fisica' ? 'PF' : 'PJ';
+      const timestamp = Date.now();
+      const safe = nombre.replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9 ]/g, '').trim().replace(/\s+/g, '_');
+      const fileName = 'F01_' + tipo + '_' + safe + '_' + timestamp + '.pdf';
+
+      // 1. Upload PDF to Storage
+      const uploadRes = await supaFetch('/storage/v1/object/formularios-f01/' + fileName, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/pdf' },
+        body: blob
+      });
+
+      let pdfUrl = '';
+      if (uploadRes.ok) {
+        pdfUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
+      }
+
+      // 2. Get form data
+      const documento = formType === 'fisica' ? g('pf-tipoDoc') + ' ' + g('pf-nroDoc') : g('pj-cuit');
+      const celular = formType === 'fisica' ? g('pf-celular') : g('pj-celular');
+      const email = formType === 'fisica' ? g('pf-email') : g('pj-email');
+      const allData = formType === 'fisica' ? getPFData() : getPJData();
+
+      // 3. Insert record
+      const insertRes = await supaFetch('/rest/v1/formularios_f01', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify({
+          tipo: formType,
+          nombre: nombre,
+          documento: documento,
+          celular: celular,
+          email: email,
+          pdf_url: pdfUrl,
+          datos: Object.fromEntries(allData.filter(([l,v]) => l && v && !l.startsWith('—')))
+        })
+      });
+
+      if (insertRes.ok) {
+        document.getElementById('uploadStatus').style.display = 'block';
+      } else {
+        throw new Error('Error guardando');
+      }
+    } catch (e) {
+      console.error('Upload error:', e);
+      document.getElementById('uploadError').style.display = 'block';
+      document.getElementById('uploadError').textContent = 'El PDF se generó pero no se pudo enviar automáticamente. Descargalo y envialo manualmente.';
+    }
   }
 
   function getImageDimensions(dataUrl) {
@@ -1516,6 +1628,95 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     const a = document.createElement('a');
     a.href = url; a.download = fileName; a.click();
     URL.revokeObjectURL(url);
+  }
+
+  // ═══════ ADMIN PANEL ═══════
+  let adminFormularios = [];
+
+  function showAdminLogin() {
+    document.getElementById('selectorScreen').style.display = 'none';
+    document.getElementById('progressBar').classList.remove('visible');
+    document.getElementById('navBar').classList.remove('visible');
+    document.getElementById('btnHome').classList.add('visible');
+    document.getElementById('adminLogin').style.display = 'block';
+    document.getElementById('adminLink').style.display = 'none';
+  }
+
+  async function adminLogin() {
+    const user = document.getElementById('adminUser').value.trim().toLowerCase();
+    const pass = document.getElementById('adminPass').value;
+    document.getElementById('adminLoginError').style.display = 'none';
+
+    try {
+      const res = await supaFetch('/rest/v1/f01_admins?usuario=eq.' + encodeURIComponent(user) + '&clave=eq.' + encodeURIComponent(pass), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.length > 0) {
+        document.getElementById('adminLogin').style.display = 'none';
+        document.getElementById('adminPanel').style.display = 'block';
+        loadFormularios();
+      } else {
+        document.getElementById('adminLoginError').style.display = 'block';
+      }
+    } catch (e) {
+      document.getElementById('adminLoginError').textContent = 'Error de conexión';
+      document.getElementById('adminLoginError').style.display = 'block';
+    }
+  }
+
+  function adminLogout() {
+    document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('adminLogin').style.display = 'none';
+    document.getElementById('selectorScreen').style.display = '';
+    document.getElementById('btnHome').classList.remove('visible');
+    document.getElementById('adminLink').style.display = '';
+    document.getElementById('adminUser').value = '';
+    document.getElementById('adminPass').value = '';
+  }
+
+  async function loadFormularios() {
+    try {
+      const res = await supaFetch('/rest/v1/formularios_f01?order=created_at.desc&limit=100', {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      adminFormularios = await res.json();
+      renderFormularios(adminFormularios);
+    } catch (e) {
+      document.getElementById('adminList').innerHTML = '<p style="color:var(--vw-red)">Error cargando formularios</p>';
+    }
+  }
+
+  function filterFormularios() {
+    const q = document.getElementById('adminSearch').value.toLowerCase();
+    const filtered = adminFormularios.filter(f =>
+      (f.nombre || '').toLowerCase().includes(q) ||
+      (f.documento || '').toLowerCase().includes(q) ||
+      (f.tipo || '').toLowerCase().includes(q)
+    );
+    renderFormularios(filtered);
+  }
+
+  function renderFormularios(list) {
+    if (list.length === 0) {
+      document.getElementById('adminList').innerHTML = '<p style="color:#8899AA;text-align:center;padding:20px;">No hay formularios cargados</p>';
+      return;
+    }
+    let html = '';
+    list.forEach(f => {
+      const fecha = new Date(f.created_at).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      const tipoLabel = f.tipo === 'fisica' ? '👤 PF' : '🏢 PJ';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--vw-new-horizon-20);">';
+      html += '<div>';
+      html += '<div style="font-weight:600;font-size:14px;">' + tipoLabel + ' ' + (f.nombre || 'Sin nombre') + '</div>';
+      html += '<div style="font-size:11px;color:#8899AA;">' + fecha + ' — ' + (f.documento || '') + '</div>';
+      html += '</div>';
+      if (f.pdf_url) {
+        html += '<a href="' + f.pdf_url + '" target="_blank" style="background:var(--vw-cobalt);color:white;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;flex-shrink:0;">Ver PDF</a>';
+      }
+      html += '</div>';
+    });
+    document.getElementById('adminList').innerHTML = html;
   }
 </script>
 
