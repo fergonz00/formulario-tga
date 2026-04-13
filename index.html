@@ -1401,24 +1401,24 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 
     // Header with logo
     doc.setFillColor(0, 30, 80);
-    doc.rect(0, 0, pageW, 42, 'F');
+    doc.rect(0, 0, pageW, 30, 'F');
 
     // Add logo centered
     const logoEl = document.querySelector('.header img.logo');
     if (logoEl) {
       try {
         const logoW = 60, logoH = 11;
-        doc.addImage(logoEl.src, 'PNG', (pageW - logoW) / 2, 5, logoW, logoH, undefined, 'MEDIUM');
+        doc.addImage(logoEl.src, 'PNG', (pageW - logoW) / 2, 3, logoW, logoH, undefined, 'MEDIUM');
       } catch(e) { console.log('Logo error:', e); }
     }
 
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(10);
+    doc.setFontSize(9);
     doc.setFont('helvetica', 'normal');
-    doc.text('Formulario F01 — ' + tipoLabel, pageW/2, 30, { align: 'center' });
-    doc.setFontSize(8);
-    doc.text('Fecha: ' + new Date().toLocaleDateString('es-AR'), pageW/2, 36, { align: 'center' });
-    y = 50;
+    doc.text('Formulario F01 — ' + tipoLabel, pageW/2, 19, { align: 'center' });
+    doc.setFontSize(7);
+    doc.text('Fecha: ' + new Date().toLocaleDateString('es-AR'), pageW/2, 25, { align: 'center' });
+    y = 36;
 
     const allData = formType === 'fisica' ? getPFData() : getPJData();
     doc.setTextColor(0, 30, 80);
