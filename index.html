@@ -565,14 +565,6 @@
       <div class="conditional" id="pf-cedVerdeCant">
         <div class="field" style="margin-top:10px"><label>Cantidad</label><input type="number" id="pf-cantVerdes" value="1" min="1" max="5" inputmode="numeric"></div>
       </div>
-      <div class="switch-field">
-        <span class="switch-label">¿Cédulas azules?</span>
-        <label class="switch"><input type="checkbox" id="pf-cedAzul" onchange="toggleCedulaAzul('pf')"><span class="slider"></span></label>
-      </div>
-      <div class="conditional" id="pf-cedAzulSection">
-        <div class="field" style="margin-top:10px"><label>Cantidad</label><input type="number" id="pf-cantAzules" value="1" min="1" max="5" inputmode="numeric" onchange="updateAutorizados('pf')"></div>
-        <div id="pf-autorizadosList"></div>
-      </div>
     </div>
   </div>
 
@@ -705,16 +697,6 @@
         </div>
       </div>
     </div>
-    <div class="section-card">
-      <div class="section-title"><div class="icon">🪪</div> Cédulas azules</div>
-      <div class="switch-field">
-        <span class="switch-label">¿Cédulas azules?</span>
-        <label class="switch"><input type="checkbox" id="pj-cedAzul" onchange="toggleCedulaAzul('pj')"><span class="slider"></span></label>
-      </div>
-      <div class="conditional" id="pj-cedAzulSection">
-        <div class="field" style="margin-top:10px"><label>Cantidad</label><input type="number" id="pj-cantAzules" value="1" min="1" max="5" inputmode="numeric" onchange="updateAutorizados('pj')"></div>
-        <div id="pj-autorizadosList"></div>
-      </div>
     </div>
   </div>
 
@@ -1444,29 +1426,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       }
     });
 
-    // Cédulas azules
+    // Cédulas verdes
     const prefix = formType === 'fisica' ? 'pf' : 'pj';
-    if (document.getElementById(prefix + '-cedAzul') && document.getElementById(prefix + '-cedAzul').checked) {
-      const cant = parseInt(g(prefix + '-cantAzules')) || 1;
-      y += 3;
-      doc.setFillColor(218, 228, 237);
-      doc.rect(margin, y - 4, contentW, 7, 'F');
-      doc.setFontSize(9); doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 30, 80);
-      doc.text('CÉDULAS AZULES: ' + cant, margin + 3, y);
-      y += 9;
-      for (let i = 0; i < cant; i++) {
-        const nombre = g(prefix + '-aut' + i + 'nombre');
-        const dni = g(prefix + '-aut' + i + 'dni');
-        if (nombre) {
-          doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(100,110,120);
-          doc.text('Autorizado ' + (i+1) + ':', margin, y);
-          doc.setFont('helvetica', 'bold'); doc.setTextColor(0,30,80);
-          doc.text(nombre + ' — DNI ' + dni, margin + 48, y);
-          y += 5.5;
-        }
-      }
-    }
-
     if (formType === 'fisica' && document.getElementById('pf-cedVerde').checked) {
       doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(100,110,120);
       doc.text('Cédulas verdes adicionales:', margin, y);
