@@ -393,9 +393,27 @@
       <div class="row row-2">
         <div class="field">
           <label>Estado civil</label>
-          <select id="pf-estadoCivil"><option value="">Seleccionar</option><option>Soltero/a</option><option>Casado/a</option><option>Divorciado/a</option><option>Viudo/a</option><option>Unión convivencial</option></select>
+          <select id="pf-estadoCivil" onchange="document.getElementById('pf-conyugeBlock').classList.toggle('show', this.value==='Casado/a')"><option value="">Seleccionar</option><option>Soltero/a</option><option>Casado/a</option><option>Divorciado/a</option><option>Viudo/a</option><option>Unión convivencial</option></select>
         </div>
         <div class="field"><label>Ocupación</label><input type="text" id="pf-ocupacion" placeholder="Ej: Empleado"></div>
+      </div>
+      <!-- Cónyuge inline (solo si Casado/a) -->
+      <div class="conditional" id="pf-conyugeBlock">
+        <div class="divider"></div>
+        <div class="section-title"><div class="icon">💍</div> Datos del cónyuge</div>
+        <div class="field"><label>Nombre y apellido</label><input type="text" id="pf-conyugeNombre"></div>
+        <div class="field"><label>CUIL del cónyuge</label><input type="text" id="pf-conyugeCuil" placeholder="20-12345678-9" inputmode="numeric"></div>
+        <div class="field">
+          <label>Cantidad de nupcias</label>
+          <div class="toggle-group">
+            <button type="button" class="toggle-btn" data-field="nupcias" data-value="1">1ª</button>
+            <button type="button" class="toggle-btn" data-field="nupcias" data-value="2">2ª</button>
+            <button type="button" class="toggle-btn" data-field="nupcias" data-value="3+">3ª+</button>
+          </div>
+        </div>
+        <div style="height:12px"></div>
+        <div class="upload-zone"><div class="upload-icon">📷</div><div class="upload-text">Foto del DNI del cónyuge</div><div class="upload-hint">Frente</div><input type="file" accept="image/*" capture="environment" onchange="handleUpload(this,'prev-pf-dniCon')"></div>
+        <div class="upload-preview" id="prev-pf-dniCon">✓ Cargado</div>
       </div>
       <div class="field"><label>Porcentaje de titularidad</label><input type="text" id="pf-porcTit" value="100%"></div>
     </div>
@@ -455,29 +473,8 @@
     </div>
   </div>
 
-  <!-- PF Step 3: Cónyuge -->
+  <!-- PF Step 3: 2do Titular (was step 4) -->
   <div class="step" id="pf-step3">
-    <div class="section-card">
-      <div class="section-title"><div class="icon">💍</div> Datos del cónyuge</div>
-      <div class="info-callout">Solo si tu estado civil es Casado/a. Si no aplica, avanzá.</div>
-      <div class="field"><label>Nombre y apellido</label><input type="text" id="pf-conyugeNombre"></div>
-      <div class="field"><label>CUIL del cónyuge</label><input type="text" id="pf-conyugeCuil" placeholder="20-12345678-9" inputmode="numeric"></div>
-      <div class="field">
-        <label>Cantidad de nupcias</label>
-        <div class="toggle-group">
-          <button type="button" class="toggle-btn" data-field="nupcias" data-value="1">1ª</button>
-          <button type="button" class="toggle-btn" data-field="nupcias" data-value="2">2ª</button>
-          <button type="button" class="toggle-btn" data-field="nupcias" data-value="3+">3ª+</button>
-        </div>
-      </div>
-      <div style="height:12px"></div>
-      <div class="upload-zone"><div class="upload-icon">📷</div><div class="upload-text">Foto del DNI del cónyuge</div><div class="upload-hint">Frente</div><input type="file" accept="image/*" capture="environment" onchange="handleUpload(this,'prev-pf-dniCon')"></div>
-      <div class="upload-preview" id="prev-pf-dniCon">✓ Cargado</div>
-    </div>
-  </div>
-
-  <!-- PF Step 4: 2do Titular -->
-  <div class="step" id="pf-step4">
     <div class="section-card">
       <div class="section-title"><div class="icon">👥</div> Segundo titular</div>
       <div class="info-callout">Solo si la unidad tendrá dos titulares. Si no, avanzá.</div>
@@ -531,8 +528,8 @@
     </div>
   </div>
 
-  <!-- PF Step 5: Operación -->
-  <div class="step" id="pf-step5">
+  <!-- PF Step 4: Operación -->
+  <div class="step" id="pf-step4">
     <div class="section-card">
       <div class="section-title"><div class="icon">📋</div> Datos de la operación</div>
       <div class="field">
@@ -569,8 +566,8 @@
     </div>
   </div>
 
-  <!-- PF Step 6: Resumen -->
-  <div class="step" id="pf-step6">
+  <!-- PF Step 5: Resumen -->
+  <div class="step" id="pf-step5">
     <div class="section-card">
       <div class="section-title"><div class="icon">✅</div> Revisá tus datos</div>
       <div class="info-callout">Verificá que todo esté correcto antes de generar el PDF.</div>
@@ -1145,7 +1142,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   const uploadedImages = {};
 
   const stepConfig = {
-    fisica: { prefix: 'pf', steps: 6, labels: ['Datos del titular','Domicilios','Cónyuge','2º Titular','Operación y cédulas','Resumen'] },
+    fisica: { prefix: 'pf', steps: 5, labels: ['Datos del titular','Domicilios','2º Titular','Operación y cédulas','Resumen'] },
     juridica: { prefix: 'pj', steps: 4, labels: ['Datos de la empresa','Datos del firmante','Operación y cédulas','Resumen'] }
   };
 
@@ -1253,10 +1250,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   function nextStep() {
     if (currentStep === totalSteps) { generatePDF(); return; }
     currentStep++;
-    if (formType === 'fisica' && currentStep === 3) {
-      var ec = document.getElementById('pf-estadoCivil');
-      if (!ec || ec.value !== 'Casado/a') { currentStep++; }
-    }
     showStep(currentStep);
   }
 
@@ -1272,10 +1265,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       return;
     }
     currentStep--;
-    if (formType === 'fisica' && currentStep === 3) {
-      var ec = document.getElementById('pf-estadoCivil');
-      if (!ec || ec.value !== 'Casado/a') { currentStep--; }
-    }
     showStep(currentStep);
   }
 
