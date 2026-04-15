@@ -461,10 +461,6 @@
       <div class="section-title"><div class="icon">💍</div> Datos del cónyuge</div>
       <div class="info-callout">Solo si tu estado civil es Casado/a. Si no aplica, avanzá.</div>
       <div class="field"><label>Nombre y apellido</label><input type="text" id="pf-conyugeNombre"></div>
-      <div class="row row-2">
-        <div class="field"><label>Tipo doc.</label><select id="pf-conyugeTipoDoc"><option>DNI</option><option>LE</option><option>LC</option><option>Pasaporte</option></select></div>
-        <div class="field"><label>Nº documento</label><input type="text" id="pf-conyugeNroDoc" inputmode="numeric"></div>
-      </div>
       <div class="field"><label>CUIL del cónyuge</label><input type="text" id="pf-conyugeCuil" placeholder="20-12345678-9" inputmode="numeric"></div>
       <div class="field">
         <label>Cantidad de nupcias</label>
@@ -1257,6 +1253,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   function nextStep() {
     if (currentStep === totalSteps) { generatePDF(); return; }
     currentStep++;
+    if (formType === 'fisica' && currentStep === 3) {
+      var ec = document.getElementById('pf-estadoCivil');
+      if (!ec || ec.value !== 'Casado/a') { currentStep++; }
+    }
     showStep(currentStep);
   }
 
@@ -1272,6 +1272,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       return;
     }
     currentStep--;
+    if (formType === 'fisica' && currentStep === 3) {
+      var ec = document.getElementById('pf-estadoCivil');
+      if (!ec || ec.value !== 'Casado/a') { currentStep--; }
+    }
     showStep(currentStep);
   }
 
@@ -1343,7 +1347,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         ['Localidad', g('pf-realLocalidad')], ['Provincia', g('pf-realProvincia')], ['CP', g('pf-realCP')]);
     }
     if (g('pf-conyugeNombre')) {
-      items.push(['— CÓNYUGE —',''], ['Nombre', g('pf-conyugeNombre')], ['Doc.', g('pf-conyugeTipoDoc')+' '+g('pf-conyugeNroDoc')], ['CUIL', g('pf-conyugeCuil')], ['Nupcias', toggleValues['nupcias']||'']);
+      items.push(['— CÓNYUGE —',''], ['Nombre', g('pf-conyugeNombre')], ['CUIL', g('pf-conyugeCuil')], ['Nupcias', toggleValues['nupcias']||'']);
     }
     if (document.getElementById('pf-tiene2do').checked) {
       items.push(['— 2º TITULAR —',''], ['Nombre', g('pf-t2nombre')], ['Doc.', g('pf-t2tipoDoc')+' '+g('pf-t2nroDoc')],
