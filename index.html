@@ -711,15 +711,36 @@
   <div class="success-screen" id="successScreen">
     <div class="success-icon">📄</div>
     <h2>¡PDF generado!</h2>
-    <p>Tu formulario está listo para descargar.</p>
-    <div id="uploadStatus" style="margin-top:12px; font-size:13px; color:var(--vw-green); display:none;">✓ Formulario enviado correctamente</div>
-    <div id="uploadError" style="margin-top:12px; font-size:13px; color:var(--vw-red); display:none;"></div>
-    <div style="margin-top:24px; max-width:320px; margin-left:auto; margin-right:auto;">
-      <button class="btn btn-send" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:16px 20px; font-size:16px;" onclick="downloadPDF()">
-        <span style="font-size:20px">⬇️</span> Descargar PDF
-      </button>
+    <!-- Uploading state -->
+    <div id="uploadingState">
+      <p style="color:#5A6B7F;">Subiendo formulario...</p>
+      <div style="margin:16px auto; width:40px; height:40px; border:3px solid var(--vw-new-horizon); border-top-color:var(--vw-cobalt); border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+      <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
     </div>
-    <p style="margin-top:16px; font-size:12px; color:#8899AA;">Una vez descargado, podés enviarlo por WhatsApp, email o como prefieras.</p>
+    <!-- Ready state -->
+    <div id="uploadReady" style="display:none;">
+      <p>Tu formulario está listo. Podés descargarlo o compartir el link.</p>
+      <div id="uploadStatus" style="margin-top:8px; font-size:13px; color:var(--vw-green);">✓ Enviado correctamente</div>
+      <div style="margin-top:20px; max-width:320px; margin-left:auto; margin-right:auto; display:flex; flex-direction:column; gap:10px;">
+        <a id="btnDownloadPDF" href="#" target="_blank" class="btn btn-send" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:16px 20px; font-size:16px; text-decoration:none;">
+          <span style="font-size:20px">⬇️</span> Descargar PDF
+        </a>
+        <button class="btn btn-primary" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:14px 20px; font-size:15px;" onclick="sharePDF()">
+          <span style="font-size:18px">📤</span> Compartir link
+        </button>
+      </div>
+      <p style="margin-top:16px; font-size:12px; color:#8899AA;">El link es permanente — podés reenviarlo por WhatsApp, email o como prefieras.</p>
+    </div>
+    <!-- Error state -->
+    <div id="uploadErrorState" style="display:none;">
+      <div id="uploadError" style="margin-top:12px; font-size:13px; color:var(--vw-red);"></div>
+      <div style="margin-top:20px; max-width:320px; margin-left:auto; margin-right:auto;">
+        <button class="btn btn-send" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:16px 20px; font-size:16px;" onclick="downloadPDFLocal()">
+          <span style="font-size:20px">⬇️</span> Descargar PDF (local)
+        </button>
+      </div>
+      <p style="margin-top:16px; font-size:12px; color:#8899AA;">No se pudo subir al servidor. Descargá el PDF y envialo manualmente.</p>
+    </div>
   </div>
 
   <!-- ═══════ ADMIN PANEL ═══════ -->
@@ -1185,6 +1206,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     Object.keys(toggleValues).forEach(k => delete toggleValues[k]);
     Object.keys(uploadedImages).forEach(k => delete uploadedImages[k]);
     generatedPDFBlob = null;
+    supabasePdfUrl = '';
 
     // Clear all inputs
     document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="date"], input[type="number"]').forEach(el => {
@@ -1209,8 +1231,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     document.getElementById('adminLogin').style.display = 'none';
     document.getElementById('adminPanel').style.display = 'none';
     document.getElementById('adminLink').style.display = '';
-    document.getElementById('uploadStatus').style.display = 'none';
-    document.getElementById('uploadError').style.display = 'none';
+    document.getElementById('uploadStatus').style.display = '';
+    document.getElementById('uploadErrorState').style.display = 'none';
+    document.getElementById('uploadingState').style.display = '';
+    document.getElementById('uploadReady').style.display = 'none';
     document.getElementById('selectorScreen').style.display = '';
     document.getElementById('progressBar').classList.remove('visible');
     document.getElementById('navBar').classList.remove('visible');
@@ -1518,6 +1542,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     return res;
   }
 
+  function getImageDimensions(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
+
+  let supabasePdfUrl = '';
+
   async function uploadToSupabase(doc, clientName) {
     try {
       const blob = doc.output('blob');
@@ -1534,10 +1569,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         body: blob
       });
 
-      let pdfUrl = '';
-      if (uploadRes.ok) {
-        pdfUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
-      }
+      if (!uploadRes.ok) throw new Error('Error subiendo PDF');
+
+      supabasePdfUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
 
       // 2. Get form data
       const documento = formType === 'fisica' ? g('pf-tipoDoc') + ' ' + g('pf-nroDoc') : g('pj-cuit');
@@ -1546,7 +1580,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const allData = formType === 'fisica' ? getPFData() : getPJData();
 
       // 3. Insert record
-      const insertRes = await supaFetch('/rest/v1/formularios_f01', {
+      await supaFetch('/rest/v1/formularios_f01', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1558,33 +1592,38 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           documento: documento,
           celular: celular,
           email: email,
-          pdf_url: pdfUrl,
+          pdf_url: supabasePdfUrl,
           datos: Object.fromEntries(allData.filter(([l,v]) => l && v && !l.startsWith('—')))
         })
       });
 
-      if (insertRes.ok) {
-        document.getElementById('uploadStatus').style.display = 'block';
-      } else {
-        throw new Error('Error guardando');
-      }
+      // Show ready state with Supabase link
+      document.getElementById('uploadingState').style.display = 'none';
+      document.getElementById('uploadReady').style.display = '';
+      document.getElementById('btnDownloadPDF').href = supabasePdfUrl;
+
     } catch (e) {
       console.error('Upload error:', e);
-      document.getElementById('uploadError').style.display = 'block';
-      document.getElementById('uploadError').textContent = 'El PDF se generó pero no se pudo enviar automáticamente. Descargalo y envialo manualmente.';
+      document.getElementById('uploadingState').style.display = 'none';
+      document.getElementById('uploadErrorState').style.display = '';
+      document.getElementById('uploadError').textContent = 'No se pudo subir el formulario. Descargalo desde acá y envialo manualmente.';
     }
   }
 
-  function getImageDimensions(dataUrl) {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-      img.onload = () => resolve({ width: img.width, height: img.height });
-      img.onerror = reject;
-      img.src = dataUrl;
-    });
+  function sharePDF() {
+    if (!supabasePdfUrl) return;
+    if (navigator.share) {
+      navigator.share({ title: 'Formulario F01', url: supabasePdfUrl }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(supabasePdfUrl).then(() => {
+        alert('Link copiado al portapapeles');
+      }).catch(() => {
+        prompt('Copiá este link:', supabasePdfUrl);
+      });
+    }
   }
 
-  function downloadPDF() {
+  function downloadPDFLocal() {
     if (!generatedPDFBlob) return;
     const name = formType === 'fisica' ? g('pf-nombre') : g('pj-razonSocial');
     const safe = (name || 'Cliente').replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9 ]/g, '').trim().replace(/\s+/g, '_');
