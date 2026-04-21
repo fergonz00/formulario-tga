@@ -101,6 +101,27 @@
   }
   .tab-btn.active .tab-count { background: rgba(255,255,255,0.25); }
 
+  .row-filters {
+    display: grid; gap: 10px; margin-bottom: 12px;
+    grid-template-columns: 1fr;
+  }
+  .row-filters.two { grid-template-columns: 1fr 1fr; }
+  .rf-item label {
+    font-size: 11px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.3px; display: block; margin-bottom: 4px;
+    color: #5A6B7F;
+  }
+  .rf-item select {
+    width: 100%; padding: 10px 12px;
+    border: 1.5px solid var(--vw-new-horizon);
+    border-radius: var(--radius-sm); background: white;
+    font-family: inherit; font-size: 14px;
+    color: var(--vw-dark-blue); -webkit-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23001E50' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 12px center;
+    padding-right: 32px;
+  }
+
   .filters {
     display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;
   }
@@ -235,6 +256,17 @@
       <button class="tab-btn" data-tab="f01" onclick="setTab('f01')">F01 <span class="tab-count" id="tab-cnt-f01">0</span></button>
     </div>
 
+    <div class="row-filters" id="rowFilters">
+      <div class="rf-item">
+        <label>Vendedor</label>
+        <select id="vendedorFilter" onchange="setVendedorFilter(this.value)"></select>
+      </div>
+      <div class="rf-item" id="adminFilterBlock" style="display:none;">
+        <label>Administrativa</label>
+        <select id="administrativaFilter" onchange="setAdministrativaFilter(this.value)"></select>
+      </div>
+    </div>
+
     <div class="filters" id="filters">
       <button class="filter-chip active" data-filter="all" onclick="setFilter('all')">Todos <span class="count" id="cnt-all">0</span></button>
       <button class="filter-chip" data-filter="a_revisar" onclick="setFilter('a_revisar')">A revisar <span class="count" id="cnt-a_revisar">0</span></button>
@@ -283,6 +315,23 @@
     vwfs: { table: 'formularios_vwfs', editUrl: 'vwfs.html?edit=',  label: 'VWFS' },
     f01:  { table: 'formularios_f01',  editUrl: 'index.html?edit=', label: 'F01'  }
   };
+
+  const VENDEDORES = [
+    'Antonio Loisi',
+    'Daniel López',
+    'Gisela Buena',
+    'Inés Alonso',
+    'Jorge Fazzini',
+    'José Castro',
+    'Julián Naddeo',
+    'Marta Castro',
+    'TG — Ventas de Gerencia'
+  ];
+
+  const ADMINISTRATIVAS = ['Antonella', 'Valeria', 'Mercedes', 'Mónica'];
+
+  let filterVendedor = '';        // '' = todos, '__none__' = sin asignar, o nombre exacto
+  let filterAdministrativa = '';
 
   // ═══════ SESSION ═══════
   function saveSession(user) {
@@ -334,8 +383,33 @@
       (isAdmin ? '🛡️ ' : '💼 ') + user + (isAdmin ? ' (admin)' : ' (ventas)');
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('panelScreen').style.display = '';
+    populateAsignacionSelects();
+    // Solo admin ve el filtro de administrativa
+    document.getElementById('adminFilterBlock').style.display = isAdmin ? '' : 'none';
+    document.getElementById('rowFilters').classList.toggle('two', isAdmin);
     // Cargar ambas tabs al iniciar (para mostrar counts correctos en las pestañas).
     Promise.all([loadTab('vwfs'), loadTab('f01')]).then(() => setTab('vwfs'));
+  }
+
+  function populateAsignacionSelects() {
+    const vOpts = '<option value="">Todos los vendedores</option>'
+      + '<option value="__none__">Todavía no asignado</option>'
+      + VENDEDORES.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
+    document.getElementById('vendedorFilter').innerHTML = vOpts;
+
+    const aOpts = '<option value="">Todas las administrativas</option>'
+      + '<option value="__none__">Todavía no asignada</option>'
+      + ADMINISTRATIVAS.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
+    document.getElementById('administrativaFilter').innerHTML = aOpts;
+  }
+
+  function setVendedorFilter(v) {
+    filterVendedor = v;
+    renderList();
+  }
+  function setAdministrativaFilter(v) {
+    filterAdministrativa = v;
+    renderList();
   }
 
   function doLogout() {
@@ -408,7 +482,14 @@
 
   function renderList() {
     const list = document.getElementById('rowList');
-    const rows = filter === 'all' ? currentRows() : currentRows().filter(r => r.estado === filter);
+    let rows = currentRows();
+    if (filter !== 'all') rows = rows.filter(r => r.estado === filter);
+    if (filterVendedor === '__none__') rows = rows.filter(r => !r.vendedor);
+    else if (filterVendedor)           rows = rows.filter(r => r.vendedor === filterVendedor);
+    if (isAdmin) {
+      if (filterAdministrativa === '__none__') rows = rows.filter(r => !r.administrativa);
+      else if (filterAdministrativa)           rows = rows.filter(r => r.administrativa === filterAdministrativa);
+    }
     if (rows.length === 0) {
       list.innerHTML = '<div class="empty-state"><div class="emoji">📭</div>Sin formularios en esta vista</div>';
       return;
@@ -420,7 +501,10 @@
       const fecha = new Date(r.created_at).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
       const nombre = r.nombre || (r.datos && (r.datos['Razón social'] || r.datos['Nombre'])) || 'Sin nombre';
       const documento = r.documento || (r.datos && (r.datos['Documento'] || r.datos['CUIT'])) || '—';
-      const meta = `${escapeHtml(documento)} · ${fecha}` + (isVwfs && r.vendedor ? ' · Vend: ' + escapeHtml(r.vendedor) : '');
+      let meta = `${escapeHtml(documento)} · ${fecha}`;
+      if (r.vendedor) meta += ' · Vend: ' + escapeHtml(r.vendedor);
+      else meta += ' · <span style="color:var(--vw-red); font-weight:700;">Sin vendedor</span>';
+      if (isAdmin && r.administrativa) meta += ' · Adm: ' + escapeHtml(r.administrativa);
       const stateHtml = isVwfs ? `<div class="row-state"><span class="chip ${chipClass}">${chipText}</span></div>` : '';
       return `
         <div class="row-item" onclick="openDetail(${r.id})">
@@ -477,9 +561,14 @@
       if (r.editado_por) {
         html += `<div class="kv"><span class="k">Última edición</span><span class="v">${escapeHtml(r.editado_por)}${r.editado_at ? ' · ' + new Date(r.editado_at).toLocaleString('es-AR') : ''}</span></div>`;
       }
-      if (r.vendedor) {
-        html += `<div class="kv"><span class="k">Vendedor asignado</span><span class="v">${escapeHtml(r.vendedor)}</span></div>`;
-      }
+    }
+
+    // Banners si falta asignar
+    if (!r.vendedor) {
+      html += `<div class="info-banner">⚠️ <strong>Falta asignar vendedor.</strong> Elegí uno abajo.</div>`;
+    }
+    if (isAdmin && !r.administrativa) {
+      html += `<div class="info-banner">⚠️ <strong>Falta asignar administrativa.</strong> Elegíla abajo.</div>`;
     }
 
     // PDF link
@@ -523,38 +612,57 @@
       }
     }
 
-    // F01 no tiene workflow — sin acciones
-    if (!isVwfs) {
-      return html;
-    }
-
-    // Acciones según rol (solo VWFS)
-    html += '<div class="section-sep">Acciones</div>';
+    // Asignaciones (vendedor + administrativa) — aplica a ambos F01 y VWFS, ambos roles (admin siempre, ventas solo vendedor)
+    html += '<div class="section-sep">Asignaciones</div>';
+    const vendedorOptions =
+      '<option value="">— Elegir vendedor —</option>' +
+      VENDEDORES.map(v => `<option value="${escapeHtml(v)}"${v === r.vendedor ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('');
+    html += `
+      <div class="card" style="padding:14px; margin-bottom:10px;">
+        <div class="field" style="margin-bottom:8px;">
+          <label>Vendedor</label>
+          <select id="vendedorSelect">${vendedorOptions}</select>
+        </div>
+        <button class="btn btn-primary btn-block" onclick="doAssignVendedor(${r.id})">Guardar vendedor</button>
+      </div>`;
 
     if (isAdmin) {
-      html += `
-        <div class="action-row two">
-          <button class="btn btn-success" onclick="doApprove(${r.id})">✓ Aprobar</button>
-          <button class="btn btn-danger" onclick="promptReject(${r.id})">✗ Rechazar</button>
-        </div>
-        <div id="rejectBlock" style="display:none; margin-top:12px;">
-          <div class="field">
-            <label>Motivo del rechazo (qué errores tiene)</label>
-            <textarea id="rejectReason" placeholder="Ej: La dirección personal no coincide con la del DNI. Falta completar nacionalidad del cónyuge."></textarea>
-          </div>
-          <button class="btn btn-danger btn-block" onclick="doReject(${r.id})">Confirmar rechazo</button>
-        </div>`;
-    } else {
-      // Ventas: asignar vendedor + editar
+      const admOptions =
+        '<option value="">— Elegir administrativa —</option>' +
+        ADMINISTRATIVAS.map(a => `<option value="${escapeHtml(a)}"${a === r.administrativa ? ' selected' : ''}>${escapeHtml(a)}</option>`).join('');
       html += `
         <div class="card" style="padding:14px; margin-bottom:10px;">
           <div class="field" style="margin-bottom:8px;">
-            <label>Vendedor asignado</label>
-            <input type="text" id="vendedorInput" value="${escapeHtml(r.vendedor || '')}" placeholder="Nombre del vendedor">
+            <label>Administrativa</label>
+            <select id="administrativaSelect">${admOptions}</select>
           </div>
-          <button class="btn btn-primary btn-block" onclick="doAssignVendedor(${r.id})">Guardar vendedor</button>
-        </div>
-        <a class="btn btn-secondary btn-block" href="${TAB_CONFIG[currentTab].editUrl}${r.id}">✏️ Editar formulario</a>`;
+          <button class="btn btn-primary btn-block" onclick="doAssignAdministrativa(${r.id})">Guardar administrativa</button>
+        </div>`;
+    }
+
+    // Acciones específicas de VWFS
+    if (isVwfs) {
+      html += '<div class="section-sep">Acciones</div>';
+      if (isAdmin) {
+        const approveDisabled = r.vendedor ? '' : 'disabled style="opacity:0.5; cursor:not-allowed;"';
+        const approveNote = r.vendedor ? '' : '<div style="font-size:11px; color:var(--vw-red); margin-top:6px;">Asigná un vendedor antes de aprobar.</div>';
+        html += `
+          <div class="action-row two">
+            <button class="btn btn-success" ${approveDisabled} onclick="doApprove(${r.id})">✓ Aprobar</button>
+            <button class="btn btn-danger" onclick="promptReject(${r.id})">✗ Rechazar</button>
+          </div>
+          ${approveNote}
+          <div id="rejectBlock" style="display:none; margin-top:12px;">
+            <div class="field">
+              <label>Motivo del rechazo (qué errores tiene)</label>
+              <textarea id="rejectReason" placeholder="Ej: La dirección personal no coincide con la del DNI. Falta completar nacionalidad del cónyuge."></textarea>
+            </div>
+            <button class="btn btn-danger btn-block" onclick="doReject(${r.id})">Confirmar rechazo</button>
+          </div>`;
+      } else {
+        // Ventas solo puede editar
+        html += `<a class="btn btn-secondary btn-block" style="margin-top:8px;" href="${TAB_CONFIG[currentTab].editUrl}${r.id}">✏️ Editar formulario</a>`;
+      }
     }
 
     return html;
@@ -591,8 +699,13 @@
   }
 
   async function doAssignVendedor(id) {
-    const val = document.getElementById('vendedorInput').value.trim();
+    const val = document.getElementById('vendedorSelect').value;
     await updateRow(id, { vendedor: val || null });
+  }
+
+  async function doAssignAdministrativa(id) {
+    const val = document.getElementById('administrativaSelect').value;
+    await updateRow(id, { administrativa: val || null });
   }
 
   async function updateRow(id, patch) {
