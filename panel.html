@@ -370,6 +370,8 @@
     filter = 'all';
     document.querySelectorAll('.filter-chip').forEach(c =>
       c.classList.toggle('active', c.dataset.filter === 'all'));
+    // F01 no usa workflow: ocultamos los filtros por estado
+    document.getElementById('filters').style.display = tab === 'f01' ? 'none' : '';
     if (!rowsCache[tab]) {
       await loadTab(tab);
     } else {
@@ -411,19 +413,22 @@
       list.innerHTML = '<div class="empty-state"><div class="emoji">📭</div>Sin formularios en esta vista</div>';
       return;
     }
+    const isVwfs = currentTab === 'vwfs';
     list.innerHTML = rows.map(r => {
       const chipClass = r.estado === 'aprobado' ? 'approved' : (r.estado === 'rechazado' ? 'rejected' : 'pending');
       const chipText = r.estado === 'aprobado' ? 'Aprobado' : (r.estado === 'rechazado' ? 'Rechazado' : 'A revisar');
       const fecha = new Date(r.created_at).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
       const nombre = r.nombre || (r.datos && (r.datos['Razón social'] || r.datos['Nombre'])) || 'Sin nombre';
       const documento = r.documento || (r.datos && (r.datos['Documento'] || r.datos['CUIT'])) || '—';
+      const meta = `${escapeHtml(documento)} · ${fecha}` + (isVwfs && r.vendedor ? ' · Vend: ' + escapeHtml(r.vendedor) : '');
+      const stateHtml = isVwfs ? `<div class="row-state"><span class="chip ${chipClass}">${chipText}</span></div>` : '';
       return `
         <div class="row-item" onclick="openDetail(${r.id})">
           <div class="row-main">
             <div class="row-name">${escapeHtml(nombre)}</div>
-            <div class="row-meta">${escapeHtml(documento)} · ${fecha}${r.vendedor ? ' · Vend: ' + escapeHtml(r.vendedor) : ''}</div>
+            <div class="row-meta">${meta}</div>
           </div>
-          <div class="row-state"><span class="chip ${chipClass}">${chipText}</span></div>
+          ${stateHtml}
         </div>`;
     }).join('');
   }
@@ -448,28 +453,33 @@
   }
 
   function renderDetail(r) {
+    const isVwfs = currentTab === 'vwfs';
     const chipClass = r.estado === 'aprobado' ? 'approved' : (r.estado === 'rechazado' ? 'rejected' : 'pending');
     const chipText = r.estado === 'aprobado' ? 'Aprobado' : (r.estado === 'rechazado' ? 'Rechazado' : 'A revisar');
     const fecha = new Date(r.created_at).toLocaleString('es-AR');
+    const nombre = r.nombre || (r.datos && (r.datos['Razón social'] || r.datos['Nombre'])) || 'Sin nombre';
+    const documento = r.documento || (r.datos && (r.datos['Documento'] || r.datos['CUIT'])) || '—';
 
     let html = `
       <div class="detail-header">
-        <h2>${escapeHtml(r.nombre)}</h2>
-        <div class="sub">${escapeHtml(r.documento)} · ${fecha}</div>
-        <div style="margin-top:8px;"><span class="chip ${chipClass}">${chipText}</span></div>
+        <h2>${escapeHtml(nombre)}</h2>
+        <div class="sub">${escapeHtml(documento)} · ${fecha}</div>
+        ${isVwfs ? `<div style="margin-top:8px;"><span class="chip ${chipClass}">${chipText}</span></div>` : ''}
       </div>`;
 
-    if (r.estado === 'rechazado' && r.errores_adm) {
-      html += `<div class="error-banner"><strong>Motivo del rechazo:</strong><br>${escapeHtml(r.errores_adm)}</div>`;
-    }
-    if (r.revisado_por) {
-      html += `<div class="kv"><span class="k">Revisado por</span><span class="v">${escapeHtml(r.revisado_por)}${r.revisado_at ? ' · ' + new Date(r.revisado_at).toLocaleString('es-AR') : ''}</span></div>`;
-    }
-    if (r.editado_por) {
-      html += `<div class="kv"><span class="k">Última edición</span><span class="v">${escapeHtml(r.editado_por)}${r.editado_at ? ' · ' + new Date(r.editado_at).toLocaleString('es-AR') : ''}</span></div>`;
-    }
-    if (r.vendedor) {
-      html += `<div class="kv"><span class="k">Vendedor asignado</span><span class="v">${escapeHtml(r.vendedor)}</span></div>`;
+    if (isVwfs) {
+      if (r.estado === 'rechazado' && r.errores_adm) {
+        html += `<div class="error-banner"><strong>Motivo del rechazo:</strong><br>${escapeHtml(r.errores_adm)}</div>`;
+      }
+      if (r.revisado_por) {
+        html += `<div class="kv"><span class="k">Revisado por</span><span class="v">${escapeHtml(r.revisado_por)}${r.revisado_at ? ' · ' + new Date(r.revisado_at).toLocaleString('es-AR') : ''}</span></div>`;
+      }
+      if (r.editado_por) {
+        html += `<div class="kv"><span class="k">Última edición</span><span class="v">${escapeHtml(r.editado_por)}${r.editado_at ? ' · ' + new Date(r.editado_at).toLocaleString('es-AR') : ''}</span></div>`;
+      }
+      if (r.vendedor) {
+        html += `<div class="kv"><span class="k">Vendedor asignado</span><span class="v">${escapeHtml(r.vendedor)}</span></div>`;
+      }
     }
 
     // PDF link
@@ -498,7 +508,12 @@
       }
     }
 
-    // Acciones según rol
+    // F01 no tiene workflow — sin acciones
+    if (!isVwfs) {
+      return html;
+    }
+
+    // Acciones según rol (solo VWFS)
     html += '<div class="section-sep">Acciones</div>';
 
     if (isAdmin) {
