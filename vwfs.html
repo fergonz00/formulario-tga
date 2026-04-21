@@ -173,8 +173,41 @@
   }
   .toggle-btn:active { transform: scale(0.97); }
 
+  .upload-zone {
+    border: 2px dashed var(--vw-new-horizon); border-radius: var(--radius);
+    padding: 20px 16px; text-align: center; cursor: pointer;
+    transition: all var(--transition); position: relative;
+  }
+  .upload-zone:active, .upload-zone.has-file {
+    border-color: var(--vw-green); background: rgba(0,135,60,0.03);
+  }
+  .upload-zone .upload-icon { font-size: 28px; margin-bottom: 6px; }
+  .upload-zone .upload-text { font-size: 13px; font-weight: 600; }
+  .upload-zone .upload-hint { font-size: 11px; color: #8899AA; margin-top: 4px; }
+  .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  .upload-preview {
+    display: none; margin-top: 10px;
+    border-radius: var(--radius-sm); overflow: hidden;
+    border: 1.5px solid var(--vw-green);
+  }
+  .upload-preview.show { display: block; }
+  .upload-preview img {
+    width: 100%; height: auto; max-height: 280px; object-fit: contain;
+    display: block; background: #000;
+  }
+  .upload-preview .preview-meta {
+    padding: 8px 12px; background: var(--vw-new-horizon-20);
+    font-size: 12px; color: var(--vw-green); font-weight: 600;
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .upload-preview .preview-remove {
+    color: var(--vw-red); font-weight: 700; cursor: pointer;
+    font-size: 12px; background: none; border: none; padding: 0;
+  }
+
   .conditional { display: none; animation: fadeIn 0.25s ease; }
   .conditional.show { display: block; }
+  .switch-field.conditional.show { display: flex; }
 
   .info-callout {
     background: rgba(0,64,193,0.05); border-left: 3px solid var(--vw-cobalt);
@@ -454,6 +487,62 @@
           <label>CP</label>
           <input type="text" inputmode="numeric" id="domCP">
         </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-title"><span class="icon">📷</span>Foto del DNI</div>
+
+      <div class="info-callout" style="background: rgba(255,140,0,0.08); border-left-color: var(--vw-amber);">
+        <strong>⭐ Recomendado:</strong> Usá la app <strong>Mi Argentina</strong> y hacé una captura de pantalla de tu DNI digital. Es la opción que mejor sale y más rápida.
+      </div>
+
+      <div class="field">
+        <label>¿Qué vas a subir?</label>
+        <div class="toggle-group">
+          <button type="button" class="toggle-btn" data-field="dniMode" data-value="miarg" onclick="setDniMode('miarg')">📱 Mi Argentina</button>
+          <button type="button" class="toggle-btn" data-field="dniMode" data-value="fisico" onclick="setDniMode('fisico')">📇 Foto del DNI físico</button>
+        </div>
+      </div>
+
+      <!-- Modo: Mi Argentina -->
+      <div class="conditional" id="dniMiargBlock">
+        <div class="upload-zone" id="uploadMiargZone">
+          <div class="upload-icon">📱</div>
+          <div class="upload-text">Tocá para subir captura de Mi Argentina</div>
+          <div class="upload-hint">Mínimo 1000×700 px · 100 KB</div>
+          <input type="file" accept="image/*" id="dniMiargFile" onchange="handleDniUpload('miarg', this)">
+        </div>
+        <div class="upload-preview" id="uploadMiargPreview"></div>
+      </div>
+
+      <!-- Modo: Foto DNI físico -->
+      <div class="conditional" id="dniFisicoBlock">
+        <div class="upload-zone" id="uploadFrenteZone">
+          <div class="upload-icon">📇</div>
+          <div class="upload-text">Foto del DNI — <strong>Frente</strong></div>
+          <div class="upload-hint">Que se vean los 4 bordes del DNI nítidos</div>
+          <input type="file" accept="image/*" id="dniFrenteFile" onchange="handleDniUpload('frente', this)">
+        </div>
+        <div class="upload-preview" id="uploadFrentePreview"></div>
+
+        <div class="upload-zone" id="uploadDorsoZone" style="margin-top: 12px;">
+          <div class="upload-icon">📇</div>
+          <div class="upload-text">Foto del DNI — <strong>Dorso</strong></div>
+          <div class="upload-hint">Que se vean los 4 bordes del DNI nítidos</div>
+          <input type="file" accept="image/*" id="dniDorsoFile" onchange="handleDniUpload('dorso', this)">
+        </div>
+        <div class="upload-preview" id="uploadDorsoPreview"></div>
+      </div>
+
+      <div id="dniError" class="info-callout err" style="display:none; margin-top: 10px;"></div>
+
+      <div class="switch-field conditional" id="dniConfirmBlock" style="margin-top: 14px;">
+        <span class="switch-label">Confirmo que el DNI se ve nítido, completo y los datos se leen bien</span>
+        <label class="switch">
+          <input type="checkbox" id="dniConfirm">
+          <span class="slider"></span>
+        </label>
       </div>
     </div>
 
@@ -884,6 +973,11 @@
   let generatedPDFBlob = null;
   let supabasePdfUrl = '';
   let matchedF01Id = null;
+  let dniMode = null;
+  const dniImages = {};
+  const DNI_MIN_WIDTH = 1000;
+  const DNI_MIN_HEIGHT = 700;
+  const DNI_MIN_BYTES = 100 * 1024;
 
   // ═══════ HELPERS ═══════
   function g(id) { const el = document.getElementById(id); return el ? (el.value || '') : ''; }
@@ -926,6 +1020,149 @@
   function toggleCotit() {
     const show = document.getElementById('tieneCotit').checked;
     document.getElementById('cotitBlock').classList.toggle('show', show);
+  }
+
+  // ═══════ DNI UPLOAD ═══════
+  function setDniMode(mode) {
+    dniMode = mode;
+    document.getElementById('dniMiargBlock').classList.toggle('show', mode === 'miarg');
+    document.getElementById('dniFisicoBlock').classList.toggle('show', mode === 'fisico');
+    if (mode === 'miarg') {
+      removeDniImage('frente', true);
+      removeDniImage('dorso', true);
+    } else {
+      removeDniImage('miarg', true);
+    }
+    updateDniConfirmVisibility();
+  }
+
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(new Error('No se pudo leer el archivo'));
+      r.readAsDataURL(file);
+    });
+  }
+
+  function getImgDims(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.onerror = () => reject(new Error('Imagen inválida'));
+      img.src = dataUrl;
+    });
+  }
+
+  async function handleDniUpload(which, input) {
+    const err = document.getElementById('dniError');
+    err.style.display = 'none';
+    err.textContent = '';
+    const file = input.files && input.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      err.textContent = 'El archivo debe ser una imagen (JPG o PNG).';
+      err.style.display = '';
+      input.value = '';
+      return;
+    }
+    if (file.size < DNI_MIN_BYTES) {
+      err.textContent = 'La foto pesa solo ' + Math.round(file.size/1024) + ' KB. Necesitamos al menos ' + Math.round(DNI_MIN_BYTES/1024) + ' KB para que el DNI se lea bien. Sacá una foto con más resolución o menos compresión.';
+      err.style.display = '';
+      input.value = '';
+      return;
+    }
+
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const dims = await getImgDims(dataUrl);
+      if (dims.width < DNI_MIN_WIDTH || dims.height < DNI_MIN_HEIGHT) {
+        err.textContent = 'La foto tiene muy poca resolución (' + dims.width + '×' + dims.height + '). Necesitamos al menos ' + DNI_MIN_WIDTH + '×' + DNI_MIN_HEIGHT + '. Probá sacar la foto con más luz o más cerca, o usá la app Mi Argentina.';
+        err.style.display = '';
+        input.value = '';
+        return;
+      }
+
+      dniImages[which] = { dataUrl, file, w: dims.width, h: dims.height };
+      showDniPreview(which);
+      updateDniConfirmVisibility();
+    } catch (e) {
+      err.textContent = 'No se pudo procesar la imagen. Intentá con otra foto.';
+      err.style.display = '';
+      input.value = '';
+    }
+  }
+
+  function previewPrefix(which) {
+    return which === 'miarg' ? 'Miarg' : (which === 'frente' ? 'Frente' : 'Dorso');
+  }
+
+  function showDniPreview(which) {
+    const prefix = previewPrefix(which);
+    const zone = document.getElementById('upload' + prefix + 'Zone');
+    const prev = document.getElementById('upload' + prefix + 'Preview');
+    const img = dniImages[which];
+    if (!zone || !prev || !img) return;
+    zone.classList.add('has-file');
+    prev.innerHTML =
+      '<img src="' + img.dataUrl + '" alt="Vista previa">' +
+      '<div class="preview-meta">' +
+        '<span>✓ ' + img.w + '×' + img.h + ' px · ' + Math.round(img.file.size/1024) + ' KB</span>' +
+        '<button type="button" class="preview-remove" onclick="removeDniImage(\'' + which + '\')">Quitar</button>' +
+      '</div>';
+    prev.classList.add('show');
+  }
+
+  function removeDniImage(which, silent) {
+    delete dniImages[which];
+    const prefix = previewPrefix(which);
+    const zone = document.getElementById('upload' + prefix + 'Zone');
+    const prev = document.getElementById('upload' + prefix + 'Preview');
+    const inputId = 'dni' + prefix + 'File';
+    const input = document.getElementById(inputId);
+    if (zone) zone.classList.remove('has-file');
+    if (prev) { prev.innerHTML = ''; prev.classList.remove('show'); }
+    if (input) input.value = '';
+    if (!silent) {
+      document.getElementById('dniConfirm').checked = false;
+      updateDniConfirmVisibility();
+    }
+  }
+
+  function updateDniConfirmVisibility() {
+    const ready =
+      (dniMode === 'miarg' && dniImages.miarg) ||
+      (dniMode === 'fisico' && dniImages.frente && dniImages.dorso);
+    document.getElementById('dniConfirmBlock').classList.toggle('show', !!ready);
+  }
+
+  function validateDniStep() {
+    const err = document.getElementById('dniError');
+    err.style.display = 'none';
+    err.textContent = '';
+
+    if (!dniMode) {
+      err.textContent = 'Elegí qué tipo de foto vas a subir: Mi Argentina (recomendado) o DNI físico.';
+      err.style.display = '';
+      return false;
+    }
+    if (dniMode === 'miarg' && !dniImages.miarg) {
+      err.textContent = 'Subí la captura de Mi Argentina antes de avanzar.';
+      err.style.display = '';
+      return false;
+    }
+    if (dniMode === 'fisico' && (!dniImages.frente || !dniImages.dorso)) {
+      err.textContent = 'Faltan fotos del DNI. Necesitamos frente y dorso.';
+      err.style.display = '';
+      return false;
+    }
+    if (!document.getElementById('dniConfirm').checked) {
+      err.textContent = 'Confirmá que el DNI se ve nítido y completo tildando la casilla.';
+      err.style.display = '';
+      return false;
+    }
+    return true;
   }
 
   // ═══════ ENTRY SCREEN: precarga desde F01 ═══════
@@ -1085,6 +1322,10 @@
   }
 
   function nextStep() {
+    if (currentStep === 1 && !validateDniStep()) {
+      document.getElementById('dniError').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
     if (currentStep === TOTAL_STEPS) { generatePDF(); return; }
     currentStep++;
     showStep(currentStep);
@@ -1278,10 +1519,39 @@
       }
     }
 
+    addDniPagesToPdf(doc);
+
     generatedPDFBlob = doc.output('blob');
     goToSuccessScreen();
     const fullName = (g('apellido') + ' ' + g('nombre')).trim() || 'Cliente';
     uploadToSupabase(doc, fullName);
+  }
+
+  function addDniPagesToPdf(doc) {
+    const pageW = 210, pageH = 297, margin = 10;
+    const maxW = pageW - margin * 2;
+    const maxH = pageH - margin * 2 - 14;
+    const toAdd = dniMode === 'miarg' ? ['miarg'] : ['frente', 'dorso'];
+    for (const which of toAdd) {
+      const img = dniImages[which];
+      if (!img) continue;
+      doc.addPage();
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(12);
+      doc.setTextColor(0, 30, 80);
+      const title = which === 'miarg' ? 'DNI (Mi Argentina)'
+        : (which === 'frente' ? 'DNI — Frente' : 'DNI — Dorso');
+      doc.text(title, pageW / 2, margin + 5, { align: 'center' });
+
+      const aspect = img.w / img.h;
+      let drawW = maxW, drawH = drawW / aspect;
+      if (drawH > maxH) { drawH = maxH; drawW = drawH * aspect; }
+      const x = (pageW - drawW) / 2;
+      const y = margin + 10;
+      const fmt = img.dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+      try { doc.addImage(img.dataUrl, fmt, x, y, drawW, drawH); }
+      catch (e) { console.error('addImage failed', e); }
+    }
   }
 
   function goToSuccessScreen() {
@@ -1296,6 +1566,30 @@
   }
 
   // ═══════ UPLOAD ═══════
+  async function uploadDniImages(safeName, timestamp) {
+    const urls = {};
+    const toUpload = dniMode === 'miarg' ? ['miarg'] : ['frente', 'dorso'];
+    for (const which of toUpload) {
+      const img = dniImages[which];
+      if (!img) continue;
+      const ext = img.file.type === 'image/png' ? 'png' : 'jpg';
+      const fileName = 'dni/VWFS_' + safeName + '_' + timestamp + '_' + which + '.' + ext;
+      try {
+        const res = await supaFetch('/storage/v1/object/formularios-vwfs/' + fileName, {
+          method: 'POST',
+          headers: { 'Content-Type': img.file.type },
+          body: img.file
+        });
+        if (res.ok) {
+          urls[which] = SUPABASE_URL + '/storage/v1/object/public/formularios-vwfs/' + fileName;
+        }
+      } catch (e) {
+        console.error('DNI upload failed for ' + which, e);
+      }
+    }
+    return urls;
+  }
+
   async function uploadToSupabase(doc, clientName) {
     try {
       const blob = doc.output('blob');
@@ -1313,6 +1607,8 @@
 
       supabasePdfUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-vwfs/' + fileName;
 
+      const dniUrls = await uploadDniImages(safe, timestamp);
+
       const items = getAllData();
       const datosObj = {};
       for (const [l, v] of items) {
@@ -1320,6 +1616,10 @@
         if (datosObj[l]) datosObj[l + ' (2)'] = v;
         else datosObj[l] = v;
       }
+      datosObj['DNI modo'] = dniMode === 'miarg' ? 'Mi Argentina' : 'Foto DNI físico';
+      if (dniUrls.miarg)  datosObj['DNI Mi Argentina URL'] = dniUrls.miarg;
+      if (dniUrls.frente) datosObj['DNI Frente URL'] = dniUrls.frente;
+      if (dniUrls.dorso)  datosObj['DNI Dorso URL']  = dniUrls.dorso;
 
       await supaFetch('/rest/v1/formularios_vwfs', {
         method: 'POST',
