@@ -777,7 +777,7 @@
 
 <!-- Admin link -->
 <div id="adminLink" style="text-align:center;padding:20px;font-size:12px;">
-  <a href="#admin" onclick="showAdminLogin()" style="color:#8899AA;text-decoration:none;">Acceso administración</a>
+  <a href="panel.html" style="color:#8899AA;text-decoration:none;">🔐 Ingresar al panel</a>
 </div>
 
 <script>/** @license
@@ -1580,22 +1580,40 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const allData = formType === 'fisica' ? getPFData() : getPJData();
 
       // 3. Insert record
-      await supaFetch('/rest/v1/formularios_f01', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          tipo: formType,
-          nombre: nombre,
-          documento: documento,
-          celular: celular,
-          email: email,
-          pdf_url: supabasePdfUrl,
-          datos: Object.fromEntries(allData.filter(([l,v]) => l && v && !l.startsWith('—')))
-        })
-      });
+      const datosObj = Object.fromEntries(allData.filter(([l,v]) => l && v && !l.startsWith('—')));
+      if (window.__f01EditMode && window.__f01EditingId) {
+        await supaFetch('/rest/v1/formularios_f01?id=eq.' + window.__f01EditingId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+          body: JSON.stringify({
+            tipo: formType,
+            nombre: nombre,
+            documento: documento,
+            celular: celular,
+            email: email,
+            pdf_url: supabasePdfUrl,
+            datos: datosObj,
+            estado: 'a_revisar',
+            errores_adm: null,
+            editado_por: window.__f01EditUser || 'ventas',
+            editado_at: new Date().toISOString()
+          })
+        });
+      } else {
+        await supaFetch('/rest/v1/formularios_f01', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+          body: JSON.stringify({
+            tipo: formType,
+            nombre: nombre,
+            documento: documento,
+            celular: celular,
+            email: email,
+            pdf_url: supabasePdfUrl,
+            datos: datosObj
+          })
+        });
+      }
 
       // Show ready state with Supabase link
       document.getElementById('uploadingState').style.display = 'none';
@@ -1723,6 +1741,124 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     });
     document.getElementById('adminList').innerHTML = html;
   }
+
+  // ═══════ F01 EDIT MODE (panel ventas → index.html?edit=ID) ═══════
+  (async function initF01EditMode() {
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('edit');
+    if (!editId) return;
+
+    window.__f01EditMode  = true;
+    window.__f01EditingId = parseInt(editId, 10);
+    window.__f01EditUser  = sessionStorage.getItem('vwfs_admin_user') || 'ventas';
+
+    try {
+      const res = await supaFetch('/rest/v1/formularios_f01?id=eq.' + window.__f01EditingId, {
+        headers: { 'Accept': 'application/json' }
+      });
+      const rows = await res.json();
+      if (!Array.isArray(rows) || !rows.length) {
+        alert('No se encontró el formulario a editar.');
+        return;
+      }
+      const r = rows[0];
+      const d = r.datos || {};
+
+      // Arranca el formulario según el tipo guardado
+      startForm(r.tipo === 'juridica' ? 'juridica' : 'fisica');
+
+      const set = (id, v) => {
+        const el = document.getElementById(id);
+        if (el && v != null && v !== '') { el.value = v; el.style.background = '#FFFBEB'; }
+      };
+      const setToggle = (field, v) => {
+        if (!v) return;
+        toggleValues[field] = v;
+        document.querySelectorAll('.toggle-btn[data-field="'+field+'"]').forEach(b =>
+          b.classList.toggle('selected', b.dataset.value === v));
+      };
+
+      if (r.tipo === 'juridica') {
+        set('pj-razonSocial', d['Razón social']);
+        const cuit = (d['CUIT'] || r.documento || '');
+        set('pj-cuit', cuit.replace(/^CUIT\s*/,''));
+        set('pj-actividad', d['Actividad']);
+        set('pj-celular',  d['Celular'] || r.celular);
+        set('pj-email',    d['E-mail'] || r.email);
+        set('pj-personeria', d['Personería']);
+        set('pj-nroInsc',    d['Nº inscr.']);
+        set('pj-fechaInsc',  d['Fecha inscr.']);
+        // Domicilio
+        const dirMatch = (d['Dirección'] || '').match(/^(.+?)\s+(\d+\w*)$/);
+        if (dirMatch) { set('pj-calle', dirMatch[1]); set('pj-nro', dirMatch[2]); }
+        else set('pj-calle', d['Dirección']);
+        set('pj-localidad', d['Localidad']);
+        set('pj-provincia', d['Provincia']);
+        set('pj-cp', d['CP']);
+        // Firmante
+        set('pj-cargo', d['Cargo']);
+        set('pj-firmNombre', d['Nombre']);
+        const fdParts = (d['Doc.'] || '').split(' ');
+        if (fdParts[0]) { const s = document.getElementById('pj-firmTipoDoc'); if (s && [...s.options].some(o=>o.value===fdParts[0])) s.value = fdParts[0]; }
+        set('pj-firmNroDoc', fdParts.slice(1).join(' '));
+        setToggle('pj-sexo', d['Sexo']);
+        set('pj-firmCuil',  d['CUIL']);
+        set('pj-firmCelular', d['Celular']);
+        set('pj-firmEmail',   d['E-mail']);
+        set('pj-firmEstadoCivil', d['Estado civil']);
+        set('pj-firmOcupacion',   d['Ocupación']);
+        setToggle('pj-iva', d['Cond. IVA']);
+        setToggle('pj-uso', d['Uso unidad']);
+      } else {
+        // PF
+        set('pf-nombre', d['Nombre']);
+        const docParts = (d['Documento'] || r.documento || '').split(' ');
+        if (docParts[0]) { const s = document.getElementById('pf-tipoDoc'); if (s && [...s.options].some(o=>o.value===docParts[0])) s.value = docParts[0]; }
+        set('pf-nroDoc', docParts.slice(1).join(' '));
+        set('pf-cuil',        d['CUIL']);
+        setToggle('pf-sexo',  d['Sexo']);
+        set('pf-nacionalidad', d['Nacionalidad']);
+        set('pf-celular',    d['Celular'] || r.celular);
+        set('pf-email',      d['E-mail'] || r.email);
+        set('pf-telFijo',    d['Tel. fijo']);
+        set('pf-fechaNac',   d['Fecha nac.']);
+        set('pf-lugarNac',   d['Lugar nac.']);
+        if (d['Estado civil']) { const sel = document.getElementById('pf-estadoCivil'); if (sel) { sel.value = d['Estado civil']; sel.style.background = '#FFFBEB'; sel.dispatchEvent(new Event('change')); } }
+        set('pf-ocupacion',  d['Ocupación']);
+        set('pf-porcTit',    d['% Titularidad']);
+        // Dirección DNI
+        const dirFull = d['Dirección'] || '';
+        const mDir = dirFull.match(/^(.+?)\s+(\d+\w*)$/);
+        if (mDir) { set('pf-dniCalle', mDir[1]); set('pf-dniNro', mDir[2]); } else set('pf-dniCalle', dirFull);
+        set('pf-dniLocalidad', d['Localidad']);
+        set('pf-dniProvincia', d['Provincia']);
+        set('pf-dniCP',        d['CP']);
+        // Cónyuge
+        if (d['Nupcias'] || (d['CUIL'] && d['Nombre'] !== (d['Nombre']))) {
+          // best effort
+        }
+        // 2º Titular
+        if (d['— 2º TITULAR —'] !== undefined || d['% Tit.']) {
+          const cb = document.getElementById('pf-tiene2do');
+          if (cb) { cb.checked = true; cb.dispatchEvent(new Event('change')); }
+        }
+        setToggle('pf-iva',  d['Cond. IVA']);
+        setToggle('pf-uso',  d['Uso unidad']);
+      }
+
+      // Avisamos sobre las fotos del DNI (no se recuperan, hay que volver a subirlas)
+      setTimeout(() => {
+        const banner = document.createElement('div');
+        banner.style.cssText = 'background:#FFF3E0;color:#BF5A00;padding:12px 16px;border-radius:10px;margin:12px 16px;font-size:13px;border-left:3px solid #FF8C00;max-width:480px;margin-left:auto;margin-right:auto;';
+        banner.innerHTML = '<strong>Editando formulario F01.</strong><br>Las fotos del DNI y cédulas no se conservan al editar — volvé a subirlas antes de enviar.';
+        const container = document.querySelector('.form-container');
+        if (container) container.insertBefore(banner, container.firstChild);
+      }, 200);
+    } catch (e) {
+      console.error('F01 edit error:', e);
+      alert('Error al cargar el formulario para edición: ' + e.message);
+    }
+  })();
 </script>
 
 </body>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Panel VWFS — Tito González Automotores</title>
+<title>Panel — Tito González Automotores</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
@@ -82,6 +82,24 @@
   .btn-danger  { background: var(--vw-red);   color: white; }
   .btn-secondary { background: var(--vw-new-horizon-20); color: var(--vw-dark-blue); }
   .btn-block { width: 100%; display: block; }
+
+  .tabs {
+    display: flex; gap: 0; background: white; border-radius: var(--radius);
+    margin-bottom: 12px; padding: 4px; box-shadow: var(--shadow-sm);
+  }
+  .tab-btn {
+    flex: 1; padding: 10px 16px; background: transparent;
+    border: none; border-radius: var(--radius-sm);
+    font-family: inherit; font-size: 14px; font-weight: 700;
+    color: #5A6B7F; cursor: pointer; transition: all var(--transition);
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .tab-btn.active { background: var(--vw-cobalt); color: white; }
+  .tab-btn .tab-count {
+    font-size: 11px; padding: 1px 7px; border-radius: 10px;
+    background: rgba(0,0,0,0.1); font-weight: 700;
+  }
+  .tab-btn.active .tab-count { background: rgba(255,255,255,0.25); }
 
   .filters {
     display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;
@@ -204,7 +222,7 @@
 <!-- MAIN PANEL -->
 <div id="panelScreen" style="display:none;">
   <div class="header">
-    <h1>Formularios VWFS</h1>
+    <h1>Panel de formularios</h1>
     <div style="display:flex; gap:8px; align-items:center;">
       <span class="user-chip" id="userChip"></span>
       <button onclick="doLogout()">Salir</button>
@@ -212,6 +230,11 @@
   </div>
 
   <div class="container">
+    <div class="tabs">
+      <button class="tab-btn active" data-tab="vwfs" onclick="setTab('vwfs')">VWFS <span class="tab-count" id="tab-cnt-vwfs">0</span></button>
+      <button class="tab-btn" data-tab="f01" onclick="setTab('f01')">F01 <span class="tab-count" id="tab-cnt-f01">0</span></button>
+    </div>
+
     <div class="filters" id="filters">
       <button class="filter-chip active" data-filter="all" onclick="setFilter('all')">Todos <span class="count" id="cnt-all">0</span></button>
       <button class="filter-chip" data-filter="a_revisar" onclick="setFilter('a_revisar')">A revisar <span class="count" id="cnt-a_revisar">0</span></button>
@@ -251,9 +274,15 @@
 
   let currentUser = null;
   let isAdmin = false;
-  let allRows = [];
+  let currentTab = 'vwfs';          // 'vwfs' | 'f01'
+  const rowsCache = { vwfs: null, f01: null };
   let filter = 'all';
   let currentDetailId = null;
+
+  const TAB_CONFIG = {
+    vwfs: { table: 'formularios_vwfs', editUrl: 'vwfs.html?edit=',  label: 'VWFS' },
+    f01:  { table: 'formularios_f01',  editUrl: 'index.html?edit=', label: 'F01'  }
+  };
 
   // ═══════ SESSION ═══════
   function saveSession(user) {
@@ -305,7 +334,8 @@
       (isAdmin ? '🛡️ ' : '💼 ') + user + (isAdmin ? ' (admin)' : ' (ventas)');
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('panelScreen').style.display = '';
-    loadRows();
+    // Cargar ambas tabs al iniciar (para mostrar counts correctos en las pestañas).
+    Promise.all([loadTab('vwfs'), loadTab('f01')]).then(() => setTab('vwfs'));
   }
 
   function doLogout() {
@@ -314,24 +344,53 @@
   }
 
   // ═══════ LOAD ROWS ═══════
-  async function loadRows() {
+  async function loadTab(tab) {
+    const cfg = TAB_CONFIG[tab];
     const list = document.getElementById('rowList');
     list.innerHTML = '<div class="loading">Cargando…</div>';
     try {
-      const res = await supaFetch('/rest/v1/formularios_vwfs?order=created_at.desc&limit=500', {
+      const res = await supaFetch('/rest/v1/' + cfg.table + '?order=created_at.desc&limit=500', {
         headers: { 'Accept': 'application/json' }
       });
-      allRows = await res.json();
-      updateCounts();
+      const rows = await res.json();
+      rowsCache[tab] = Array.isArray(rows) ? rows : [];
+      updateTabCounts();
+      updateFilterCounts();
       renderList();
     } catch (e) {
-      list.innerHTML = '<div class="error-banner">Error cargando formularios.</div>';
+      list.innerHTML = '<div class="error-banner">Error cargando formularios ' + cfg.label + '.</div>';
     }
   }
 
-  function updateCounts() {
-    const counts = { all: allRows.length, a_revisar: 0, aprobado: 0, rechazado: 0 };
-    for (const r of allRows) counts[r.estado] = (counts[r.estado] || 0) + 1;
+  async function setTab(tab) {
+    currentTab = tab;
+    document.querySelectorAll('.tab-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.tab === tab));
+    // Reset filter to "all" when switching tabs
+    filter = 'all';
+    document.querySelectorAll('.filter-chip').forEach(c =>
+      c.classList.toggle('active', c.dataset.filter === 'all'));
+    if (!rowsCache[tab]) {
+      await loadTab(tab);
+    } else {
+      updateFilterCounts();
+      renderList();
+    }
+  }
+
+  function currentRows() {
+    return rowsCache[currentTab] || [];
+  }
+
+  function updateTabCounts() {
+    document.getElementById('tab-cnt-vwfs').textContent = rowsCache.vwfs ? rowsCache.vwfs.length : 0;
+    document.getElementById('tab-cnt-f01').textContent  = rowsCache.f01  ? rowsCache.f01.length  : 0;
+  }
+
+  function updateFilterCounts() {
+    const rows = currentRows();
+    const counts = { all: rows.length, a_revisar: 0, aprobado: 0, rechazado: 0 };
+    for (const r of rows) counts[r.estado] = (counts[r.estado] || 0) + 1;
     document.getElementById('cnt-all').textContent       = counts.all;
     document.getElementById('cnt-a_revisar').textContent = counts.a_revisar;
     document.getElementById('cnt-aprobado').textContent  = counts.aprobado;
@@ -347,7 +406,7 @@
 
   function renderList() {
     const list = document.getElementById('rowList');
-    const rows = filter === 'all' ? allRows : allRows.filter(r => r.estado === filter);
+    const rows = filter === 'all' ? currentRows() : currentRows().filter(r => r.estado === filter);
     if (rows.length === 0) {
       list.innerHTML = '<div class="empty-state"><div class="emoji">📭</div>Sin formularios en esta vista</div>';
       return;
@@ -356,11 +415,13 @@
       const chipClass = r.estado === 'aprobado' ? 'approved' : (r.estado === 'rechazado' ? 'rejected' : 'pending');
       const chipText = r.estado === 'aprobado' ? 'Aprobado' : (r.estado === 'rechazado' ? 'Rechazado' : 'A revisar');
       const fecha = new Date(r.created_at).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+      const nombre = r.nombre || (r.datos && (r.datos['Razón social'] || r.datos['Nombre'])) || 'Sin nombre';
+      const documento = r.documento || (r.datos && (r.datos['Documento'] || r.datos['CUIT'])) || '—';
       return `
         <div class="row-item" onclick="openDetail(${r.id})">
           <div class="row-main">
-            <div class="row-name">${escapeHtml(r.nombre || 'Sin nombre')}</div>
-            <div class="row-meta">${escapeHtml(r.documento || '—')} · ${fecha}${r.vendedor ? ' · Vend: ' + escapeHtml(r.vendedor) : ''}</div>
+            <div class="row-name">${escapeHtml(nombre)}</div>
+            <div class="row-meta">${escapeHtml(documento)} · ${fecha}${r.vendedor ? ' · Vend: ' + escapeHtml(r.vendedor) : ''}</div>
           </div>
           <div class="row-state"><span class="chip ${chipClass}">${chipText}</span></div>
         </div>`;
@@ -375,7 +436,7 @@
   // ═══════ DETAIL ═══════
   function openDetail(id) {
     currentDetailId = id;
-    const r = allRows.find(x => x.id === id);
+    const r = currentRows().find(x => x.id === id);
     if (!r) return;
     document.getElementById('detailContent').innerHTML = renderDetail(r);
     document.getElementById('detailBackdrop').classList.add('show');
@@ -463,7 +524,7 @@
           </div>
           <button class="btn btn-primary btn-block" onclick="doAssignVendedor(${r.id})">Guardar vendedor</button>
         </div>
-        <a class="btn btn-secondary btn-block" href="vwfs.html?edit=${r.id}">✏️ Editar formulario</a>`;
+        <a class="btn btn-secondary btn-block" href="${TAB_CONFIG[currentTab].editUrl}${r.id}">✏️ Editar formulario</a>`;
     }
 
     return html;
@@ -505,8 +566,9 @@
   }
 
   async function updateRow(id, patch) {
+    const cfg = TAB_CONFIG[currentTab];
     try {
-      const res = await supaFetch('/rest/v1/formularios_vwfs?id=eq.' + id, {
+      const res = await supaFetch('/rest/v1/' + cfg.table + '?id=eq.' + id, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -516,7 +578,7 @@
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       closeDetail();
-      await loadRows();
+      await loadTab(currentTab);
     } catch (e) {
       alert('No se pudo guardar el cambio: ' + e.message);
     }
