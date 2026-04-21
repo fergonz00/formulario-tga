@@ -546,6 +546,120 @@
       </div>
     </div>
 
+    <div class="section-card">
+      <div class="section-title"><span class="icon">🏦</span>Cuenta en Banco Francés (BBVA)</div>
+
+      <div class="field">
+        <label>¿Ya tenés cuenta en Banco Francés?</label>
+        <div class="toggle-group">
+          <button type="button" class="toggle-btn" data-field="bcoFrances" data-value="Sí, ya tengo" onclick="setBcoFrances('si')">Sí, ya tengo</button>
+          <button type="button" class="toggle-btn" data-field="bcoFrances" data-value="No, necesito abrir" onclick="setBcoFrances('no')">No, necesito abrir</button>
+        </div>
+      </div>
+
+      <div class="conditional" id="bcoFrancesBlock">
+        <div class="info-callout">Indicá dónde te queda cómoda la sucursal para abrir la cuenta.</div>
+
+        <div class="field">
+          <label>Provincia</label>
+          <select id="bcoProv" onchange="onProvinciaBcoChange()">
+            <option value="">— Elegir provincia —</option>
+            <option>CABA</option>
+            <option>Buenos Aires</option>
+            <option>Catamarca</option>
+            <option>Chaco</option>
+            <option>Chubut</option>
+            <option>Córdoba</option>
+            <option>Corrientes</option>
+            <option>Entre Ríos</option>
+            <option>Formosa</option>
+            <option>Jujuy</option>
+            <option>La Pampa</option>
+            <option>La Rioja</option>
+            <option>Mendoza</option>
+            <option>Misiones</option>
+            <option>Neuquén</option>
+            <option>Río Negro</option>
+            <option>Salta</option>
+            <option>San Juan</option>
+            <option>San Luis</option>
+            <option>Santa Cruz</option>
+            <option>Santa Fe</option>
+            <option>Santiago del Estero</option>
+            <option>Tierra del Fuego</option>
+            <option>Tucumán</option>
+          </select>
+        </div>
+
+        <div class="field conditional" id="bcoBarrioBlock">
+          <label>Barrio (CABA)</label>
+          <select id="bcoBarrio">
+            <option value="">— Elegir barrio —</option>
+            <option>Agronomía</option>
+            <option>Almagro</option>
+            <option>Balvanera</option>
+            <option>Barracas</option>
+            <option>Belgrano</option>
+            <option>Boedo</option>
+            <option>Caballito</option>
+            <option>Chacarita</option>
+            <option>Coghlan</option>
+            <option>Colegiales</option>
+            <option>Constitución</option>
+            <option>Flores</option>
+            <option>Floresta</option>
+            <option>La Boca</option>
+            <option>La Paternal</option>
+            <option>Liniers</option>
+            <option>Mataderos</option>
+            <option>Monte Castro</option>
+            <option>Monserrat</option>
+            <option>Nueva Pompeya</option>
+            <option>Núñez</option>
+            <option>Palermo</option>
+            <option>Parque Avellaneda</option>
+            <option>Parque Chacabuco</option>
+            <option>Parque Chas</option>
+            <option>Parque Patricios</option>
+            <option>Puerto Madero</option>
+            <option>Recoleta</option>
+            <option>Retiro</option>
+            <option>Saavedra</option>
+            <option>San Cristóbal</option>
+            <option>San Nicolás</option>
+            <option>San Telmo</option>
+            <option>Vélez Sarsfield</option>
+            <option>Versalles</option>
+            <option>Villa Crespo</option>
+            <option>Villa Devoto</option>
+            <option>Villa del Parque</option>
+            <option>Villa General Mitre</option>
+            <option>Villa Lugano</option>
+            <option>Villa Luro</option>
+            <option>Villa Ortúzar</option>
+            <option>Villa Pueyrredón</option>
+            <option>Villa Real</option>
+            <option>Villa Riachuelo</option>
+            <option>Villa Santa Rita</option>
+            <option>Villa Soldati</option>
+            <option>Villa Urquiza</option>
+          </select>
+        </div>
+
+        <div class="field conditional" id="bcoLocalidadBlock">
+          <label>Localidad</label>
+          <input type="text" id="bcoLocalidad" placeholder="Ej: San Isidro, Mar del Plata">
+        </div>
+
+        <div class="field">
+          <label>Sucursal preferida o referencia <span class="optional">(opcional)</span></label>
+          <input type="text" id="bcoSucursal" placeholder="Ej: Cerca del trabajo, Sucursal Palermo">
+        </div>
+      </div>
+
+      <div id="bcoError" class="info-callout err" style="display:none; margin-top: 10px;"></div>
+    </div>
+
   </div>
 
   <!-- ═══════ STEP 2: Estado civil + cónyuge ═══════ -->
@@ -1137,6 +1251,62 @@
     document.getElementById('dniConfirmBlock').classList.toggle('show', !!ready);
   }
 
+  // ═══════ BANCO FRANCÉS ═══════
+  let bcoFrancesMode = null; // 'si' | 'no'
+
+  function setBcoFrances(mode) {
+    bcoFrancesMode = mode;
+    document.getElementById('bcoFrancesBlock').classList.toggle('show', mode === 'no');
+    document.getElementById('bcoError').style.display = 'none';
+    if (mode === 'si') {
+      // Limpio campos si el usuario había elegido "no" antes
+      document.getElementById('bcoProv').value = '';
+      document.getElementById('bcoBarrio').value = '';
+      document.getElementById('bcoLocalidad').value = '';
+      document.getElementById('bcoSucursal').value = '';
+      document.getElementById('bcoBarrioBlock').classList.remove('show');
+      document.getElementById('bcoLocalidadBlock').classList.remove('show');
+    }
+  }
+
+  function onProvinciaBcoChange() {
+    const prov = g('bcoProv');
+    document.getElementById('bcoBarrioBlock').classList.toggle('show', prov === 'CABA');
+    document.getElementById('bcoLocalidadBlock').classList.toggle('show', prov !== '' && prov !== 'CABA');
+    if (prov !== 'CABA') document.getElementById('bcoBarrio').value = '';
+    if (prov === 'CABA' || prov === '') document.getElementById('bcoLocalidad').value = '';
+  }
+
+  function validateBcoFrances() {
+    const err = document.getElementById('bcoError');
+    err.style.display = 'none';
+    err.textContent = '';
+    if (!bcoFrancesMode) {
+      err.textContent = 'Decinos si ya tenés cuenta en Banco Francés o si necesitás abrir una.';
+      err.style.display = '';
+      return false;
+    }
+    if (bcoFrancesMode === 'no') {
+      const prov = g('bcoProv');
+      if (!prov) {
+        err.textContent = 'Elegí la provincia donde te queda cómoda la sucursal.';
+        err.style.display = '';
+        return false;
+      }
+      if (prov === 'CABA' && !g('bcoBarrio')) {
+        err.textContent = 'Elegí el barrio de CABA donde preferís abrir la cuenta.';
+        err.style.display = '';
+        return false;
+      }
+      if (prov !== 'CABA' && !g('bcoLocalidad').trim()) {
+        err.textContent = 'Escribí la localidad donde preferís abrir la cuenta.';
+        err.style.display = '';
+        return false;
+      }
+    }
+    return true;
+  }
+
   function validateDniStep() {
     const err = document.getElementById('dniError');
     err.style.display = 'none';
@@ -1322,9 +1492,15 @@
   }
 
   function nextStep() {
-    if (currentStep === 1 && !validateDniStep()) {
-      document.getElementById('dniError').scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
+    if (currentStep === 1) {
+      if (!validateDniStep()) {
+        document.getElementById('dniError').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+      if (!validateBcoFrances()) {
+        document.getElementById('bcoError').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
     }
     if (currentStep === TOTAL_STEPS) { generatePDF(); return; }
     currentStep++;
@@ -1378,9 +1554,21 @@
       ['Localidad', g('domLocalidad')],
       ['CP', g('domCP')],
 
+      ['— BANCO FRANCÉS —', ''],
+      ['Cuenta BBVA', toggleValues['bcoFrances'] || ''],
+    ];
+
+    if (bcoFrancesMode === 'no') {
+      items.push(['Sucursal — Provincia', g('bcoProv')]);
+      if (g('bcoProv') === 'CABA') items.push(['Sucursal — Barrio', g('bcoBarrio')]);
+      else items.push(['Sucursal — Localidad', g('bcoLocalidad')]);
+      if (g('bcoSucursal')) items.push(['Sucursal — Referencia', g('bcoSucursal')]);
+    }
+
+    items.push(
       ['— ESTADO CIVIL —', ''],
       ['Estado civil', g('estadoCivil')],
-    ];
+    );
 
     if (document.getElementById('conyugeBlock').classList.contains('show')) {
       items.push(
