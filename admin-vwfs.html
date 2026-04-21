@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Panel VWFS — Tito González Automotores</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+  :root {
+    --vw-dark-blue: #001E50;
+    --vw-cobalt: #0040C1;
+    --vw-new-horizon: #DAE4ED;
+    --vw-new-horizon-20: #F2F5F8;
+    --vw-amber: #FF8C00;
+    --vw-white: #FFFFFF;
+    --vw-red: #E4002B;
+    --vw-green: #00873C;
+    --shadow-sm: 0 1px 3px rgba(0,30,80,0.08);
+    --shadow-md: 0 4px 12px rgba(0,30,80,0.1);
+    --radius: 14px;
+    --radius-sm: 10px;
+    --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--vw-new-horizon-20);
+    color: var(--vw-dark-blue);
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .header {
+    background: var(--vw-dark-blue); color: white;
+    padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .header h1 { font-size: 16px; font-weight: 700; }
+  .header .user-chip {
+    font-size: 12px; padding: 4px 10px; border-radius: 20px;
+    background: rgba(255,255,255,0.15); display: flex; align-items: center; gap: 8px;
+  }
+  .header button {
+    background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white;
+    padding: 6px 12px; border-radius: 18px; font-size: 12px; cursor: pointer;
+    font-family: inherit;
+  }
+
+  .container { padding: 16px; max-width: 720px; margin: 0 auto; }
+
+  .card {
+    background: white; border-radius: var(--radius);
+    padding: 16px; margin-bottom: 10px; box-shadow: var(--shadow-sm);
+  }
+
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 12px; font-weight: 600;
+    margin-bottom: 5px; text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .field input, .field textarea, .field select {
+    width: 100%; padding: 12px 14px; border: 1.5px solid var(--vw-new-horizon);
+    border-radius: var(--radius-sm); font-family: inherit; font-size: 15px;
+    color: var(--vw-dark-blue); background: white; -webkit-appearance: none;
+  }
+  .field input:focus, .field textarea:focus, .field select:focus {
+    outline: none; border-color: var(--vw-cobalt);
+    box-shadow: 0 0 0 3px rgba(0,64,193,0.1);
+  }
+  .field textarea { resize: vertical; min-height: 80px; }
+
+  .btn {
+    padding: 12px 18px; border: none; border-radius: var(--radius-sm);
+    font-family: inherit; font-size: 14px; font-weight: 700;
+    cursor: pointer; transition: transform 0.15s; text-align: center;
+    display: inline-block; text-decoration: none;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--vw-cobalt); color: white; }
+  .btn-success { background: var(--vw-green); color: white; }
+  .btn-danger  { background: var(--vw-red);   color: white; }
+  .btn-secondary { background: var(--vw-new-horizon-20); color: var(--vw-dark-blue); }
+  .btn-block { width: 100%; display: block; }
+
+  .filters {
+    display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .filter-chip {
+    padding: 8px 14px; border-radius: 20px;
+    border: 1.5px solid var(--vw-new-horizon);
+    background: white; font-size: 13px; font-weight: 600;
+    cursor: pointer; font-family: inherit; color: var(--vw-dark-blue);
+  }
+  .filter-chip.active {
+    background: var(--vw-cobalt); color: white; border-color: var(--vw-cobalt);
+  }
+  .filter-chip .count {
+    font-size: 11px; margin-left: 4px; opacity: 0.75;
+  }
+
+  .row-item {
+    background: white; border-radius: var(--radius);
+    padding: 14px 16px; margin-bottom: 8px; box-shadow: var(--shadow-sm);
+    display: flex; justify-content: space-between; align-items: center;
+    cursor: pointer; transition: box-shadow 0.2s;
+  }
+  .row-item:hover { box-shadow: var(--shadow-md); }
+  .row-item .row-main { flex: 1; min-width: 0; }
+  .row-item .row-name { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+  .row-item .row-meta { font-size: 12px; color: #5A6B7F; }
+  .row-item .row-state { flex-shrink: 0; margin-left: 12px; }
+
+  .chip {
+    font-size: 11px; padding: 3px 10px; border-radius: 10px;
+    font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+  }
+  .chip.pending  { background: #FFF3E0; color: #BF5A00; }
+  .chip.approved { background: #E8F5E9; color: var(--vw-green); }
+  .chip.rejected { background: #FFEBEE; color: var(--vw-red); }
+
+  /* Detail view */
+  .detail-backdrop {
+    position: fixed; inset: 0; background: rgba(0,30,80,0.5);
+    display: none; align-items: flex-end; justify-content: center; z-index: 20;
+  }
+  .detail-backdrop.show { display: flex; }
+  .detail-sheet {
+    background: white; width: 100%; max-width: 720px;
+    max-height: 95dvh; overflow-y: auto;
+    border-radius: var(--radius) var(--radius) 0 0;
+    padding: 16px;
+  }
+  @media (min-width: 720px) {
+    .detail-backdrop { align-items: center; padding: 16px; }
+    .detail-sheet { border-radius: var(--radius); max-height: 90dvh; }
+  }
+  .detail-close {
+    background: none; border: none; font-size: 24px; cursor: pointer;
+    color: var(--vw-dark-blue); float: right; padding: 4px 10px;
+  }
+  .detail-header { margin-bottom: 14px; }
+  .detail-header h2 { font-size: 18px; font-weight: 800; }
+  .detail-header .sub { font-size: 12px; color: #5A6B7F; margin-top: 2px; }
+
+  .kv { padding: 6px 0; font-size: 13px; display: flex; justify-content: space-between; gap: 10px; border-bottom: 1px solid var(--vw-new-horizon-20); }
+  .kv .k { color: #5A6B7F; flex-shrink: 0; }
+  .kv .v { text-align: right; font-weight: 600; word-break: break-word; }
+
+  .section-sep {
+    font-size: 11px; font-weight: 800; text-transform: uppercase;
+    letter-spacing: 0.5px; color: var(--vw-cobalt);
+    margin: 14px 0 4px; padding-top: 10px; border-top: 2px solid var(--vw-new-horizon-20);
+  }
+  .section-sep:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+
+  .error-banner {
+    background: #FFEBEE; color: var(--vw-red); padding: 10px 14px;
+    border-radius: var(--radius-sm); margin-bottom: 12px; font-size: 13px;
+    border-left: 3px solid var(--vw-red);
+  }
+  .info-banner {
+    background: #FFF3E0; color: #BF5A00; padding: 10px 14px;
+    border-radius: var(--radius-sm); margin-bottom: 12px; font-size: 13px;
+    border-left: 3px solid var(--vw-amber);
+  }
+  .ok-banner {
+    background: #E8F5E9; color: var(--vw-green); padding: 10px 14px;
+    border-radius: var(--radius-sm); margin-bottom: 12px; font-size: 13px;
+    border-left: 3px solid var(--vw-green);
+  }
+
+  .action-row { display: grid; gap: 8px; margin-top: 14px; }
+  .action-row.two { grid-template-columns: 1fr 1fr; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: #5A6B7F; }
+  .empty-state .emoji { font-size: 40px; margin-bottom: 10px; }
+
+  .loading { text-align: center; padding: 40px 20px; color: #5A6B7F; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="header"><h1>Panel VWFS</h1></div>
+  <div class="container">
+    <div class="card" style="max-width: 400px; margin: 40px auto;">
+      <h2 style="text-align: center; margin-bottom: 18px; font-size: 18px;">Ingresar al panel</h2>
+      <div class="field">
+        <label>Usuario</label>
+        <input type="text" id="adminUser" autocomplete="username">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="adminPass" autocomplete="current-password">
+      </div>
+      <div class="error-banner" id="loginError" style="display:none;"></div>
+      <button class="btn btn-primary btn-block" onclick="doLogin()">Ingresar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN PANEL -->
+<div id="panelScreen" style="display:none;">
+  <div class="header">
+    <h1>Formularios VWFS</h1>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <span class="user-chip" id="userChip"></span>
+      <button onclick="doLogout()">Salir</button>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="filters" id="filters">
+      <button class="filter-chip active" data-filter="all" onclick="setFilter('all')">Todos <span class="count" id="cnt-all">0</span></button>
+      <button class="filter-chip" data-filter="a_revisar" onclick="setFilter('a_revisar')">A revisar <span class="count" id="cnt-a_revisar">0</span></button>
+      <button class="filter-chip" data-filter="rechazado" onclick="setFilter('rechazado')">Rechazados <span class="count" id="cnt-rechazado">0</span></button>
+      <button class="filter-chip" data-filter="aprobado" onclick="setFilter('aprobado')">Aprobados <span class="count" id="cnt-aprobado">0</span></button>
+    </div>
+
+    <div id="rowList">
+      <div class="loading">Cargando…</div>
+    </div>
+  </div>
+</div>
+
+<!-- DETAIL SHEET -->
+<div class="detail-backdrop" id="detailBackdrop" onclick="if(event.target===this)closeDetail()">
+  <div class="detail-sheet" id="detailSheet">
+    <button class="detail-close" onclick="closeDetail()">×</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<script>
+  const SUPABASE_URL = 'https://wjfglsafgaltusmbnccl.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqZmdsc2FmZ2FsdHVzbWJuY2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MzM2OTksImV4cCI6MjA4OTAwOTY5OX0.OOwgyKDNQsbBaGDaL0OhJfc8eOsCClvvAPW0VFBKrOA';
+
+  async function supaFetch(path, options = {}) {
+    const res = await fetch(SUPABASE_URL + path, {
+      ...options,
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        ...options.headers
+      }
+    });
+    return res;
+  }
+
+  let currentUser = null;
+  let isAdmin = false;
+  let allRows = [];
+  let filter = 'all';
+  let currentDetailId = null;
+
+  // ═══════ SESSION ═══════
+  function saveSession(user) {
+    sessionStorage.setItem('vwfs_admin_user', user);
+  }
+  function clearSession() {
+    sessionStorage.removeItem('vwfs_admin_user');
+  }
+  function getSession() {
+    return sessionStorage.getItem('vwfs_admin_user');
+  }
+
+  async function doLogin() {
+    const user = document.getElementById('adminUser').value.trim().toLowerCase();
+    const pass = document.getElementById('adminPass').value;
+    const err = document.getElementById('loginError');
+    err.style.display = 'none';
+
+    if (!user || !pass) {
+      err.textContent = 'Completá usuario y contraseña.';
+      err.style.display = '';
+      return;
+    }
+
+    try {
+      const res = await supaFetch('/rest/v1/f01_admins?usuario=eq.' + encodeURIComponent(user)
+        + '&clave=eq.' + encodeURIComponent(pass), {
+        headers: { 'Accept': 'application/json' }
+      });
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) {
+        err.textContent = 'Usuario o contraseña incorrectos.';
+        err.style.display = '';
+        return;
+      }
+      enterPanel(user);
+      saveSession(user);
+    } catch (e) {
+      console.error(e);
+      err.textContent = 'Error de conexión. Intentá de nuevo.';
+      err.style.display = '';
+    }
+  }
+
+  function enterPanel(user) {
+    currentUser = user;
+    isAdmin = (user === 'administracion');
+    document.getElementById('userChip').textContent =
+      (isAdmin ? '🛡️ ' : '💼 ') + user + (isAdmin ? ' (admin)' : ' (ventas)');
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('panelScreen').style.display = '';
+    loadRows();
+  }
+
+  function doLogout() {
+    clearSession();
+    window.location.reload();
+  }
+
+  // ═══════ LOAD ROWS ═══════
+  async function loadRows() {
+    const list = document.getElementById('rowList');
+    list.innerHTML = '<div class="loading">Cargando…</div>';
+    try {
+      const res = await supaFetch('/rest/v1/formularios_vwfs?order=created_at.desc&limit=500', {
+        headers: { 'Accept': 'application/json' }
+      });
+      allRows = await res.json();
+      updateCounts();
+      renderList();
+    } catch (e) {
+      list.innerHTML = '<div class="error-banner">Error cargando formularios.</div>';
+    }
+  }
+
+  function updateCounts() {
+    const counts = { all: allRows.length, a_revisar: 0, aprobado: 0, rechazado: 0 };
+    for (const r of allRows) counts[r.estado] = (counts[r.estado] || 0) + 1;
+    document.getElementById('cnt-all').textContent       = counts.all;
+    document.getElementById('cnt-a_revisar').textContent = counts.a_revisar;
+    document.getElementById('cnt-aprobado').textContent  = counts.aprobado;
+    document.getElementById('cnt-rechazado').textContent = counts.rechazado;
+  }
+
+  function setFilter(f) {
+    filter = f;
+    document.querySelectorAll('.filter-chip').forEach(c =>
+      c.classList.toggle('active', c.dataset.filter === f));
+    renderList();
+  }
+
+  function renderList() {
+    const list = document.getElementById('rowList');
+    const rows = filter === 'all' ? allRows : allRows.filter(r => r.estado === filter);
+    if (rows.length === 0) {
+      list.innerHTML = '<div class="empty-state"><div class="emoji">📭</div>Sin formularios en esta vista</div>';
+      return;
+    }
+    list.innerHTML = rows.map(r => {
+      const chipClass = r.estado === 'aprobado' ? 'approved' : (r.estado === 'rechazado' ? 'rejected' : 'pending');
+      const chipText = r.estado === 'aprobado' ? 'Aprobado' : (r.estado === 'rechazado' ? 'Rechazado' : 'A revisar');
+      const fecha = new Date(r.created_at).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
+      return `
+        <div class="row-item" onclick="openDetail(${r.id})">
+          <div class="row-main">
+            <div class="row-name">${escapeHtml(r.nombre || 'Sin nombre')}</div>
+            <div class="row-meta">${escapeHtml(r.documento || '—')} · ${fecha}${r.vendedor ? ' · Vend: ' + escapeHtml(r.vendedor) : ''}</div>
+          </div>
+          <div class="row-state"><span class="chip ${chipClass}">${chipText}</span></div>
+        </div>`;
+    }).join('');
+  }
+
+  function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
+  }
+
+  // ═══════ DETAIL ═══════
+  function openDetail(id) {
+    currentDetailId = id;
+    const r = allRows.find(x => x.id === id);
+    if (!r) return;
+    document.getElementById('detailContent').innerHTML = renderDetail(r);
+    document.getElementById('detailBackdrop').classList.add('show');
+  }
+
+  function closeDetail() {
+    document.getElementById('detailBackdrop').classList.remove('show');
+    currentDetailId = null;
+  }
+
+  function renderDetail(r) {
+    const chipClass = r.estado === 'aprobado' ? 'approved' : (r.estado === 'rechazado' ? 'rejected' : 'pending');
+    const chipText = r.estado === 'aprobado' ? 'Aprobado' : (r.estado === 'rechazado' ? 'Rechazado' : 'A revisar');
+    const fecha = new Date(r.created_at).toLocaleString('es-AR');
+
+    let html = `
+      <div class="detail-header">
+        <h2>${escapeHtml(r.nombre)}</h2>
+        <div class="sub">${escapeHtml(r.documento)} · ${fecha}</div>
+        <div style="margin-top:8px;"><span class="chip ${chipClass}">${chipText}</span></div>
+      </div>`;
+
+    if (r.estado === 'rechazado' && r.errores_adm) {
+      html += `<div class="error-banner"><strong>Motivo del rechazo:</strong><br>${escapeHtml(r.errores_adm)}</div>`;
+    }
+    if (r.revisado_por) {
+      html += `<div class="kv"><span class="k">Revisado por</span><span class="v">${escapeHtml(r.revisado_por)}${r.revisado_at ? ' · ' + new Date(r.revisado_at).toLocaleString('es-AR') : ''}</span></div>`;
+    }
+    if (r.editado_por) {
+      html += `<div class="kv"><span class="k">Última edición</span><span class="v">${escapeHtml(r.editado_por)}${r.editado_at ? ' · ' + new Date(r.editado_at).toLocaleString('es-AR') : ''}</span></div>`;
+    }
+    if (r.vendedor) {
+      html += `<div class="kv"><span class="k">Vendedor asignado</span><span class="v">${escapeHtml(r.vendedor)}</span></div>`;
+    }
+
+    // PDF link
+    if (r.pdf_url) {
+      html += `<div style="margin:14px 0;"><a class="btn btn-primary btn-block" href="${r.pdf_url}" target="_blank">📄 Abrir PDF completo</a></div>`;
+    }
+
+    // Datos
+    html += '<div class="section-sep">Datos del formulario</div>';
+    const datos = r.datos || {};
+    for (const [k, v] of Object.entries(datos)) {
+      if (!v) continue;
+      if (k.endsWith('URL')) continue; // mostramos aparte
+      html += `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(v)}</span></div>`;
+    }
+
+    // Fotos DNI
+    const dniUrls = [];
+    if (datos['DNI Mi Argentina URL']) dniUrls.push(['Mi Argentina', datos['DNI Mi Argentina URL']]);
+    if (datos['DNI Frente URL']) dniUrls.push(['DNI - Frente', datos['DNI Frente URL']]);
+    if (datos['DNI Dorso URL'])  dniUrls.push(['DNI - Dorso',  datos['DNI Dorso URL']]);
+    if (dniUrls.length) {
+      html += '<div class="section-sep">Fotos del DNI</div>';
+      for (const [lbl, url] of dniUrls) {
+        html += `<div style="margin-bottom:10px;"><div style="font-size:12px; color:#5A6B7F; margin-bottom:4px;">${lbl}</div><a href="${url}" target="_blank"><img src="${url}" style="width:100%; max-height:240px; object-fit:contain; background:#000; border-radius:8px;"></a></div>`;
+      }
+    }
+
+    // Acciones según rol
+    html += '<div class="section-sep">Acciones</div>';
+
+    if (isAdmin) {
+      html += `
+        <div class="action-row two">
+          <button class="btn btn-success" onclick="doApprove(${r.id})">✓ Aprobar</button>
+          <button class="btn btn-danger" onclick="promptReject(${r.id})">✗ Rechazar</button>
+        </div>
+        <div id="rejectBlock" style="display:none; margin-top:12px;">
+          <div class="field">
+            <label>Motivo del rechazo (qué errores tiene)</label>
+            <textarea id="rejectReason" placeholder="Ej: La dirección personal no coincide con la del DNI. Falta completar nacionalidad del cónyuge."></textarea>
+          </div>
+          <button class="btn btn-danger btn-block" onclick="doReject(${r.id})">Confirmar rechazo</button>
+        </div>`;
+    } else {
+      // Ventas: asignar vendedor + editar
+      html += `
+        <div class="card" style="padding:14px; margin-bottom:10px;">
+          <div class="field" style="margin-bottom:8px;">
+            <label>Vendedor asignado</label>
+            <input type="text" id="vendedorInput" value="${escapeHtml(r.vendedor || '')}" placeholder="Nombre del vendedor">
+          </div>
+          <button class="btn btn-primary btn-block" onclick="doAssignVendedor(${r.id})">Guardar vendedor</button>
+        </div>
+        <a class="btn btn-secondary btn-block" href="vwfs.html?edit=${r.id}">✏️ Editar formulario</a>`;
+    }
+
+    return html;
+  }
+
+  // ═══════ ACTIONS ═══════
+  function promptReject(id) {
+    document.getElementById('rejectBlock').style.display = 'block';
+    document.getElementById('rejectReason').focus();
+  }
+
+  async function doApprove(id) {
+    if (!confirm('¿Aprobar este formulario? Esto va a quitarlo de la lista "A revisar".')) return;
+    await updateRow(id, {
+      estado: 'aprobado',
+      errores_adm: null,
+      revisado_por: currentUser,
+      revisado_at: new Date().toISOString()
+    });
+  }
+
+  async function doReject(id) {
+    const reason = document.getElementById('rejectReason').value.trim();
+    if (!reason) {
+      alert('Escribí el motivo del rechazo antes de confirmar.');
+      return;
+    }
+    await updateRow(id, {
+      estado: 'rechazado',
+      errores_adm: reason,
+      revisado_por: currentUser,
+      revisado_at: new Date().toISOString()
+    });
+  }
+
+  async function doAssignVendedor(id) {
+    const val = document.getElementById('vendedorInput').value.trim();
+    await updateRow(id, { vendedor: val || null });
+  }
+
+  async function updateRow(id, patch) {
+    try {
+      const res = await supaFetch('/rest/v1/formularios_vwfs?id=eq.' + id, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal'
+        },
+        body: JSON.stringify(patch)
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      closeDetail();
+      await loadRows();
+    } catch (e) {
+      alert('No se pudo guardar el cambio: ' + e.message);
+    }
+  }
+
+  // ═══════ INIT ═══════
+  document.getElementById('adminPass').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') doLogin();
+  });
+  document.getElementById('adminUser').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('adminPass').focus();
+  });
+
+  // Auto-login si hay sesión
+  const sessionUser = getSession();
+  if (sessionUser) {
+    enterPanel(sessionUser);
+  }
+</script>
+
+</body>
+</html>

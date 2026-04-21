@@ -1750,6 +1750,16 @@
     document.getElementById('uploadingState').style.display = '';
     document.getElementById('uploadReady').style.display = 'none';
     document.getElementById('uploadErrorState').style.display = 'none';
+    if (editMode) {
+      const h = document.querySelector('#uploadingState h3');
+      const p = document.querySelector('#uploadingState p');
+      if (h) h.textContent = 'Guardando cambios…';
+      if (p) p.textContent = 'Estamos actualizando el formulario y generando el PDF nuevo.';
+      const h2 = document.querySelector('#uploadReady h3');
+      const p2 = document.querySelector('#uploadReady p');
+      if (h2) h2.textContent = '✓ Cambios guardados';
+      if (p2) p2.textContent = 'El formulario queda nuevamente "A revisar" por administración.';
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
@@ -1760,6 +1770,11 @@
     for (const which of toUpload) {
       const img = dniImages[which];
       if (!img) continue;
+      // Si la imagen ya existe y no se reemplazó (sin File real), mantener URL.
+      if (img.existingUrl && !(img.file instanceof File)) {
+        urls[which] = img.existingUrl;
+        continue;
+      }
       const ext = img.file.type === 'image/png' ? 'png' : 'jpg';
       const fileName = 'dni/VWFS_' + safeName + '_' + timestamp + '_' + which + '.' + ext;
       try {
@@ -1809,22 +1824,44 @@
       if (dniUrls.frente) datosObj['DNI Frente URL'] = dniUrls.frente;
       if (dniUrls.dorso)  datosObj['DNI Dorso URL']  = dniUrls.dorso;
 
-      await supaFetch('/rest/v1/formularios_vwfs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
-          nombre: (g('apellido') + ', ' + g('nombre')).trim(),
-          documento: g('tipoDoc') + ' ' + g('nroDoc'),
-          email: g('email'),
-          celular: g('celular'),
-          f01_id: matchedF01Id,
-          pdf_url: supabasePdfUrl,
-          datos: datosObj
-        })
-      });
+      if (editMode && editingId) {
+        await supaFetch('/rest/v1/formularios_vwfs?id=eq.' + editingId, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            nombre: (g('apellido') + ', ' + g('nombre')).trim(),
+            documento: g('tipoDoc') + ' ' + g('nroDoc'),
+            email: g('email'),
+            celular: g('celular'),
+            pdf_url: supabasePdfUrl,
+            datos: datosObj,
+            estado: 'a_revisar',
+            errores_adm: null,
+            editado_por: editUser,
+            editado_at: new Date().toISOString()
+          })
+        });
+      } else {
+        await supaFetch('/rest/v1/formularios_vwfs', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({
+            nombre: (g('apellido') + ', ' + g('nombre')).trim(),
+            documento: g('tipoDoc') + ' ' + g('nroDoc'),
+            email: g('email'),
+            celular: g('celular'),
+            f01_id: matchedF01Id,
+            pdf_url: supabasePdfUrl,
+            datos: datosObj
+          })
+        });
+      }
 
       document.getElementById('uploadingState').style.display = 'none';
       document.getElementById('uploadReady').style.display = '';
@@ -1862,6 +1899,244 @@
 
   // Default PEP=No
   setToggle('pep', 'No');
+
+  // ═══════ EDIT MODE (panel ventas → vwfs.html?edit=ID) ═══════
+  let editMode = false;
+  let editingId = null;
+  let editingRecord = null;
+  let editUser = null;
+
+  function blobToDataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(blob);
+    });
+  }
+
+  async function loadDniFromExistingUrl(which, url) {
+    try {
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const blob = await res.blob();
+      const dataUrl = await blobToDataUrl(blob);
+      const dims = await getImgDims(dataUrl);
+      dniImages[which] = {
+        dataUrl,
+        file: null,
+        existingUrl: url,
+        w: dims.width,
+        h: dims.height,
+        size: blob.size
+      };
+      // Armo un pseudo-file para showDniPreview
+      dniImages[which].file = { size: blob.size, type: blob.type };
+      showDniPreview(which);
+    } catch (e) {
+      console.warn('No se pudo cargar DNI desde URL', url, e);
+    }
+  }
+
+  function prefillFromRecord(r) {
+    const d = r.datos || {};
+    const set = (id, v) => { if (v != null && v !== '') setField(id, v); };
+
+    // Iden tributaria
+    const idenRaw = d['Iden. tributaria'] || '';
+    const [idenTipo, ...idenRest] = idenRaw.split(' ');
+    if (idenTipo && ['CUIT','CUIL','Nº'].includes(idenTipo)) setToggle('idenTrib', idenTipo);
+    set('idenTribNro', idenRest.join(' '));
+
+    // Documento
+    const [docTipo, ...docRest] = (d['Documento'] || r.documento || '').split(' ');
+    if (docTipo) {
+      const sel = document.getElementById('tipoDoc');
+      if ([...sel.options].some(o => o.value === docTipo)) { sel.value = docTipo; sel.classList.add('prefilled'); }
+    }
+    set('nroDoc', docRest.join(' '));
+
+    set('apellido', d['Apellido']);
+    set('nombre',   d['Nombre']);
+    setToggle('sexo', d['Sexo']);
+    set('fechaNac',    d['Fecha nac.']);
+    set('nacionalidad', d['Nacionalidad']);
+    if (d['Estudios']) { const es = document.getElementById('estudios'); es.value = d['Estudios']; es.classList.add('prefilled'); }
+    setToggle('pep', d['PEP'] || 'No');
+
+    set('email',    d['E-mail'] || r.email);
+    set('telFijo',  d['Tel. fijo']);
+    set('celular',  d['Celular'] || r.celular);
+
+    // Dirección personal: viene como 'Dirección' compuesto "Calle Nro Piso UF"
+    // Tratamos de partir en calle/número como mejor-esfuerzo.
+    const dirFull = d['Dirección'] || '';
+    const mDir = dirFull.match(/^(.+?)\s+(\d+\w*)(?:\s+(.*))?$/);
+    if (mDir) {
+      set('domCalle', mDir[1]);
+      set('domNro', mDir[2]);
+      if (mDir[3]) set('domPiso', mDir[3]);
+    } else set('domCalle', dirFull);
+    set('domProvincia', d['Provincia']);
+    set('domLocalidad', d['Localidad']);
+    set('domCP', d['CP']);
+
+    // Banco Francés
+    const bco = d['Cuenta BBVA'];
+    if (bco) {
+      const mode = bco.startsWith('Sí') ? 'si' : 'no';
+      setBcoFrances(mode);
+      setToggle('bcoFrances', bco);
+      if (mode === 'no') {
+        set('bcoProv', d['Sucursal — Provincia']);
+        onProvinciaBcoChange();
+        set('bcoBarrio',    d['Sucursal — Barrio']);
+        set('bcoLocalidad', d['Sucursal — Localidad']);
+        set('bcoSucursal',  d['Sucursal — Referencia']);
+      }
+    }
+
+    // Estado civil
+    if (d['Estado civil']) {
+      const ec = document.getElementById('estadoCivil');
+      ec.value = d['Estado civil'];
+      ec.classList.add('prefilled');
+      toggleConyuge();
+    }
+
+    // Cónyuge
+    if (d['Iden. trib.']) {
+      const [tipo, ...rest] = d['Iden. trib.'].split(' ');
+      if (tipo) setToggle('cony-idenTrib', tipo);
+      set('cony-idenTribNro', rest.join(' '));
+    }
+    const conyDoc = d['Doc.'] || '';
+    const [cdTipo, ...cdRest] = conyDoc.split(' ');
+    if (cdTipo) { const s = document.getElementById('cony-tipoDoc'); if ([...s.options].some(o=>o.value===cdTipo)) s.value = cdTipo; }
+    set('cony-nroDoc',        cdRest.join(' '));
+    set('cony-apellido',      d['Apellido (2)']);
+    set('cony-nombre',        d['Nombre (2)']);
+    setToggle('cony-sexo',    d['Sexo (2)']);
+    set('cony-fechaNac',      d['Fecha nac. (2)']);
+    set('cony-nacionalidad',  d['Nacionalidad (2)']);
+    set('cony-ingFijos',      (d['Ingresos fijos'] || '').replace('$',''));
+    set('cony-ingVar',        (d['Ingresos variables'] || '').replace('$',''));
+
+    // Laboral
+    setToggle('sitLaboral', d['Situación laboral']);
+    set('ocupacion',  d['Ocupación']);
+    set('actividad',  d['Actividad']);
+    set('antiguedad', d['Antigüedad']);
+    set('empresa',    d['Empresa']);
+    set('telComercial', d['Tel. comercial']);
+
+    if (d['Dom. comercial'] === 'Igual al personal') {
+      document.getElementById('domComIgual').checked = true;
+      toggleDomComercial();
+    } else {
+      set('comCalle',      d['Dirección (2)'] || '');
+      set('comProvincia',  d['Provincia (2)']);
+      set('comLocalidad',  d['Localidad (2)']);
+      set('comCP',         d['CP (2)']);
+    }
+
+    // Ingresos cliente
+    set('ingFijos',       (d['Ingresos fijos'] || '').replace('$',''));
+    set('ingVar',         (d['Ingresos variables'] || '').replace('$',''));
+    set('grupoFamiliar',  d['Grupo familiar']);
+    set('personasCargo',  d['Personas a cargo']);
+    setToggle('tipoIva',  d['Cond. IVA']);
+
+    // Vivienda
+    setToggle('sitVivienda', d['Situación']);
+    set('anosResidencia',    d['Años residencia']);
+    set('valLocativo',       (d['Valor locativo'] || '').replace('$',''));
+    set('valInmueble',       (d['Valor inmueble'] || '').replace('$',''));
+
+    // Cotitular
+    if (d['Tipo persona']) {
+      document.getElementById('tieneCotit').checked = true;
+      toggleCotit();
+      setToggle('cotit-tipoPersona', d['Tipo persona']);
+      const [tipo, ...rest] = (d['Iden. trib. (2)'] || '').split(' ');
+      if (tipo) setToggle('cotit-idenTrib', tipo);
+      set('cotit-idenTribNro', rest.join(' '));
+      const [cdt, ...cdr] = (d['Doc. (2)'] || '').split(' ');
+      if (cdt) { const s = document.getElementById('cotit-tipoDoc'); if ([...s.options].some(o=>o.value===cdt)) s.value = cdt; }
+      set('cotit-nroDoc', cdr.join(' '));
+      set('cotit-apellido', d['Apellido (3)']);
+      set('cotit-nombre',   d['Nombre (3)']);
+      setToggle('cotit-sexo', d['Sexo (3)']);
+      set('cotit-fechaNac', d['Fecha nac. (3)']);
+    }
+
+    // DNI
+    const dniModeStr = d['DNI modo'];
+    if (dniModeStr === 'Mi Argentina') {
+      setDniMode('miarg');
+      setToggle('dniMode', 'Sí, ya tengo'); // chequear si aplica — este toggle es distinto
+      document.querySelectorAll('.toggle-btn[data-field="dniMode"]').forEach(b =>
+        b.classList.toggle('selected', b.dataset.value === 'miarg'));
+      toggleValues['dniMode'] = 'miarg';
+    } else if (dniModeStr === 'Foto DNI físico') {
+      setDniMode('fisico');
+      document.querySelectorAll('.toggle-btn[data-field="dniMode"]').forEach(b =>
+        b.classList.toggle('selected', b.dataset.value === 'fisico'));
+      toggleValues['dniMode'] = 'fisico';
+    }
+
+    document.getElementById('dniConfirm').checked = true;
+    updateDniConfirmVisibility();
+  }
+
+  async function loadEditRecord(id) {
+    try {
+      const res = await supaFetch('/rest/v1/formularios_vwfs?id=eq.' + id, {
+        headers: { 'Accept': 'application/json' }
+      });
+      const rows = await res.json();
+      if (!Array.isArray(rows) || !rows.length) {
+        alert('No se encontró el formulario a editar.');
+        return false;
+      }
+      editingRecord = rows[0];
+      prefillFromRecord(editingRecord);
+
+      const d = editingRecord.datos || {};
+      const dniLoads = [];
+      if (d['DNI Mi Argentina URL']) dniLoads.push(loadDniFromExistingUrl('miarg', d['DNI Mi Argentina URL']));
+      if (d['DNI Frente URL'])       dniLoads.push(loadDniFromExistingUrl('frente', d['DNI Frente URL']));
+      if (d['DNI Dorso URL'])        dniLoads.push(loadDniFromExistingUrl('dorso',  d['DNI Dorso URL']));
+      await Promise.all(dniLoads);
+
+      return true;
+    } catch (e) {
+      console.error(e);
+      alert('Error cargando el formulario: ' + e.message);
+      return false;
+    }
+  }
+
+  // Init edit mode
+  (async function initEditMode() {
+    const params = new URLSearchParams(window.location.search);
+    const editId = params.get('edit');
+    if (!editId) return;
+
+    editMode = true;
+    editingId = parseInt(editId, 10);
+    editUser = sessionStorage.getItem('vwfs_admin_user') || 'ventas';
+
+    // UI: ocultar entry screen, mostrar loading
+    document.getElementById('entryScreen').innerHTML =
+      '<div class="selector-card" style="text-align:center;"><h2>Cargando formulario…</h2>' +
+      '<p>Traemos los datos para editar. Un momento.</p></div>';
+
+    const ok = await loadEditRecord(editingId);
+    if (ok) {
+      startForm();
+    }
+  })();
 </script>
 
 </body>
