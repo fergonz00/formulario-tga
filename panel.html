@@ -496,15 +496,30 @@
       html += `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(v)}</span></div>`;
     }
 
-    // Fotos DNI
-    const dniUrls = [];
-    if (datos['DNI Mi Argentina URL']) dniUrls.push(['Mi Argentina', datos['DNI Mi Argentina URL']]);
-    if (datos['DNI Frente URL']) dniUrls.push(['DNI - Frente', datos['DNI Frente URL']]);
-    if (datos['DNI Dorso URL'])  dniUrls.push(['DNI - Dorso',  datos['DNI Dorso URL']]);
-    if (dniUrls.length) {
-      html += '<div class="section-sep">Fotos del DNI</div>';
-      for (const [lbl, url] of dniUrls) {
-        html += `<div style="margin-bottom:10px;"><div style="font-size:12px; color:#5A6B7F; margin-bottom:4px;">${lbl}</div><a href="${url}" target="_blank"><img src="${url}" style="width:100%; max-height:240px; object-fit:contain; background:#000; border-radius:8px;"></a></div>`;
+    // Fotos adjuntas (cualquier key de datos que termine en " URL")
+    const adjuntos = [];
+    for (const [k, v] of Object.entries(datos)) {
+      if (typeof v === 'string' && k.endsWith(' URL') && v.startsWith('http')) {
+        const lbl = k.replace(/ URL$/, '').replace(/^DNI /, '').trim() || k;
+        adjuntos.push([lbl || k, v]);
+      }
+    }
+    if (adjuntos.length) {
+      html += '<div class="section-sep">Documentación adjunta</div>';
+      for (const [lbl, url] of adjuntos) {
+        const isImage = /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url);
+        const fileName = url.split('/').pop().split('?')[0];
+        html += `
+          <div style="margin-bottom:14px;">
+            <div style="font-size:12px; color:#5A6B7F; margin-bottom:6px; font-weight:600;">${escapeHtml(lbl)}</div>
+            ${isImage
+              ? `<a href="${url}" target="_blank"><img src="${url}" style="width:100%; max-height:240px; object-fit:contain; background:#000; border-radius:8px;"></a>`
+              : ''}
+            <div style="display:flex; gap:6px; margin-top:6px;">
+              <a class="btn btn-secondary" style="flex:1; font-size:12px; padding:8px 10px;" href="${url}" target="_blank">Abrir</a>
+              <a class="btn btn-primary"   style="flex:1; font-size:12px; padding:8px 10px;" href="${url}" download="${escapeHtml(fileName)}">⬇ Descargar</a>
+            </div>
+          </div>`;
       }
     }
 

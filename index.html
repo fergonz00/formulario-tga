@@ -1553,6 +1553,42 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 
   let supabasePdfUrl = '';
 
+  async function uploadF01DniImages(safeName, timestamp) {
+    const urls = {};
+    const keys = formType === 'fisica'
+      ? [
+          ['prev-pf-dni1',   'DNI Titular Frente'],
+          ['prev-pf-dni2',   'DNI Titular Dorso'],
+          ['prev-pf-dniCon', 'DNI Cónyuge'],
+          ['prev-pf-dniT2',  'DNI 2° Titular']
+        ]
+      : [
+          ['prev-pj-dni1', 'DNI Firmante Frente'],
+          ['prev-pj-dni2', 'DNI Firmante Dorso']
+        ];
+    for (const [imgKey, label] of keys) {
+      const img = uploadedImages[imgKey];
+      if (!img || !img.data) continue;
+      const ext = (img.type || '').includes('png') ? 'png' : 'jpg';
+      const fileName = 'dni/F01_' + safeName + '_' + timestamp + '_' + imgKey + '.' + ext;
+      try {
+        const r = await fetch(img.data);
+        const blob = await r.blob();
+        const res = await supaFetch('/storage/v1/object/formularios-f01/' + fileName, {
+          method: 'POST',
+          headers: { 'Content-Type': img.type || 'image/jpeg' },
+          body: blob
+        });
+        if (res.ok) {
+          urls[label + ' URL'] = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
+        }
+      } catch (e) {
+        console.error('F01 DNI upload failed', imgKey, e);
+      }
+    }
+    return urls;
+  }
+
   async function uploadToSupabase(doc, clientName) {
     try {
       const blob = doc.output('blob');
@@ -1573,11 +1609,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 
       supabasePdfUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
 
+      // 1b. Upload DNI images to bucket
+      const dniUrls = await uploadF01DniImages(safe, timestamp);
+
       // 2. Get form data
       const documento = formType === 'fisica' ? g('pf-tipoDoc') + ' ' + g('pf-nroDoc') : g('pj-cuit');
       const celular = formType === 'fisica' ? g('pf-celular') : g('pj-celular');
       const email = formType === 'fisica' ? g('pf-email') : g('pj-email');
       const allData = formType === 'fisica' ? getPFData() : getPJData();
+
+      const datosObj = Object.fromEntries(allData.filter(([l,v]) => l && v && !l.startsWith('—')));
+      Object.assign(datosObj, dniUrls);
 
       // 3. Insert record
       await supaFetch('/rest/v1/formularios_f01', {
@@ -1593,7 +1635,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           celular: celular,
           email: email,
           pdf_url: supabasePdfUrl,
-          datos: Object.fromEntries(allData.filter(([l,v]) => l && v && !l.startsWith('—')))
+          datos: datosObj
         })
       });
 

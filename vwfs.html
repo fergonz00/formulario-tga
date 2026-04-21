@@ -1100,6 +1100,18 @@
   // ═══════ HELPERS ═══════
   function g(id) { const el = document.getElementById(id); return el ? (el.value || '') : ''; }
 
+  function fmtARS(v) {
+    if (v == null || v === '') return '';
+    const n = Number(String(v).replace(/[^\d]/g, ''));
+    if (!isFinite(n) || n === 0) return '';
+    return '$ ' + n.toLocaleString('es-AR');
+  }
+
+  function parseARS(v) {
+    if (v == null) return '';
+    return String(v).replace(/[^\d]/g, '');
+  }
+
   function setField(id, value) {
     const el = document.getElementById(id);
     if (!el || value == null || value === '') return;
@@ -1584,8 +1596,8 @@
         ['Sexo', toggleValues['cony-sexo'] || ''],
         ['Fecha nac.', g('cony-fechaNac')],
         ['Nacionalidad', g('cony-nacionalidad')],
-        ['Ingresos fijos', g('cony-ingFijos') ? '$' + g('cony-ingFijos') : ''],
-        ['Ingresos variables', g('cony-ingVar') ? '$' + g('cony-ingVar') : ''],
+        ['Ingresos fijos', fmtARS(g('cony-ingFijos'))],
+        ['Ingresos variables', fmtARS(g('cony-ingVar'))],
       );
     }
 
@@ -1614,8 +1626,8 @@
 
     items.push(
       ['— INGRESOS —', ''],
-      ['Ingresos fijos', g('ingFijos') ? '$' + g('ingFijos') : ''],
-      ['Ingresos variables', g('ingVar') ? '$' + g('ingVar') : ''],
+      ['Ingresos fijos', fmtARS(g('ingFijos'))],
+      ['Ingresos variables', fmtARS(g('ingVar'))],
       ['Grupo familiar', g('grupoFamiliar')],
       ['Personas a cargo', g('personasCargo')],
       ['Cond. IVA', toggleValues['tipoIva'] || ''],
@@ -1623,8 +1635,8 @@
       ['— VIVIENDA —', ''],
       ['Situación', toggleValues['sitVivienda'] || ''],
       ['Años residencia', g('anosResidencia')],
-      ['Valor locativo', g('valLocativo') ? '$' + g('valLocativo') : ''],
-      ['Valor inmueble', g('valInmueble') ? '$' + g('valInmueble') : ''],
+      ['Valor locativo', fmtARS(g('valLocativo'))],
+      ['Valor inmueble', fmtARS(g('valInmueble'))],
     );
 
     if (document.getElementById('tieneCotit').checked) {
@@ -1637,10 +1649,20 @@
         ['Nombre', g('cotit-nombre')],
         ['Sexo', toggleValues['cotit-sexo'] || ''],
         ['Fecha nac.', g('cotit-fechaNac')],
-        ['Ingresos fijos', g('cotit-ingFijos') ? '$' + g('cotit-ingFijos') : ''],
-        ['Ingresos variables', g('cotit-ingVar') ? '$' + g('cotit-ingVar') : ''],
+        ['Ingresos fijos', fmtARS(g('cotit-ingFijos'))],
+        ['Ingresos variables', fmtARS(g('cotit-ingVar'))],
       );
     }
+
+    // Documentación (DNI)
+    const dniCargado =
+      (dniMode === 'miarg' && dniImages.miarg) ||
+      (dniMode === 'fisico' && dniImages.frente && dniImages.dorso);
+    items.push(
+      ['— DOCUMENTACIÓN —', ''],
+      ['Tipo de carga', dniMode === 'miarg' ? 'Mi Argentina' : (dniMode === 'fisico' ? 'Foto DNI físico' : '')],
+      ['DNI cargado', dniCargado ? 'Sí ✓ (ver páginas adjuntas)' : 'No'],
+    );
 
     return items;
   }
@@ -1741,8 +1763,19 @@
       const x = (pageW - drawW) / 2;
       const y = margin + 10;
       const fmt = img.dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
-      try { doc.addImage(img.dataUrl, fmt, x, y, drawW, drawH); }
-      catch (e) { console.error('addImage failed', e); }
+      try {
+        doc.addImage(img.dataUrl, fmt, x, y, drawW, drawH);
+      } catch (e) {
+        console.error('addImage failed', e);
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(11);
+        doc.setTextColor(228, 0, 43);
+        doc.text('La foto no se pudo incluir en el PDF.', pageW / 2, pageH / 2 - 10, { align: 'center' });
+        doc.setFontSize(9);
+        doc.setTextColor(90, 107, 127);
+        doc.text('La foto sí se subió al sistema y se puede consultar desde el panel administrativo.',
+          pageW / 2, pageH / 2, { align: 'center' });
+      }
     }
   }
 
@@ -2023,8 +2056,8 @@
     setToggle('cony-sexo',    d['Sexo (2)']);
     set('cony-fechaNac',      d['Fecha nac. (2)']);
     set('cony-nacionalidad',  d['Nacionalidad (2)']);
-    set('cony-ingFijos',      (d['Ingresos fijos'] || '').replace('$',''));
-    set('cony-ingVar',        (d['Ingresos variables'] || '').replace('$',''));
+    set('cony-ingFijos', parseARS(d['Ingresos fijos']));
+    set('cony-ingVar',   parseARS(d['Ingresos variables']));
 
     // Laboral
     setToggle('sitLaboral', d['Situación laboral']);
@@ -2045,8 +2078,8 @@
     }
 
     // Ingresos cliente
-    set('ingFijos',       (d['Ingresos fijos'] || '').replace('$',''));
-    set('ingVar',         (d['Ingresos variables'] || '').replace('$',''));
+    set('ingFijos', parseARS(d['Ingresos fijos']));
+    set('ingVar',   parseARS(d['Ingresos variables']));
     set('grupoFamiliar',  d['Grupo familiar']);
     set('personasCargo',  d['Personas a cargo']);
     setToggle('tipoIva',  d['Cond. IVA']);
@@ -2054,8 +2087,8 @@
     // Vivienda
     setToggle('sitVivienda', d['Situación']);
     set('anosResidencia',    d['Años residencia']);
-    set('valLocativo',       (d['Valor locativo'] || '').replace('$',''));
-    set('valInmueble',       (d['Valor inmueble'] || '').replace('$',''));
+    set('valLocativo', parseARS(d['Valor locativo']));
+    set('valInmueble', parseARS(d['Valor inmueble']));
 
     // Cotitular
     if (d['Tipo persona']) {
