@@ -1327,28 +1327,44 @@
       dniAnalisis = data;
       loader.style.display = 'none';
 
-      // 3. Mostrar resultado segun calidad
+      // 3. Mostrar resultado con detalle por cara (legibilidad, nitidez, bordes)
       const cal = data.calidad || {};
+      const cardFor = (label, c) => {
+        if (!c) return '';
+        const row = (ok, txtOk, txtBad) =>
+          '<div style="display:flex; gap:6px; align-items:center; font-size:13px; padding:2px 0;">' +
+            '<span style="color:' + (ok ? 'var(--vw-green)' : 'var(--vw-red)') + '; font-weight:700;">' + (ok ? '✓' : '✗') + '</span>' +
+            '<span>' + (ok ? txtOk : txtBad) + '</span>' +
+          '</div>';
+        return (
+          '<div style="background: var(--vw-white); border:1px solid var(--vw-new-horizon); border-radius:10px; padding:10px 12px; margin-top:8px;">' +
+            '<div style="font-weight:700; margin-bottom:4px;">' + label + '</div>' +
+            row(!!c.legible, 'Legible', 'No se lee bien') +
+            row(!c.blur,     'Foto nítida (sin blur)', 'Foto con blur / desenfocada') +
+            row(!c.bordes_cortados, 'Los 4 bordes visibles', 'Bordes cortados / DNI fuera de encuadre') +
+            (c.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + c.motivo + '</div>' : '') +
+          '</div>'
+        );
+      };
+
+      const detalle = cardFor('Frente', cal.frente) + cardFor('Dorso', cal.dorso);
+
       if (cal.ok_global === true) {
         dniAnalisisOk = true;
         resultEl.innerHTML =
           '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: var(--vw-green);">' +
             '<strong>✓ DNI OK.</strong> La IA pudo leer los datos correctamente. ' +
             'Precargamos el formulario con lo que leyó. Revisalo en el siguiente paso y editá lo que haga falta.' +
-          '</div>';
+          '</div>' + detalle;
         resultEl.style.display = '';
         prefillFromDniExtraido(data.extraido || {});
       } else {
         dniAnalisisOk = false;
-        const motivos = [];
-        if (cal.frente && !cal.frente.ok) motivos.push('Frente: ' + (cal.frente.motivo || 'no se ve bien'));
-        if (cal.dorso && !cal.dorso.ok) motivos.push('Dorso: ' + (cal.dorso.motivo || 'no se ve bien'));
         resultEl.innerHTML =
           '<div class="info-callout err">' +
-            '<strong>✗ El DNI no cumple.</strong> ' +
-            (motivos.length ? motivos.join(' · ') : 'Volvé a sacar las fotos con mejor luz y los 4 bordes del DNI visibles.') +
-          '</div>' +
-          '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetDniForRetry()">Sacar foto de nuevo</button>';
+            '<strong>✗ El DNI no cumple.</strong> Mirá el detalle abajo y sacá las fotos de nuevo.' +
+          '</div>' + detalle +
+          '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetDniForRetry()">Sacar fotos de nuevo</button>';
         resultEl.style.display = '';
       }
 
