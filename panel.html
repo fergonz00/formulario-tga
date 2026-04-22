@@ -47,7 +47,7 @@
     font-family: inherit;
   }
 
-  .container { padding: 16px; max-width: 720px; margin: 0 auto; }
+  .container { padding: 16px; max-width: 800px; margin: 0 auto; }
 
   .card {
     background: white; border-radius: var(--radius);
@@ -80,8 +80,10 @@
   .btn-primary { background: var(--vw-cobalt); color: white; }
   .btn-success { background: var(--vw-green); color: white; }
   .btn-danger  { background: var(--vw-red);   color: white; }
+  .btn-amber   { background: var(--vw-amber); color: white; }
   .btn-secondary { background: var(--vw-new-horizon-20); color: var(--vw-dark-blue); }
   .btn-block { width: 100%; display: block; }
+  .btn[disabled] { opacity: 0.5; cursor: not-allowed; }
 
   .tabs {
     display: flex; gap: 0; background: white; border-radius: var(--radius);
@@ -153,10 +155,13 @@
   .chip {
     font-size: 11px; padding: 3px 10px; border-radius: 10px;
     font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;
+    white-space: nowrap;
   }
   .chip.pending  { background: #FFF3E0; color: #BF5A00; }
   .chip.approved { background: #E8F5E9; color: var(--vw-green); }
   .chip.rejected { background: #FFEBEE; color: var(--vw-red); }
+  .chip.info     { background: #E3F2FD; color: #1565C0; }
+  .chip.muted    { background: #F5F5F5; color: #757575; }
 
   /* Detail view */
   .detail-backdrop {
@@ -211,11 +216,50 @@
 
   .action-row { display: grid; gap: 8px; margin-top: 14px; }
   .action-row.two { grid-template-columns: 1fr 1fr; }
+  .action-row.three { grid-template-columns: 1fr 1fr 1fr; }
 
   .empty-state { text-align: center; padding: 60px 20px; color: #5A6B7F; }
   .empty-state .emoji { font-size: 40px; margin-bottom: 10px; }
 
   .loading { text-align: center; padding: 40px 20px; color: #5A6B7F; font-size: 14px; }
+
+  /* DNI check list (IA quality results) */
+  .check-card {
+    background: white; border: 1px solid var(--vw-new-horizon);
+    border-radius: 10px; padding: 10px 12px; margin-top: 8px;
+  }
+  .check-row { display: flex; gap: 6px; align-items: center; font-size: 13px; padding: 2px 0; }
+  .check-row .t-ok  { color: var(--vw-green); font-weight: 700; }
+  .check-row .t-bad { color: var(--vw-red); font-weight: 700; }
+
+  /* Mismatches table */
+  .mismatch-row {
+    display: grid; grid-template-columns: 110px 1fr 1fr 60px;
+    gap: 8px; padding: 8px 0; font-size: 12px;
+    border-bottom: 1px solid var(--vw-new-horizon-20);
+  }
+  .mismatch-row.header { font-weight: 700; font-size: 11px; text-transform: uppercase; color: #5A6B7F; }
+  .mismatch-row .bad { color: var(--vw-red); font-weight: 700; }
+  .mismatch-row .ok  { color: var(--vw-green); font-weight: 700; }
+
+  /* Comprobantes table */
+  .comp-table { width: 100%; margin-top: 6px; font-size: 13px; }
+  .comp-table th, .comp-table td {
+    text-align: left; padding: 8px 6px;
+    border-bottom: 1px solid var(--vw-new-horizon-20);
+  }
+  .comp-table th { font-size: 11px; color: #5A6B7F; text-transform: uppercase; letter-spacing: 0.3px; }
+  .comp-table .right { text-align: right; }
+  .comp-table tfoot td { font-weight: 800; border-top: 2px solid var(--vw-dark-blue); }
+
+  .spinner {
+    width: 20px; height: 20px;
+    border: 3px solid rgba(0,64,193,0.2);
+    border-top-color: var(--vw-cobalt);
+    border-radius: 50%; animation: spin 0.8s linear infinite;
+    display: inline-block; vertical-align: middle;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
@@ -268,10 +312,16 @@
     </div>
 
     <div class="filters" id="filters">
-      <button class="filter-chip active" data-filter="all" onclick="setFilter('all')">Todos <span class="count" id="cnt-all">0</span></button>
-      <button class="filter-chip" data-filter="a_revisar" onclick="setFilter('a_revisar')">A revisar <span class="count" id="cnt-a_revisar">0</span></button>
-      <button class="filter-chip" data-filter="rechazado" onclick="setFilter('rechazado')">Rechazados <span class="count" id="cnt-rechazado">0</span></button>
-      <button class="filter-chip" data-filter="aprobado" onclick="setFilter('aprobado')">Aprobados <span class="count" id="cnt-aprobado">0</span></button>
+      <button class="filter-chip active" data-filter="all"                 onclick="setFilter('all')">Todos <span class="count" id="cnt-all">0</span></button>
+      <button class="filter-chip"        data-filter="datero_cargado"     onclick="setFilter('datero_cargado')">Por revisar <span class="count" id="cnt-datero_cargado">0</span></button>
+      <button class="filter-chip"        data-filter="vendedor_revisando" onclick="setFilter('vendedor_revisando')">En correcciones <span class="count" id="cnt-vendedor_revisando">0</span></button>
+      <button class="filter-chip"        data-filter="en_carga_vw"        onclick="setFilter('en_carga_vw')">En carga VW <span class="count" id="cnt-en_carga_vw">0</span></button>
+      <button class="filter-chip"        data-filter="pdf_vw_cargado"     onclick="setFilter('pdf_vw_cargado')">PDF VW cargado <span class="count" id="cnt-pdf_vw_cargado">0</span></button>
+      <button class="filter-chip"        data-filter="admin_revisando"    onclick="setFilter('admin_revisando')">En admin <span class="count" id="cnt-admin_revisando">0</span></button>
+      <button class="filter-chip"        data-filter="aprobado"           onclick="setFilter('aprobado')">Aprobados <span class="count" id="cnt-aprobado">0</span></button>
+      <button class="filter-chip"        data-filter="rechazado"          onclick="setFilter('rechazado')">Rechazados <span class="count" id="cnt-rechazado">0</span></button>
+      <button class="filter-chip"        data-filter="rechazado_dni"      onclick="setFilter('rechazado_dni')">Rechazados DNI <span class="count" id="cnt-rechazado_dni">0</span></button>
+      <button class="filter-chip"        data-filter="a_revisar"          onclick="setFilter('a_revisar')">Legacy <span class="count" id="cnt-a_revisar">0</span></button>
     </div>
 
     <div id="rowList">
@@ -293,7 +343,7 @@
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqZmdsc2FmZ2FsdHVzbWJuY2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MzM2OTksImV4cCI6MjA4OTAwOTY5OX0.OOwgyKDNQsbBaGDaL0OhJfc8eOsCClvvAPW0VFBKrOA';
 
   async function supaFetch(path, options = {}) {
-    const res = await fetch(SUPABASE_URL + path, {
+    return fetch(SUPABASE_URL + path, {
       ...options,
       headers: {
         'apikey': SUPABASE_KEY,
@@ -301,13 +351,14 @@
         ...options.headers
       }
     });
-    return res;
   }
 
-  let currentUser = null;
-  let isAdmin = false;
-  let currentTab = 'vwfs';          // 'vwfs' | 'f01'
+  // ═══════ STATE ═══════
+  let currentUser = null;       // nombre de usuario logueado
+  let currentRole = 'ventas';   // 'ventas' | 'administracion' | 'owner'
+  let currentTab = 'vwfs';
   const rowsCache = { vwfs: null, f01: null };
+  const comprobantesCache = {}; // { vwfsId: [row,...] }
   let filter = 'all';
   let currentDetailId = null;
 
@@ -317,31 +368,43 @@
   };
 
   const VENDEDORES = [
-    'Antonio Loisi',
-    'Daniel López',
-    'Gisela Buena',
-    'Inés Alonso',
-    'Jorge Fazzini',
-    'José Castro',
-    'Julián Naddeo',
-    'Marta Castro',
-    'TG — Ventas de Gerencia'
+    'Antonio Loisi','Daniel López','Gisela Buena','Inés Alonso','Jorge Fazzini',
+    'José Castro','Julián Naddeo','Marta Castro','TG — Ventas de Gerencia'
   ];
+  const ADMINISTRATIVAS = ['Antonella','Valeria','Mercedes','Mónica'];
 
-  const ADMINISTRATIVAS = ['Antonella', 'Valeria', 'Mercedes', 'Mónica'];
+  // Mapeo de estados a labels + chip class
+  const ESTADOS = {
+    datero_cargado:     { label: 'Por revisar',      chip: 'pending'  },
+    vendedor_revisando: { label: 'En correcciones', chip: 'pending'  },
+    en_carga_vw:        { label: 'En carga VW',     chip: 'info'     },
+    pdf_vw_cargado:     { label: 'PDF VW cargado',  chip: 'info'     },
+    admin_revisando:    { label: 'En admin',         chip: 'pending'  },
+    aprobado:           { label: 'Aprobado',         chip: 'approved' },
+    rechazado:          { label: 'Rechazado',        chip: 'rejected' },
+    rechazado_dni:      { label: 'Rechazado DNI',    chip: 'rejected' },
+    a_revisar:          { label: 'A revisar',        chip: 'pending'  }
+  };
+  const ESTADO_KEYS = Object.keys(ESTADOS);
 
-  let filterVendedor = '';        // '' = todos, '__none__' = sin asignar, o nombre exacto
+  const TIPOS_COMPROBANTE = ['Seña', 'Refuerzo', 'Cancelación', 'Otro'];
+
+  let filterVendedor = '';
   let filterAdministrativa = '';
 
   // ═══════ SESSION ═══════
-  function saveSession(user) {
+  function saveSession(user, role) {
     sessionStorage.setItem('vwfs_admin_user', user);
+    sessionStorage.setItem('vwfs_admin_role', role || 'ventas');
   }
   function clearSession() {
     sessionStorage.removeItem('vwfs_admin_user');
+    sessionStorage.removeItem('vwfs_admin_role');
   }
   function getSession() {
-    return sessionStorage.getItem('vwfs_admin_user');
+    const user = sessionStorage.getItem('vwfs_admin_user');
+    const role = sessionStorage.getItem('vwfs_admin_role') || 'ventas';
+    return user ? { user, role } : null;
   }
 
   async function doLogin() {
@@ -349,26 +412,21 @@
     const pass = document.getElementById('adminPass').value;
     const err = document.getElementById('loginError');
     err.style.display = 'none';
-
     if (!user || !pass) {
       err.textContent = 'Completá usuario y contraseña.';
-      err.style.display = '';
-      return;
+      err.style.display = ''; return;
     }
-
     try {
       const res = await supaFetch('/rest/v1/f01_admins?usuario=eq.' + encodeURIComponent(user)
-        + '&clave=eq.' + encodeURIComponent(pass), {
-        headers: { 'Accept': 'application/json' }
-      });
+        + '&clave=eq.' + encodeURIComponent(pass), { headers: { 'Accept': 'application/json' } });
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) {
         err.textContent = 'Usuario o contraseña incorrectos.';
-        err.style.display = '';
-        return;
+        err.style.display = ''; return;
       }
-      enterPanel(user);
-      saveSession(user);
+      const role = data[0].rol || (user === 'administracion' ? 'administracion' : 'ventas');
+      enterPanel(user, role);
+      saveSession(user, role);
     } catch (e) {
       console.error(e);
       err.textContent = 'Error de conexión. Intentá de nuevo.';
@@ -376,18 +434,20 @@
     }
   }
 
-  function enterPanel(user) {
+  function isAdminOrOwner() { return currentRole === 'administracion' || currentRole === 'owner'; }
+  function isOwner() { return currentRole === 'owner'; }
+
+  function enterPanel(user, role) {
     currentUser = user;
-    isAdmin = (user === 'administracion');
-    document.getElementById('userChip').textContent =
-      (isAdmin ? '🛡️ ' : '💼 ') + user + (isAdmin ? ' (admin)' : ' (ventas)');
+    currentRole = role || 'ventas';
+    const emoji = currentRole === 'owner' ? '👑' : (currentRole === 'administracion' ? '🛡️' : '💼');
+    const roleLabel = currentRole === 'owner' ? 'owner' : (currentRole === 'administracion' ? 'admin' : 'ventas');
+    document.getElementById('userChip').textContent = emoji + ' ' + user + ' (' + roleLabel + ')';
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('panelScreen').style.display = '';
     populateAsignacionSelects();
-    // Solo admin ve el filtro de administrativa
-    document.getElementById('adminFilterBlock').style.display = isAdmin ? '' : 'none';
-    document.getElementById('rowFilters').classList.toggle('two', isAdmin);
-    // Cargar ambas tabs al iniciar (para mostrar counts correctos en las pestañas).
+    document.getElementById('adminFilterBlock').style.display = isAdminOrOwner() ? '' : 'none';
+    document.getElementById('rowFilters').classList.toggle('two', isAdminOrOwner());
     Promise.all([loadTab('vwfs'), loadTab('f01')]).then(() => setTab('vwfs'));
   }
 
@@ -396,26 +456,16 @@
       + '<option value="__none__">Todavía no asignado</option>'
       + VENDEDORES.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join('');
     document.getElementById('vendedorFilter').innerHTML = vOpts;
-
     const aOpts = '<option value="">Todas las administrativas</option>'
       + '<option value="__none__">Todavía no asignada</option>'
       + ADMINISTRATIVAS.map(a => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join('');
     document.getElementById('administrativaFilter').innerHTML = aOpts;
   }
 
-  function setVendedorFilter(v) {
-    filterVendedor = v;
-    renderList();
-  }
-  function setAdministrativaFilter(v) {
-    filterAdministrativa = v;
-    renderList();
-  }
+  function setVendedorFilter(v) { filterVendedor = v; renderList(); }
+  function setAdministrativaFilter(v) { filterAdministrativa = v; renderList(); }
 
-  function doLogout() {
-    clearSession();
-    window.location.reload();
-  }
+  function doLogout() { clearSession(); window.location.reload(); }
 
   // ═══════ LOAD ROWS ═══════
   async function loadTab(tab) {
@@ -440,23 +490,15 @@
     currentTab = tab;
     document.querySelectorAll('.tab-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === tab));
-    // Reset filter to "all" when switching tabs
     filter = 'all';
     document.querySelectorAll('.filter-chip').forEach(c =>
       c.classList.toggle('active', c.dataset.filter === 'all'));
-    // F01 no usa workflow: ocultamos los filtros por estado
     document.getElementById('filters').style.display = tab === 'f01' ? 'none' : '';
-    if (!rowsCache[tab]) {
-      await loadTab(tab);
-    } else {
-      updateFilterCounts();
-      renderList();
-    }
+    if (!rowsCache[tab]) await loadTab(tab);
+    else { updateFilterCounts(); renderList(); }
   }
 
-  function currentRows() {
-    return rowsCache[currentTab] || [];
-  }
+  function currentRows() { return rowsCache[currentTab] || []; }
 
   function updateTabCounts() {
     document.getElementById('tab-cnt-vwfs').textContent = rowsCache.vwfs ? rowsCache.vwfs.length : 0;
@@ -465,12 +507,14 @@
 
   function updateFilterCounts() {
     const rows = currentRows();
-    const counts = { all: rows.length, a_revisar: 0, aprobado: 0, rechazado: 0 };
-    for (const r of rows) counts[r.estado] = (counts[r.estado] || 0) + 1;
-    document.getElementById('cnt-all').textContent       = counts.all;
-    document.getElementById('cnt-a_revisar').textContent = counts.a_revisar;
-    document.getElementById('cnt-aprobado').textContent  = counts.aprobado;
-    document.getElementById('cnt-rechazado').textContent = counts.rechazado;
+    const counts = { all: rows.length };
+    for (const k of ESTADO_KEYS) counts[k] = 0;
+    for (const r of rows) if (counts[r.estado] != null) counts[r.estado]++;
+    document.getElementById('cnt-all').textContent = counts.all;
+    for (const k of ESTADO_KEYS) {
+      const el = document.getElementById('cnt-' + k);
+      if (el) el.textContent = counts[k] || 0;
+    }
   }
 
   function setFilter(f) {
@@ -485,10 +529,10 @@
     let rows = currentRows();
     if (filter !== 'all') rows = rows.filter(r => r.estado === filter);
     if (filterVendedor === '__none__') rows = rows.filter(r => !r.vendedor);
-    else if (filterVendedor)           rows = rows.filter(r => r.vendedor === filterVendedor);
-    if (isAdmin) {
+    else if (filterVendedor) rows = rows.filter(r => r.vendedor === filterVendedor);
+    if (isAdminOrOwner()) {
       if (filterAdministrativa === '__none__') rows = rows.filter(r => !r.administrativa);
-      else if (filterAdministrativa)           rows = rows.filter(r => r.administrativa === filterAdministrativa);
+      else if (filterAdministrativa) rows = rows.filter(r => r.administrativa === filterAdministrativa);
     }
     if (rows.length === 0) {
       list.innerHTML = '<div class="empty-state"><div class="emoji">📭</div>Sin formularios en esta vista</div>';
@@ -496,16 +540,15 @@
     }
     const isVwfs = currentTab === 'vwfs';
     list.innerHTML = rows.map(r => {
-      const chipClass = r.estado === 'aprobado' ? 'approved' : (r.estado === 'rechazado' ? 'rejected' : 'pending');
-      const chipText = r.estado === 'aprobado' ? 'Aprobado' : (r.estado === 'rechazado' ? 'Rechazado' : 'A revisar');
+      const est = ESTADOS[r.estado] || ESTADOS.a_revisar;
       const fecha = new Date(r.created_at).toLocaleString('es-AR', { day:'2-digit', month:'2-digit', year:'2-digit', hour:'2-digit', minute:'2-digit' });
       const nombre = r.nombre || (r.datos && (r.datos['Razón social'] || r.datos['Nombre'])) || 'Sin nombre';
       const documento = r.documento || (r.datos && (r.datos['Documento'] || r.datos['CUIT'])) || '—';
       let meta = `${escapeHtml(documento)} · ${fecha}`;
       if (r.vendedor) meta += ' · Vend: ' + escapeHtml(r.vendedor);
       else meta += ' · <span style="color:var(--vw-red); font-weight:700;">Sin vendedor</span>';
-      if (isAdmin && r.administrativa) meta += ' · Adm: ' + escapeHtml(r.administrativa);
-      const stateHtml = isVwfs ? `<div class="row-state"><span class="chip ${chipClass}">${chipText}</span></div>` : '';
+      if (isAdminOrOwner() && r.administrativa) meta += ' · Adm: ' + escapeHtml(r.administrativa);
+      const stateHtml = isVwfs ? `<div class="row-state"><span class="chip ${est.chip}">${escapeHtml(est.label)}</span></div>` : '';
       return `
         <div class="row-item" onclick="openDetail(${r.id})">
           <div class="row-main">
@@ -522,13 +565,30 @@
     return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c]);
   }
 
+  function fmtARS(n) {
+    if (n == null || isNaN(Number(n))) return '—';
+    return '$ ' + Number(n).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function fmtFecha(s) {
+    if (!s) return '—';
+    if (/^\d{4}-\d{2}-\d{2}/.test(s)) {
+      const [y, m, d] = s.substring(0, 10).split('-');
+      return `${d}/${m}/${y}`;
+    }
+    return s;
+  }
+
   // ═══════ DETAIL ═══════
-  function openDetail(id) {
+  async function openDetail(id) {
     currentDetailId = id;
     const r = currentRows().find(x => x.id === id);
     if (!r) return;
-    document.getElementById('detailContent').innerHTML = renderDetail(r);
+    document.getElementById('detailContent').innerHTML = '<div class="loading">Cargando…</div>';
     document.getElementById('detailBackdrop').classList.add('show');
+    // Precargar comprobantes si es VWFS
+    if (currentTab === 'vwfs') await loadComprobantes(id);
+    document.getElementById('detailContent').innerHTML = renderDetail(r);
   }
 
   function closeDetail() {
@@ -536,10 +596,29 @@
     currentDetailId = null;
   }
 
+  async function loadComprobantes(vwfsId) {
+    try {
+      const res = await supaFetch('/rest/v1/comprobantes_pago?vwfs_id=eq.' + vwfsId + '&eliminado=eq.false&order=fecha_pago.desc,id.desc', {
+        headers: { 'Accept': 'application/json' }
+      });
+      const rows = await res.json();
+      comprobantesCache[vwfsId] = Array.isArray(rows) ? rows : [];
+    } catch (e) {
+      console.warn('No pude cargar comprobantes', e);
+      comprobantesCache[vwfsId] = [];
+    }
+  }
+
+  function refreshDetail() {
+    if (currentDetailId == null) return;
+    const r = currentRows().find(x => x.id === currentDetailId);
+    if (r) document.getElementById('detailContent').innerHTML = renderDetail(r);
+  }
+
+  // ═══════ RENDER DETAIL ═══════
   function renderDetail(r) {
     const isVwfs = currentTab === 'vwfs';
-    const chipClass = r.estado === 'aprobado' ? 'approved' : (r.estado === 'rechazado' ? 'rejected' : 'pending');
-    const chipText = r.estado === 'aprobado' ? 'Aprobado' : (r.estado === 'rechazado' ? 'Rechazado' : 'A revisar');
+    const est = ESTADOS[r.estado] || ESTADOS.a_revisar;
     const fecha = new Date(r.created_at).toLocaleString('es-AR');
     const nombre = r.nombre || (r.datos && (r.datos['Razón social'] || r.datos['Nombre'])) || 'Sin nombre';
     const documento = r.documento || (r.datos && (r.datos['Documento'] || r.datos['CUIT'])) || '—';
@@ -548,12 +627,15 @@
       <div class="detail-header">
         <h2>${escapeHtml(nombre)}</h2>
         <div class="sub">${escapeHtml(documento)} · ${fecha}</div>
-        ${isVwfs ? `<div style="margin-top:8px;"><span class="chip ${chipClass}">${chipText}</span></div>` : ''}
+        ${isVwfs ? `<div style="margin-top:8px;"><span class="chip ${est.chip}">${escapeHtml(est.label)}</span></div>` : ''}
       </div>`;
 
     if (isVwfs) {
       if (r.estado === 'rechazado' && r.errores_adm) {
         html += `<div class="error-banner"><strong>Motivo del rechazo:</strong><br>${escapeHtml(r.errores_adm)}</div>`;
+      }
+      if (r.estado === 'rechazado_dni' && r.motivo_rechazo_dni) {
+        html += `<div class="error-banner"><strong>DNI rechazado por admin:</strong><br>${escapeHtml(r.motivo_rechazo_dni)}<br><small>Pedirle al cliente un DNI nuevo.</small></div>`;
       }
       if (r.revisado_por) {
         html += `<div class="kv"><span class="k">Revisado por</span><span class="v">${escapeHtml(r.revisado_por)}${r.revisado_at ? ' · ' + new Date(r.revisado_at).toLocaleString('es-AR') : ''}</span></div>`;
@@ -563,122 +645,498 @@
       }
     }
 
-    // Banners si falta asignar
     if (!r.vendedor) {
       html += `<div class="info-banner">⚠️ <strong>Falta asignar vendedor.</strong> Elegí uno abajo.</div>`;
     }
-    if (isAdmin && !r.administrativa) {
+    if (isAdminOrOwner() && !r.administrativa) {
       html += `<div class="info-banner">⚠️ <strong>Falta asignar administrativa.</strong> Elegíla abajo.</div>`;
     }
 
-    // PDF link
+    // PDF principal
     if (r.pdf_url) {
       html += `<div style="margin:14px 0;"><a class="btn btn-primary btn-block" href="${r.pdf_url}" target="_blank">📄 Abrir PDF completo</a></div>`;
     }
 
-    // Datos
+    // ═══ DNI (VWFS + F01) ═══
+    if (r.dni_frente_url || r.dni_dorso_url || r.dni_analisis) {
+      html += '<div class="section-sep">DNI</div>';
+      html += renderDniSection(r, isVwfs);
+    }
+
+    // ═══ Datos del formulario ═══
     html += '<div class="section-sep">Datos del formulario</div>';
     const datos = r.datos || {};
     for (const [k, v] of Object.entries(datos)) {
       if (!v) continue;
-      if (k.endsWith('URL')) continue; // mostramos aparte
+      if (k.endsWith('URL')) continue;
       html += `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(v)}</span></div>`;
     }
 
-    // Fotos adjuntas (cualquier key de datos que termine en " URL")
+    // ═══ Otros adjuntos (URL keys en datos) ═══
     const adjuntos = [];
     for (const [k, v] of Object.entries(datos)) {
       if (typeof v === 'string' && k.endsWith(' URL') && v.startsWith('http')) {
-        const lbl = k.replace(/ URL$/, '').replace(/^DNI /, '').trim() || k;
-        adjuntos.push([lbl || k, v]);
+        const lbl = k.replace(/ URL$/, '');
+        adjuntos.push([lbl, v]);
       }
     }
     if (adjuntos.length) {
       html += '<div class="section-sep">Documentación adjunta</div>';
       for (const [lbl, url] of adjuntos) {
-        const isImage = /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url);
-        const fileName = url.split('/').pop().split('?')[0];
-        html += `
-          <div style="margin-bottom:14px;">
-            <div style="font-size:12px; color:#5A6B7F; margin-bottom:6px; font-weight:600;">${escapeHtml(lbl)}</div>
-            ${isImage
-              ? `<a href="${url}" target="_blank"><img src="${url}" style="width:100%; max-height:240px; object-fit:contain; background:#000; border-radius:8px;"></a>`
-              : ''}
-            <div style="display:flex; gap:6px; margin-top:6px;">
-              <a class="btn btn-secondary" style="flex:1; font-size:12px; padding:8px 10px;" href="${url}" target="_blank">Abrir</a>
-              <a class="btn btn-primary"   style="flex:1; font-size:12px; padding:8px 10px;" href="${url}" download="${escapeHtml(fileName)}">⬇ Descargar</a>
-            </div>
-          </div>`;
+        html += renderAdjunto(lbl, url);
       }
     }
 
-    // Asignaciones (vendedor + administrativa) — aplica a ambos F01 y VWFS, ambos roles (admin siempre, ventas solo vendedor)
+    // ═══ Asignaciones ═══
     html += '<div class="section-sep">Asignaciones</div>';
     const vendedorOptions =
       '<option value="">— Elegir vendedor —</option>' +
       VENDEDORES.map(v => `<option value="${escapeHtml(v)}"${v === r.vendedor ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('');
     html += `
       <div class="card" style="padding:14px; margin-bottom:10px;">
-        <div class="field" style="margin-bottom:8px;">
-          <label>Vendedor</label>
-          <select id="vendedorSelect">${vendedorOptions}</select>
-        </div>
+        <div class="field" style="margin-bottom:8px;"><label>Vendedor</label>
+          <select id="vendedorSelect">${vendedorOptions}</select></div>
         <button class="btn btn-primary btn-block" onclick="doAssignVendedor(${r.id})">Guardar vendedor</button>
       </div>`;
-
-    if (isAdmin) {
+    if (isAdminOrOwner()) {
       const admOptions =
         '<option value="">— Elegir administrativa —</option>' +
         ADMINISTRATIVAS.map(a => `<option value="${escapeHtml(a)}"${a === r.administrativa ? ' selected' : ''}>${escapeHtml(a)}</option>`).join('');
       html += `
         <div class="card" style="padding:14px; margin-bottom:10px;">
-          <div class="field" style="margin-bottom:8px;">
-            <label>Administrativa</label>
-            <select id="administrativaSelect">${admOptions}</select>
-          </div>
+          <div class="field" style="margin-bottom:8px;"><label>Administrativa</label>
+            <select id="administrativaSelect">${admOptions}</select></div>
           <button class="btn btn-primary btn-block" onclick="doAssignAdministrativa(${r.id})">Guardar administrativa</button>
         </div>`;
     }
 
-    // Acciones específicas de VWFS
+    // ═══ Comprobantes (solo VWFS) ═══
+    if (isVwfs) {
+      html += renderComprobantesSection(r);
+    }
+
+    // ═══ Acciones ═══
     if (isVwfs) {
       html += '<div class="section-sep">Acciones</div>';
-      if (isAdmin) {
-        const approveDisabled = r.vendedor ? '' : 'disabled style="opacity:0.5; cursor:not-allowed;"';
-        const approveNote = r.vendedor ? '' : '<div style="font-size:11px; color:var(--vw-red); margin-top:6px;">Asigná un vendedor antes de aprobar.</div>';
-        html += `
-          <div class="action-row two">
-            <button class="btn btn-success" ${approveDisabled} onclick="doApprove(${r.id})">✓ Aprobar</button>
-            <button class="btn btn-danger" onclick="promptReject(${r.id})">✗ Rechazar</button>
-          </div>
-          ${approveNote}
-          <div id="rejectBlock" style="display:none; margin-top:12px;">
-            <div class="field">
-              <label>Motivo del rechazo (qué errores tiene)</label>
-              <textarea id="rejectReason" placeholder="Ej: La dirección personal no coincide con la del DNI. Falta completar nacionalidad del cónyuge."></textarea>
-            </div>
-            <button class="btn btn-danger btn-block" onclick="doReject(${r.id})">Confirmar rechazo</button>
-          </div>`;
-      } else {
-        // Ventas solo puede editar
-        html += `<a class="btn btn-secondary btn-block" style="margin-top:8px;" href="${TAB_CONFIG[currentTab].editUrl}${r.id}">✏️ Editar formulario</a>`;
-      }
+      html += renderAccionesVwfs(r);
     }
 
     return html;
   }
 
-  // ═══════ ACTIONS ═══════
-  function promptReject(id) {
+  function renderDniSection(r, isVwfs) {
+    let html = '';
+    const frenteUrl = r.dni_frente_url;
+    const dorsoUrl  = r.dni_dorso_url;
+    const an = r.dni_analisis || null;
+
+    // Calidad IA
+    if (an && an.calidad) {
+      const cal = an.calidad;
+      if (cal.ok_global === true) {
+        html += '<div class="ok-banner">✓ DNI validado por IA — calidad OK.</div>';
+      } else {
+        html += '<div class="error-banner">✗ DNI con problemas de calidad (IA).</div>';
+      }
+      html += renderCheckCard('Frente', cal.frente);
+      html += renderCheckCard('Dorso',  cal.dorso);
+    } else if (frenteUrl || dorsoUrl) {
+      html += '<div class="info-banner">DNI subido sin análisis IA (formulario antiguo).</div>';
+    }
+
+    // Imágenes
+    if (frenteUrl) html += renderAdjunto('DNI Frente', frenteUrl);
+    if (dorsoUrl)  html += renderAdjunto('DNI Dorso',  dorsoUrl);
+
+    // Mismatches IA (solo VWFS): datos del datero vs extraido del DNI
+    if (isVwfs && an && an.extraido) {
+      const miss = computeMismatches(r.datos || {}, an.extraido);
+      if (miss.length) {
+        html += '<div style="font-size:12px; font-weight:700; color:#5A6B7F; text-transform:uppercase; letter-spacing:0.3px; margin-top:12px; margin-bottom:4px;">Discrepancias datero ↔ DNI</div>';
+        html += '<div class="card" style="padding:10px;">';
+        html += '<div class="mismatch-row header"><div>Campo</div><div>Datero</div><div>DNI leído</div><div class="right">Est.</div></div>';
+        for (const m of miss) {
+          html += `<div class="mismatch-row">
+            <div><strong>${escapeHtml(m.campo)}</strong></div>
+            <div>${escapeHtml(m.datero)}</div>
+            <div>${escapeHtml(m.dni)}</div>
+            <div class="right ${m.ok ? 'ok' : 'bad'}">${m.ok ? '✓' : '✗'}</div>
+          </div>`;
+        }
+        html += '</div>';
+      }
+    }
+
+    // Admin/owner: botones de aprobación del DNI
+    if (isVwfs && isAdminOrOwner()) {
+      const dniAprob = r.dni_aprobado_admin;
+      html += '<div class="action-row two" style="margin-top:12px;">';
+      html += `<button class="btn ${dniAprob === true ? 'btn-success' : 'btn-secondary'}" onclick="doApproveDni(${r.id})">${dniAprob === true ? '✓ DNI aprobado' : '✓ Aprobar DNI'}</button>`;
+      html += `<button class="btn btn-danger" onclick="promptRejectDni(${r.id})">✗ Rechazar DNI</button>`;
+      html += '</div>';
+      html += `<div id="rejectDniBlock" style="display:none; margin-top:10px;">
+        <div class="field"><label>Motivo (se envía al vendedor para que pida DNI nuevo)</label>
+          <textarea id="rejectDniReason" placeholder="Ej: foto borrosa en el dorso, no se lee el numero de tramite"></textarea></div>
+        <button class="btn btn-danger btn-block" onclick="doRejectDni(${r.id})">Confirmar rechazo DNI</button>
+      </div>`;
+    }
+    return html;
+  }
+
+  function renderCheckCard(label, c) {
+    if (!c) return '';
+    const row = (ok, txtOk, txtBad) => `<div class="check-row"><span class="${ok ? 't-ok' : 't-bad'}">${ok ? '✓' : '✗'}</span><span>${escapeHtml(ok ? txtOk : txtBad)}</span></div>`;
+    return `<div class="check-card">
+      <div style="font-weight:700; margin-bottom:4px;">${escapeHtml(label)}</div>
+      ${row(!!c.legible, 'Legible', 'No se lee bien')}
+      ${row(!c.blur, 'Foto nítida (sin blur)', 'Foto con blur / desenfocada')}
+      ${row(!c.bordes_cortados, 'Los 4 bordes visibles', 'Bordes cortados / DNI fuera de encuadre')}
+      ${row(!!c.fondo_blanco, 'Sobre fondo blanco (bordes nítidos)', 'No está sobre fondo blanco')}
+      ${c.motivo ? `<div style="font-size:12px; color:#556; margin-top:6px;">${escapeHtml(c.motivo)}</div>` : ''}
+    </div>`;
+  }
+
+  function renderAdjunto(lbl, url) {
+    const isImage = /\.(jpg|jpeg|png|webp|gif)(\?|$)/i.test(url);
+    const fileName = url.split('/').pop().split('?')[0];
+    return `
+      <div style="margin-bottom:14px;">
+        <div style="font-size:12px; color:#5A6B7F; margin-bottom:6px; font-weight:600;">${escapeHtml(lbl)}</div>
+        ${isImage ? `<a href="${url}" target="_blank"><img src="${url}" style="width:100%; max-height:240px; object-fit:contain; background:#000; border-radius:8px;"></a>` : ''}
+        <div style="display:flex; gap:6px; margin-top:6px;">
+          <a class="btn btn-secondary" style="flex:1; font-size:12px; padding:8px 10px;" href="${url}" target="_blank">Abrir</a>
+          <a class="btn btn-primary"   style="flex:1; font-size:12px; padding:8px 10px;" href="${url}" download="${escapeHtml(fileName)}">⬇ Descargar</a>
+        </div>
+      </div>`;
+  }
+
+  // Comparacion simple datero <-> extraido (Levenshtein normalizada)
+  function computeMismatches(datos, extraido) {
+    const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
+    const sim = (a, b) => {
+      const s1 = norm(a), s2 = norm(b);
+      if (!s1 && !s2) return 1;
+      if (!s1 || !s2) return 0;
+      const m = s1.length, n = s2.length;
+      const dp = Array.from({length: m+1}, () => new Array(n+1).fill(0));
+      for (let i=0; i<=m; i++) dp[i][0] = i;
+      for (let j=0; j<=n; j++) dp[0][j] = j;
+      for (let i=1; i<=m; i++) for (let j=1; j<=n; j++) {
+        const cost = s1[i-1] === s2[j-1] ? 0 : 1;
+        dp[i][j] = Math.min(dp[i-1][j]+1, dp[i][j-1]+1, dp[i-1][j-1]+cost);
+      }
+      return 1 - dp[m][n] / Math.max(m, n);
+    };
+    const get = (keys) => {
+      for (const k of keys) if (datos[k]) return datos[k];
+      return '';
+    };
+    const checks = [
+      { campo: 'Nombre',     datero: get(['Nombre', 'Nombres']),              dni: extraido.nombre,     umbral: 0.9 },
+      { campo: 'Apellido',   datero: get(['Apellido', 'Apellidos']),          dni: extraido.apellido,   umbral: 0.9 },
+      { campo: 'DNI',        datero: (get(['Documento']) + '').replace(/\D/g, ''), dni: (extraido.dni || '').replace(/\D/g, ''), umbral: 1.0 },
+      { campo: 'F. nac.',    datero: get(['Fecha nac.', 'Fecha de nacimiento']), dni: extraido.fecha_nacimiento, umbral: 0.9 },
+      { campo: 'Domicilio',  datero: get(['Dirección', 'Domicilio']),         dni: extraido.domicilio,  umbral: 0.6 },
+      { campo: 'Localidad',  datero: get(['Localidad']),                       dni: extraido.localidad,  umbral: 0.85 },
+      { campo: 'Provincia',  datero: get(['Provincia']),                       dni: extraido.provincia,  umbral: 0.85 },
+    ];
+    const out = [];
+    for (const c of checks) {
+      if (!c.dni && !c.datero) continue;
+      const s = sim(c.datero, c.dni);
+      out.push({ campo: c.campo, datero: c.datero || '—', dni: c.dni || '—', ok: s >= c.umbral, sim: s });
+    }
+    return out;
+  }
+
+  // ═══════ COMPROBANTES SECTION ═══════
+  function renderComprobantesSection(r) {
+    const list = comprobantesCache[r.id] || [];
+    const canDelete = isAdminOrOwner();
+    const total = list.reduce((acc, c) => acc + (Number(c.monto) || 0), 0);
+
+    let rows = '';
+    if (!list.length) {
+      rows = '<tr><td colspan="6" style="text-align:center; padding:18px; color:#5A6B7F;">Sin comprobantes todavía</td></tr>';
+    } else {
+      rows = list.map(c => `
+        <tr>
+          <td>${escapeHtml(fmtFecha(c.fecha_pago))}</td>
+          <td>${escapeHtml(c.numero_comprobante || '—')}</td>
+          <td class="right">${fmtARS(c.monto)}</td>
+          <td>${escapeHtml(c.tipo || '—')}${c.tipo === 'Otro' && c.tipo_otro ? ': ' + escapeHtml(c.tipo_otro) : ''}</td>
+          <td>
+            <a href="${c.file_url}" target="_blank" class="btn btn-secondary" style="font-size:11px; padding:6px 10px;">Abrir</a>
+            <a href="${c.file_url}" download class="btn btn-primary" style="font-size:11px; padding:6px 10px;">⬇</a>
+          </td>
+          ${canDelete ? `<td><button class="btn btn-danger" style="font-size:11px; padding:6px 10px;" onclick="doDeleteComprobante(${c.id})">🗑</button></td>` : ''}
+        </tr>`).join('');
+    }
+
+    const headCols = `
+      <tr>
+        <th>Fecha</th><th>Nº</th><th class="right">Monto</th>
+        <th>Tipo</th><th>Archivo</th>${canDelete ? '<th></th>' : ''}
+      </tr>`;
+
+    const foot = list.length ? `
+      <tfoot><tr>
+        <td colspan="2">Total</td>
+        <td class="right">${fmtARS(total)}</td>
+        <td colspan="${canDelete ? 3 : 2}"></td>
+      </tr></tfoot>` : '';
+
+    return `
+      <div class="section-sep">Comprobantes de pago</div>
+      <div class="card" style="padding:12px;">
+        <div style="overflow-x:auto;">
+          <table class="comp-table">
+            <thead>${headCols}</thead>
+            <tbody>${rows}</tbody>
+            ${foot}
+          </table>
+        </div>
+        <button class="btn btn-primary btn-block" style="margin-top:10px;" onclick="openComprobanteUploader(${r.id})">+ Subir comprobante</button>
+      </div>
+      <div id="comprobanteUploader" style="display:none; margin-top:10px;"></div>`;
+  }
+
+  function openComprobanteUploader(vwfsId) {
+    const box = document.getElementById('comprobanteUploader');
+    const tipoOpts = TIPOS_COMPROBANTE.map(t => `<option value="${t}">${t}</option>`).join('');
+    box.innerHTML = `
+      <div class="card" style="padding:14px;">
+        <div style="font-weight:700; margin-bottom:10px;">Nuevo comprobante</div>
+        <div class="field"><label>Archivo (imagen o PDF)</label>
+          <input type="file" id="compFile" accept="image/*,application/pdf">
+        </div>
+        <div class="field"><label>Tipo</label>
+          <select id="compTipo" onchange="toggleCompOtro()"><option value="">— Elegir —</option>${tipoOpts}</select>
+        </div>
+        <div class="field" id="compOtroBlock" style="display:none;"><label>Describí el tipo</label>
+          <input type="text" id="compTipoOtro" placeholder="Ej: Entrega usado, transferencia bancaria">
+        </div>
+        <div id="compAnalyzingState" style="display:none; padding:10px; background:#F2F5F8; border-radius:8px; margin-bottom:10px; font-size:13px;">
+          <span class="spinner"></span> Analizando comprobante con IA (fecha, nº, monto, duplicados)…
+        </div>
+        <div id="compPreview" style="display:none; margin-bottom:10px;"></div>
+        <div class="error-banner" id="compError" style="display:none;"></div>
+        <div class="action-row two">
+          <button class="btn btn-secondary" onclick="cancelComprobanteUpload()">Cancelar</button>
+          <button class="btn btn-primary" id="compAnalyzeBtn" onclick="analyzeComprobante(${vwfsId})">Analizar y subir</button>
+        </div>
+      </div>`;
+    box.style.display = '';
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Limpio estado
+    window._compAnalisis = null;
+    window._compFileUrl = '';
+  }
+
+  function cancelComprobanteUpload() {
+    const box = document.getElementById('comprobanteUploader');
+    if (box) { box.innerHTML = ''; box.style.display = 'none'; }
+    window._compAnalisis = null;
+    window._compFileUrl = '';
+  }
+
+  function toggleCompOtro() {
+    const v = document.getElementById('compTipo').value;
+    document.getElementById('compOtroBlock').style.display = v === 'Otro' ? '' : 'none';
+  }
+
+  async function analyzeComprobante(vwfsId) {
+    const err = document.getElementById('compError');
+    const previewEl = document.getElementById('compPreview');
+    const btn = document.getElementById('compAnalyzeBtn');
+    const loader = document.getElementById('compAnalyzingState');
+    err.style.display = 'none'; err.textContent = '';
+    previewEl.style.display = 'none'; previewEl.innerHTML = '';
+
+    const fileInput = document.getElementById('compFile');
+    const tipo = document.getElementById('compTipo').value;
+    if (!fileInput.files || !fileInput.files[0]) {
+      err.textContent = 'Seleccioná un archivo.'; err.style.display = ''; return;
+    }
+    if (!tipo) {
+      err.textContent = 'Elegí el tipo de comprobante.'; err.style.display = ''; return;
+    }
+    const tipoOtro = tipo === 'Otro' ? document.getElementById('compTipoOtro').value.trim() : '';
+    if (tipo === 'Otro' && !tipoOtro) {
+      err.textContent = 'Describí el tipo cuando seleccionás "Otro".'; err.style.display = ''; return;
+    }
+    const file = fileInput.files[0];
+
+    btn.disabled = true;
+    loader.style.display = '';
+
+    try {
+      // 1. Subir al bucket
+      const timestamp = Date.now();
+      const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+      const path = 'vwfs-' + vwfsId + '/' + timestamp + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const upRes = await supaFetch('/storage/v1/object/comprobantes-pago/' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
+        body: file
+      });
+      if (!upRes.ok) {
+        const t = await upRes.text();
+        throw new Error('Fallo subida: ' + t);
+      }
+      const fileUrl = SUPABASE_URL + '/storage/v1/object/public/comprobantes-pago/' + path;
+
+      // 2. Llamar Edge Function con la lista de comprobantes existentes
+      const existentes = (comprobantesCache[vwfsId] || []).map(c => ({
+        id: c.id,
+        numero_comprobante: c.numero_comprobante,
+        monto: c.monto,
+        fecha_pago: c.fecha_pago
+      }));
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-comprobante', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ file_url: fileUrl, existentes })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Error analizando');
+
+      loader.style.display = 'none';
+      window._compAnalisis = data;
+      window._compFileUrl = fileUrl;
+      window._compFileName = file.name;
+
+      // 3. Si hay duplicado, bloquear
+      if (data.duplicado && data.duplicado.is_duplicate) {
+        const m = data.duplicado.matching || {};
+        err.innerHTML = '<strong>❌ Comprobante duplicado.</strong> Ya hay uno cargado con número <b>' + escapeHtml(m.numero || '—') + '</b>, monto ' + fmtARS(m.monto) + ', fecha ' + escapeHtml(fmtFecha(m.fecha)) + '.';
+        err.style.display = '';
+        btn.disabled = false; return;
+      }
+
+      // 4. Si la IA dice que no es legible, bloquear
+      const cal = data.calidad || {};
+      if (!cal.ok) {
+        err.innerHTML = '<strong>❌ Comprobante no legible.</strong> ' + escapeHtml(cal.motivo || 'Sacá una foto más clara o en mejor calidad.');
+        err.style.display = '';
+        btn.disabled = false; return;
+      }
+
+      // 5. Mostrar datos extraídos en forma editable + botón Guardar
+      const ext = data.extraido || {};
+      previewEl.innerHTML = `
+        <div class="ok-banner">✓ Comprobante OK. Revisá los datos extraídos y, si algo está mal, corregilo antes de guardar.</div>
+        <div class="field"><label>Fecha de pago</label>
+          <input type="date" id="compFecha" value="${escapeHtml(ext.fecha_pago || '')}"></div>
+        <div class="field"><label>Número de comprobante</label>
+          <input type="text" id="compNumero" value="${escapeHtml(ext.numero_comprobante || '')}"></div>
+        <div class="field"><label>Monto (ARS)</label>
+          <input type="number" step="0.01" id="compMonto" value="${ext.monto != null ? ext.monto : ''}"></div>
+        <div style="font-size:11px; color:#5A6B7F; margin-bottom:8px;">${ext.entidad ? 'Entidad: ' + escapeHtml(ext.entidad) : ''} ${ext.metodo ? ' · Método: ' + escapeHtml(ext.metodo) : ''}</div>
+        <button class="btn btn-success btn-block" onclick="saveComprobante(${vwfsId}, '${escapeHtml(tipo)}', '${escapeHtml(tipoOtro)}')">💾 Guardar comprobante</button>
+      `;
+      previewEl.style.display = '';
+      btn.style.display = 'none';
+    } catch (e) {
+      console.error('analyzeComprobante error', e);
+      loader.style.display = 'none';
+      err.textContent = 'No se pudo analizar: ' + (e.message || 'error desconocido');
+      err.style.display = '';
+      btn.disabled = false;
+    }
+  }
+
+  async function saveComprobante(vwfsId, tipo, tipoOtro) {
+    const fecha  = document.getElementById('compFecha').value || null;
+    const numero = document.getElementById('compNumero').value.trim() || null;
+    const monto  = parseFloat(document.getElementById('compMonto').value);
+    try {
+      const res = await supaFetch('/rest/v1/comprobantes_pago', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          vwfs_id: vwfsId,
+          file_url: window._compFileUrl,
+          file_name: window._compFileName || null,
+          fecha_pago: fecha,
+          numero_comprobante: numero,
+          monto: isFinite(monto) ? monto : null,
+          tipo: tipo,
+          tipo_otro: tipo === 'Otro' ? tipoOtro : null,
+          analisis_ia: window._compAnalisis || null,
+          subido_por: currentUser
+        })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      cancelComprobanteUpload();
+      await loadComprobantes(vwfsId);
+      refreshDetail();
+    } catch (e) {
+      alert('No se pudo guardar el comprobante: ' + e.message);
+    }
+  }
+
+  async function doDeleteComprobante(compId) {
+    if (!isAdminOrOwner()) { alert('No tenés permisos para eliminar.'); return; }
+    if (!confirm('¿Eliminar este comprobante? Solo admin/owner puede hacerlo.')) return;
+    try {
+      const res = await supaFetch('/rest/v1/comprobantes_pago?id=eq.' + compId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          eliminado: true,
+          eliminado_por: currentUser,
+          eliminado_at: new Date().toISOString()
+        })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (currentDetailId) { await loadComprobantes(currentDetailId); refreshDetail(); }
+    } catch (e) {
+      alert('No se pudo eliminar: ' + e.message);
+    }
+  }
+
+  // ═══════ ACCIONES VWFS (aprobar/rechazar/dni) ═══════
+  function renderAccionesVwfs(r) {
+    let html = '';
+    // Ventas / owner: boton editar
+    if (currentRole === 'ventas' || isOwner()) {
+      html += `<a class="btn btn-secondary btn-block" style="margin-bottom:8px;" href="vwfs.html?edit=${r.id}">✏️ Editar datero</a>`;
+    }
+    // Admin/owner: aprobar / rechazar finales
+    if (isAdminOrOwner()) {
+      const approveDisabled = r.vendedor ? '' : 'disabled';
+      const approveNote = r.vendedor ? '' : '<div style="font-size:11px; color:var(--vw-red); margin-top:6px;">Asigná un vendedor antes de aprobar.</div>';
+      html += `
+        <div class="action-row two">
+          <button class="btn btn-success" ${approveDisabled} onclick="doApprove(${r.id})">✓ Aprobar final</button>
+          <button class="btn btn-danger" onclick="promptReject(${r.id})">✗ Rechazar por datos</button>
+        </div>
+        ${approveNote}
+        <div id="rejectBlock" style="display:none; margin-top:12px;">
+          <div class="field"><label>Motivo del rechazo</label>
+            <textarea id="rejectReason" placeholder="Qué errores tiene"></textarea></div>
+          <button class="btn btn-danger btn-block" onclick="doReject(${r.id})">Confirmar rechazo</button>
+        </div>`;
+    }
+    return html;
+  }
+
+  function promptReject() {
     document.getElementById('rejectBlock').style.display = 'block';
     document.getElementById('rejectReason').focus();
   }
+  function promptRejectDni() {
+    document.getElementById('rejectDniBlock').style.display = 'block';
+    document.getElementById('rejectDniReason').focus();
+  }
 
   async function doApprove(id) {
-    if (!confirm('¿Aprobar este formulario? Esto va a quitarlo de la lista "A revisar".')) return;
+    if (!confirm('¿Aprobar este formulario? Esto va a quitarlo de la lista de pendientes.')) return;
     await updateRow(id, {
       estado: 'aprobado',
       errores_adm: null,
+      motivo_rechazo_dni: null,
       revisado_por: currentUser,
       revisado_at: new Date().toISOString()
     });
@@ -686,10 +1144,7 @@
 
   async function doReject(id) {
     const reason = document.getElementById('rejectReason').value.trim();
-    if (!reason) {
-      alert('Escribí el motivo del rechazo antes de confirmar.');
-      return;
-    }
+    if (!reason) { alert('Escribí el motivo del rechazo.'); return; }
     await updateRow(id, {
       estado: 'rechazado',
       errores_adm: reason,
@@ -698,30 +1153,51 @@
     });
   }
 
+  async function doApproveDni(id) {
+    await updateRow(id, {
+      dni_aprobado_admin: true,
+      motivo_rechazo_dni: null
+    }, true);
+  }
+
+  async function doRejectDni(id) {
+    const reason = document.getElementById('rejectDniReason').value.trim();
+    if (!reason) { alert('Escribí el motivo del rechazo del DNI.'); return; }
+    await updateRow(id, {
+      estado: 'rechazado_dni',
+      dni_aprobado_admin: false,
+      motivo_rechazo_dni: reason,
+      revisado_por: currentUser,
+      revisado_at: new Date().toISOString()
+    });
+  }
+
   async function doAssignVendedor(id) {
     const val = document.getElementById('vendedorSelect').value;
-    await updateRow(id, { vendedor: val || null });
+    await updateRow(id, { vendedor: val || null }, true);
   }
 
   async function doAssignAdministrativa(id) {
     const val = document.getElementById('administrativaSelect').value;
-    await updateRow(id, { administrativa: val || null });
+    await updateRow(id, { administrativa: val || null }, true);
   }
 
-  async function updateRow(id, patch) {
+  async function updateRow(id, patch, keepDetailOpen) {
     const cfg = TAB_CONFIG[currentTab];
     try {
       const res = await supaFetch('/rest/v1/' + cfg.table + '?id=eq.' + id, {
         method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
         body: JSON.stringify(patch)
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
-      closeDetail();
       await loadTab(currentTab);
+      if (keepDetailOpen && currentDetailId) {
+        const r = currentRows().find(x => x.id === currentDetailId);
+        if (r) document.getElementById('detailContent').innerHTML = renderDetail(r);
+      } else {
+        closeDetail();
+      }
     } catch (e) {
       alert('No se pudo guardar el cambio: ' + e.message);
     }
@@ -736,10 +1212,8 @@
   });
 
   // Auto-login si hay sesión
-  const sessionUser = getSession();
-  if (sessionUser) {
-    enterPanel(sessionUser);
-  }
+  const session = getSession();
+  if (session) enterPanel(session.user, session.role);
 </script>
 
 </body>
