@@ -974,7 +974,6 @@
     try {
       // 1. Subir al bucket
       const timestamp = Date.now();
-      const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
       const path = 'vwfs-' + vwfsId + '/' + timestamp + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const upRes = await supaFetch('/storage/v1/object/comprobantes-pago/' + path, {
         method: 'POST',
