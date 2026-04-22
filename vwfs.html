@@ -1454,18 +1454,25 @@
       }
     }
     setIfEmpty('nacionalidad', ext.nacionalidad);
-    if (ext.domicilio && g('domCalle') === '' && g('domNro') === '') {
+
+    // Domicilio: preferir calle + altura separados (si la IA los separo),
+    // sino parsear del string completo. Rellenamos individualmente por si
+    // uno estaba vacio y otro lleno.
+    if (ext.calle) setIfEmpty('domCalle', ext.calle);
+    if (ext.altura) setIfEmpty('domNro', String(ext.altura));
+    if (!ext.calle && !ext.altura && ext.domicilio) {
       const dom = ext.domicilio.trim();
       const match = /^(.+?)\s+(\d{1,6})(?:\s+.*)?$/.exec(dom);
       if (match) {
-        setField('domCalle', match[1].trim());
-        setField('domNro', match[2]);
+        setIfEmpty('domCalle', match[1].trim());
+        setIfEmpty('domNro', match[2]);
       } else {
-        setField('domCalle', dom);
+        setIfEmpty('domCalle', dom);
       }
     }
     setIfEmpty('domLocalidad', ext.localidad);
     setIfEmpty('domProvincia', ext.provincia);
+    if (ext.codigo_postal) setIfEmpty('domCP', String(ext.codigo_postal).replace(/^[A-Z]/i, ''));
     if (ext.cuil && g('idenTribNro') === '') {
       setField('idenTribNro', ext.cuil);
       if (!toggleValues['idenTrib']) setToggle('idenTrib', 'CUIL');

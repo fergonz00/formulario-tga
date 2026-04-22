@@ -1615,17 +1615,36 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   // Solo campos vacios (para no pisar si el usuario ya tipeo).
   function prefillFromDniExtraido(ext) {
     if (!ext || !formType) return;
-    const p = formType === 'fisica' ? 'pf' : 'pj';
     const setIf = (id, v) => {
       const el = document.getElementById(id);
       if (!el || v == null || String(v).trim() === '') return;
-      if (!el.value || el.value === '') el.value = v;
+      if (el.tagName === 'SELECT') {
+        // Para selects, buscamos una opcion cuyo texto coincida (insensitivo a mayusculas/tildes).
+        if (el.value) return;
+        const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+        const wanted = norm(v);
+        for (const opt of el.options) {
+          if (norm(opt.value) === wanted || norm(opt.text) === wanted) { el.value = opt.value; return; }
+        }
+        // Si no hay match exacto, probar prefijo (ej "Sgo. del Estero" vs "Santiago del Estero")
+        for (const opt of el.options) {
+          if (opt.value && (norm(opt.value).startsWith(wanted) || wanted.startsWith(norm(opt.value)))) { el.value = opt.value; return; }
+        }
+      } else {
+        if (!el.value || el.value === '') el.value = v;
+      }
     };
+
     if (formType === 'fisica') {
       const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
       if (full) setIf('pf-nombre', full);
-      if (ext.dni) setIf('pf-dni', ext.dni.replace(/\D/g, ''));
+      if (ext.dni) setIf('pf-nroDoc', ext.dni.replace(/\D/g, ''));
       if (ext.cuil) setIf('pf-cuil', ext.cuil);
+      if (ext.sexo) {
+        const s = ext.sexo.toUpperCase();
+        const val = s === 'F' ? 'Femenino' : (s === 'M' ? 'Masculino' : (s === 'X' ? 'X' : ''));
+        if (val) setIf('pf-sexo', val);
+      }
       if (ext.fecha_nacimiento) {
         const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(ext.fecha_nacimiento.trim());
         if (m) {
@@ -1635,9 +1654,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         }
       }
       if (ext.nacionalidad) setIf('pf-nacionalidad', ext.nacionalidad);
-      if (ext.domicilio) setIf('pf-direccion', ext.domicilio);
-      if (ext.localidad) setIf('pf-localidad', ext.localidad);
-      if (ext.provincia) setIf('pf-provincia', ext.provincia);
+
+      // Domicilio: preferir calle+altura separados si los tiene, sino parsear desde "domicilio"
+      if (ext.calle || ext.altura) {
+        if (ext.calle) setIf('pf-dniCalle', ext.calle);
+        if (ext.altura) setIf('pf-dniNro', ext.altura);
+      } else if (ext.domicilio) {
+        const dom = ext.domicilio.trim();
+        const mm = /^(.+?)\s+(\d{1,6})(?:\s+.*)?$/.exec(dom);
+        if (mm) { setIf('pf-dniCalle', mm[1].trim()); setIf('pf-dniNro', mm[2]); }
+        else setIf('pf-dniCalle', dom);
+      }
+      if (ext.localidad) setIf('pf-dniLocalidad', ext.localidad);
+      if (ext.provincia) setIf('pf-dniProvincia', ext.provincia);
+      if (ext.codigo_postal) setIf('pf-dniCP', String(ext.codigo_postal).replace(/^[A-Z]/i, ''));
     } else if (formType === 'juridica') {
       const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
       if (full) setIf('pj-firmanteNombre', full);
