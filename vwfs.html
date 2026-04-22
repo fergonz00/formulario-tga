@@ -1370,22 +1370,31 @@
     dniDorsoUrlUploaded = '';
   }
 
-  // Precarga campos de identificacion / domicilio a partir de lo leido del DNI.
-  // El cliente puede editar lo que este mal en el step 2.
+  // Precarga campos de identificacion / domicilio a partir de lo leido del DNI,
+  // pero SOLO sobre campos vacios. Si ya habian datos (por ejemplo de un F01
+  // previo), no se pisan — el panel del vendedor va a comparar despues.
   function prefillFromDniExtraido(ext) {
     if (!ext) return;
-    if (ext.nombre) setField('nombre', ext.nombre);
-    if (ext.apellido) setField('apellido', ext.apellido);
-    if (ext.dni) {
+    const setIfEmpty = (id, v) => {
+      if (v == null || String(v).trim() === '') return;
+      if (g(id) === '') setField(id, v);
+    };
+    const setToggleIfEmpty = (field, v) => {
+      if (v == null || String(v).trim() === '') return;
+      if (!toggleValues[field]) setToggle(field, v);
+    };
+
+    setIfEmpty('nombre', ext.nombre);
+    setIfEmpty('apellido', ext.apellido);
+    if (ext.dni && g('nroDoc') === '') {
       setField('nroDoc', ext.dni.replace(/\D/g, ''));
-      setField('tipoDoc', 'DNI');
+      if (g('tipoDoc') === '') setField('tipoDoc', 'DNI');
     }
     if (ext.sexo) {
       const val = ext.sexo.toUpperCase() === 'F' ? 'Femenino' : (ext.sexo.toUpperCase() === 'M' ? 'Masculino' : '');
-      if (val) setToggle('sexo', val);
+      if (val) setToggleIfEmpty('sexo', val);
     }
-    if (ext.fecha_nacimiento) {
-      // DD/MM/YYYY -> YYYY-MM-DD para input type=date
+    if (ext.fecha_nacimiento && g('fechaNac') === '') {
       const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(ext.fecha_nacimiento.trim());
       if (m) {
         const d = m[1].padStart(2, '0');
@@ -1394,27 +1403,22 @@
         setField('fechaNac', y + '-' + mo + '-' + d);
       }
     }
-    if (ext.nacionalidad) setField('nacionalidad', ext.nacionalidad);
-    if (ext.domicilio) {
-      // Intentamos separar calle y numero. Si no se puede, todo a calle.
+    setIfEmpty('nacionalidad', ext.nacionalidad);
+    if (ext.domicilio && g('domCalle') === '' && g('domNro') === '') {
       const dom = ext.domicilio.trim();
-      const match = /^(.+?)\s+(\d{1,6})(?:\s+(.*))?$/.exec(dom);
+      const match = /^(.+?)\s+(\d{1,6})(?:\s+.*)?$/.exec(dom);
       if (match) {
         setField('domCalle', match[1].trim());
         setField('domNro', match[2]);
-        if (match[3]) {
-          // El resto (ej "3B CABA") lo dejamos como hint en piso si se ve un caracter tipo piso/uf
-          // No pisamos piso/uf si el cliente ya los escribio.
-        }
       } else {
         setField('domCalle', dom);
       }
     }
-    if (ext.localidad) setField('domLocalidad', ext.localidad);
-    if (ext.provincia) setField('domProvincia', ext.provincia);
-    if (ext.cuil) {
+    setIfEmpty('domLocalidad', ext.localidad);
+    setIfEmpty('domProvincia', ext.provincia);
+    if (ext.cuil && g('idenTribNro') === '') {
       setField('idenTribNro', ext.cuil);
-      setToggle('idenTrib', 'CUIL');
+      if (!toggleValues['idenTrib']) setToggle('idenTrib', 'CUIL');
     }
   }
 
