@@ -319,6 +319,9 @@
 
   <!-- ═══════ SELECTOR ═══════ -->
   <div class="selector-screen" id="selectorScreen">
+    <div class="selector-card" id="returnFromVwfsBanner" style="display:none; background: rgba(0,64,193,0.06); border-left: 4px solid #0040C1;">
+      <p style="margin:0; font-size:14px;">📋 Primero necesitamos validar tu identidad con el F01. Cuando termines, te mandamos de vuelta al formulario VWFS automáticamente.</p>
+    </div>
     <div class="selector-card">
       <h2>¿Quién va a titular el vehículo?</h2>
       <p>Seleccioná el tipo de persona para completar el formulario correspondiente.</p>
@@ -342,10 +345,54 @@
   </div>
 
   <!-- ═══════════════════════════════════════ -->
-  <!-- ═══════ PERSONA FÍSICA (6 pasos) ═══════ -->
+  <!-- ═══════ PASO 1 COMÚN: DNI + ANÁLISIS IA ═ -->
+  <!-- ═══════════════════════════════════════ -->
+  <div class="step" id="common-step-dni">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">📷</div> Foto del DNI</div>
+
+      <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: #0040C1;">
+        <strong>Primero el DNI.</strong> Subí las dos caras (frente y dorso) del titular. Vamos a analizarlas con IA para confirmar que se ven bien y <strong>precargar el resto del formulario</strong>.
+      </div>
+
+      <div class="upload-zone" id="uploadFrenteZone">
+        <div class="upload-icon">📇</div>
+        <div class="upload-text">Foto del DNI — <strong>Frente</strong></div>
+        <div class="upload-hint">Los 4 bordes visibles, sin brillos ni sombras</div>
+        <input type="file" accept="image/*" id="dniFrenteFile" onchange="handleDniUpload('frente', this)">
+      </div>
+      <div class="upload-preview" id="uploadFrentePreview"></div>
+
+      <div class="upload-zone" id="uploadDorsoZone" style="margin-top: 12px;">
+        <div class="upload-icon">📇</div>
+        <div class="upload-text">Foto del DNI — <strong>Dorso</strong></div>
+        <div class="upload-hint">Los 4 bordes visibles, sin brillos ni sombras</div>
+        <input type="file" accept="image/*" id="dniDorsoFile" onchange="handleDniUpload('dorso', this)">
+      </div>
+      <div class="upload-preview" id="uploadDorsoPreview"></div>
+
+      <div id="dniError" class="info-callout err" style="display:none; margin-top: 10px;"></div>
+
+      <button type="button" class="btn btn-primary btn-block" id="btnAnalyzeDni" style="margin-top: 14px; display:none;" onclick="analyzeDni()">
+        Analizar DNI con IA 🧠
+      </button>
+
+      <div id="dniAnalyzingState" class="info-callout" style="display:none; margin-top: 10px; background: rgba(0,64,193,0.06); border-left-color: #0040C1;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="spinner" style="width:20px; height:20px; border:3px solid rgba(0,64,193,0.2); border-top-color: #0040C1; border-radius:50%; animation: spin 0.8s linear infinite;"></div>
+          <span>Analizando DNI con IA… (puede tardar 10–20 seg)</span>
+        </div>
+      </div>
+
+      <div id="dniAnalysisResult" style="display:none; margin-top: 10px;"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- ═══════ PERSONA FÍSICA (5 pasos internos + 1 común) ═══════ -->
   <!-- ═══════════════════════════════════════ -->
 
-  <!-- PF Step 1: Datos titular -->
+  <!-- PF Step 1 (mostrado como paso 2): Datos titular -->
   <div class="step" id="pf-step1">
     <div class="section-card">
       <div class="section-title"><div class="icon">👤</div> Datos del titular</div>
@@ -1163,9 +1210,22 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   const uploadedImages = {};
 
   const stepConfig = {
-    fisica: { prefix: 'pf', steps: 5, labels: ['Datos del titular','Domicilios','2º Titular','Operación y cédulas','Resumen'] },
-    juridica: { prefix: 'pj', steps: 4, labels: ['Datos de la empresa','Datos del firmante','Operación y cédulas','Resumen'] }
+    fisica: { prefix: 'pf', steps: 6, labels: ['Foto del DNI','Datos del titular','Domicilios','2º Titular','Operación y cédulas','Resumen'] },
+    juridica: { prefix: 'pj', steps: 5, labels: ['Foto del DNI','Datos de la empresa','Datos del firmante','Operación y cédulas','Resumen'] }
   };
+
+  // ═══════ STATE para analisis IA del DNI ═══════
+  const dniImages = {};         // { frente: {dataUrl, file, w, h}, dorso: {...} }
+  let dniAnalisis = null;       // resultado de la Edge Function
+  let dniAnalisisOk = false;    // true si calidad.ok_global, permite avanzar
+  let dniFrenteUrlUploaded = '';
+  let dniDorsoUrlUploaded = '';
+  const DNI_MIN_WIDTH = 800;
+  const DNI_MIN_HEIGHT = 500;
+  const DNI_MIN_BYTES = 80 * 1024;
+
+  // ?return=vwfs → al terminar F01 mandamos al cliente de vuelta a VWFS.
+  const returnTarget = new URLSearchParams(window.location.search).get('return') || '';
 
   // Toggle buttons
   document.querySelectorAll('.toggle-btn').forEach(btn => {
@@ -1246,7 +1306,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   function showStep(n) {
     const cfg = stepConfig[formType];
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-    const stepEl = document.getElementById(cfg.prefix + '-step' + n);
+    // n=1 es el paso comun de DNI + IA. n>1 se mapea a pf-step{n-1} o pj-step{n-1}.
+    const stepEl = n === 1
+      ? document.getElementById('common-step-dni')
+      : document.getElementById(cfg.prefix + '-step' + (n - 1));
     if (stepEl) stepEl.classList.add('active');
 
     const steps = document.querySelectorAll('.progress-step');
@@ -1272,9 +1335,32 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   }
 
   function nextStep() {
+    if (currentStep === 1) {
+      if (!validateDniStep()) {
+        document.getElementById('dniError').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+    }
     if (currentStep === totalSteps) { generatePDF(); return; }
     currentStep++;
     showStep(currentStep);
+  }
+
+  function validateDniStep() {
+    const err = document.getElementById('dniError');
+    err.style.display = 'none';
+    err.textContent = '';
+    if (!dniImages.frente || !dniImages.dorso) {
+      err.textContent = 'Subí frente y dorso del DNI antes de avanzar.';
+      err.style.display = '';
+      return false;
+    }
+    if (!dniAnalisisOk) {
+      err.textContent = 'Tocá "Analizar DNI con IA" y esperá a que valide las fotos antes de avanzar.';
+      err.style.display = '';
+      return false;
+    }
+    return true;
   }
 
   function prevStep() {
@@ -1309,6 +1395,261 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         reader.readAsDataURL(file);
       }
     }
+  }
+
+  // ═══════ DNI UPLOAD + ANALISIS IA (paso 1 comun) ═══════
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(new Error('No se pudo leer el archivo'));
+      r.readAsDataURL(file);
+    });
+  }
+
+  function getImgDims(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.onerror = () => reject(new Error('Imagen invalida'));
+      img.src = dataUrl;
+    });
+  }
+
+  function resetDniAnalysisState() {
+    dniAnalisis = null;
+    dniAnalisisOk = false;
+    const res = document.getElementById('dniAnalysisResult');
+    if (res) { res.innerHTML = ''; res.style.display = 'none'; }
+  }
+
+  async function handleDniUpload(which, input) {
+    const err = document.getElementById('dniError');
+    err.style.display = 'none';
+    err.textContent = '';
+    const file = input.files && input.files[0];
+    if (!file) return;
+
+    resetDniAnalysisState();
+
+    if (!file.type.startsWith('image/')) {
+      err.textContent = 'El archivo debe ser una imagen (JPG o PNG).';
+      err.style.display = ''; input.value = ''; return;
+    }
+    if (file.size < DNI_MIN_BYTES) {
+      err.textContent = 'La foto pesa solo ' + Math.round(file.size/1024) + ' KB. Necesitamos al menos ' + Math.round(DNI_MIN_BYTES/1024) + ' KB.';
+      err.style.display = ''; input.value = ''; return;
+    }
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const dims = await getImgDims(dataUrl);
+      if (dims.width < DNI_MIN_WIDTH || dims.height < DNI_MIN_HEIGHT) {
+        err.textContent = 'La foto tiene muy poca resolucion (' + dims.width + '×' + dims.height + '). Minimo ' + DNI_MIN_WIDTH + '×' + DNI_MIN_HEIGHT + '.';
+        err.style.display = ''; input.value = ''; return;
+      }
+      dniImages[which] = { dataUrl, file, w: dims.width, h: dims.height };
+      showDniPreview(which);
+      updateAnalyzeBtnVisibility();
+    } catch (e) {
+      err.textContent = 'No se pudo procesar la imagen. Intenta con otra foto.';
+      err.style.display = ''; input.value = '';
+    }
+  }
+
+  function previewPrefix(which) { return which === 'frente' ? 'Frente' : 'Dorso'; }
+
+  function showDniPreview(which) {
+    const prefix = previewPrefix(which);
+    const zone = document.getElementById('upload' + prefix + 'Zone');
+    const prev = document.getElementById('upload' + prefix + 'Preview');
+    const img = dniImages[which];
+    if (!zone || !prev || !img) return;
+    zone.classList.add('has-file');
+    prev.style.display = 'block';
+    prev.innerHTML =
+      '<img src="' + img.dataUrl + '" alt="Vista previa" style="max-width:100%; border-radius:8px;">' +
+      '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:12px; color:#556;">' +
+        '<span>✓ ' + img.w + '×' + img.h + ' px · ' + Math.round(img.file.size/1024) + ' KB</span>' +
+        '<button type="button" onclick="removeDniImage(\'' + which + '\')" style="border:none; background:transparent; color:#E4002B; font-weight:600; cursor:pointer;">Quitar</button>' +
+      '</div>';
+  }
+
+  function removeDniImage(which) {
+    delete dniImages[which];
+    const prefix = previewPrefix(which);
+    const zone = document.getElementById('upload' + prefix + 'Zone');
+    const prev = document.getElementById('upload' + prefix + 'Preview');
+    const input = document.getElementById('dni' + prefix + 'File');
+    if (zone) zone.classList.remove('has-file');
+    if (prev) { prev.innerHTML = ''; prev.style.display = 'none'; }
+    if (input) input.value = '';
+    resetDniAnalysisState();
+    updateAnalyzeBtnVisibility();
+  }
+
+  function updateAnalyzeBtnVisibility() {
+    const btn = document.getElementById('btnAnalyzeDni');
+    if (!btn) return;
+    const ready = !!dniImages.frente && !!dniImages.dorso && !dniAnalisisOk;
+    btn.style.display = ready ? '' : 'none';
+  }
+
+  async function analyzeDni() {
+    const btn = document.getElementById('btnAnalyzeDni');
+    const loader = document.getElementById('dniAnalyzingState');
+    const resultEl = document.getElementById('dniAnalysisResult');
+    const errEl = document.getElementById('dniError');
+    errEl.style.display = 'none'; errEl.textContent = '';
+    resultEl.innerHTML = ''; resultEl.style.display = 'none';
+
+    if (!dniImages.frente || !dniImages.dorso) {
+      errEl.textContent = 'Subi el frente y el dorso del DNI antes de analizar.';
+      errEl.style.display = ''; return;
+    }
+    btn.disabled = true; btn.style.display = 'none';
+    loader.style.display = '';
+
+    try {
+      const timestamp = Date.now();
+      const safe = 'tmp_' + timestamp;
+      const uploadOne = async (which) => {
+        const img = dniImages[which];
+        const ext = img.file.type === 'image/png' ? 'png' : 'jpg';
+        const path = safe + '/' + which + '.' + ext;
+        const res = await supaFetch('/storage/v1/object/vwfs-dnis/' + path, {
+          method: 'POST',
+          headers: { 'Content-Type': img.file.type, 'x-upsert': 'true' },
+          body: img.file
+        });
+        if (!res.ok) { const t = await res.text(); throw new Error('Fallo subida ' + which + ': ' + t); }
+        return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
+      };
+      const [urlFrente, urlDorso] = await Promise.all([uploadOne('frente'), uploadOne('dorso')]);
+      dniFrenteUrlUploaded = urlFrente;
+      dniDorsoUrlUploaded = urlDorso;
+
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-dni', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dni_frente_url: urlFrente, dni_dorso_url: urlDorso, datero: {} })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'La IA no pudo analizar el DNI. Intenta de nuevo.');
+
+      dniAnalisis = data;
+      loader.style.display = 'none';
+
+      const cal = data.calidad || {};
+      const cardFor = (label, c) => {
+        if (!c) return '';
+        const row = (ok, txtOk, txtBad) =>
+          '<div style="display:flex; gap:6px; align-items:center; font-size:13px; padding:2px 0;">' +
+            '<span style="color:' + (ok ? '#00873C' : '#E4002B') + '; font-weight:700;">' + (ok ? '✓' : '✗') + '</span>' +
+            '<span>' + (ok ? txtOk : txtBad) + '</span>' +
+          '</div>';
+        return (
+          '<div style="background:#fff; border:1px solid #DAE4ED; border-radius:10px; padding:10px 12px; margin-top:8px;">' +
+            '<div style="font-weight:700; margin-bottom:4px;">' + label + '</div>' +
+            row(!!c.legible, 'Legible', 'No se lee bien') +
+            row(!c.blur, 'Foto nitida (sin blur)', 'Foto con blur / desenfocada') +
+            row(!c.bordes_cortados, 'Los 4 bordes visibles', 'Bordes cortados / DNI fuera de encuadre') +
+            (c.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + c.motivo + '</div>' : '') +
+          '</div>'
+        );
+      };
+      const detalle = cardFor('Frente', cal.frente) + cardFor('Dorso', cal.dorso);
+
+      if (cal.ok_global === true) {
+        dniAnalisisOk = true;
+        resultEl.innerHTML =
+          '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: #00873C;">' +
+            '<strong>✓ DNI OK.</strong> La IA pudo leer los datos correctamente. Precargamos el formulario con lo que leyo.' +
+          '</div>' + detalle;
+        resultEl.style.display = '';
+        prefillFromDniExtraido(data.extraido || {});
+        // Copia los archivos al uploadedImages asi aparecen en las secciones
+        // de "DNI titular" / "DNI firmante" sin tener que re-subirlos.
+        populateUploadedImagesFromDni();
+      } else {
+        dniAnalisisOk = false;
+        resultEl.innerHTML =
+          '<div class="info-callout err">' +
+            '<strong>✗ El DNI no cumple.</strong> Mira el detalle abajo y saca las fotos de nuevo.' +
+          '</div>' + detalle +
+          '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetDniForRetry()">Sacar fotos de nuevo</button>';
+        resultEl.style.display = '';
+      }
+    } catch (e) {
+      console.error('analyzeDni error', e);
+      loader.style.display = 'none';
+      errEl.textContent = 'No pudimos analizar el DNI: ' + (e && e.message ? e.message : 'error inesperado');
+      errEl.style.display = '';
+      btn.disabled = false;
+      updateAnalyzeBtnVisibility();
+    }
+  }
+
+  function resetDniForRetry() {
+    removeDniImage('frente');
+    removeDniImage('dorso');
+    dniFrenteUrlUploaded = '';
+    dniDorsoUrlUploaded = '';
+  }
+
+  // Precarga los campos del F01 a partir de lo leido del DNI.
+  // Solo campos vacios (para no pisar si el usuario ya tipeo).
+  function prefillFromDniExtraido(ext) {
+    if (!ext || !formType) return;
+    const p = formType === 'fisica' ? 'pf' : 'pj';
+    const setIf = (id, v) => {
+      const el = document.getElementById(id);
+      if (!el || v == null || String(v).trim() === '') return;
+      if (!el.value || el.value === '') el.value = v;
+    };
+    if (formType === 'fisica') {
+      const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
+      if (full) setIf('pf-nombre', full);
+      if (ext.dni) setIf('pf-dni', ext.dni.replace(/\D/g, ''));
+      if (ext.cuil) setIf('pf-cuil', ext.cuil);
+      if (ext.fecha_nacimiento) {
+        const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(ext.fecha_nacimiento.trim());
+        if (m) {
+          const d = m[1].padStart(2, '0'), mo = m[2].padStart(2, '0');
+          const y = m[3].length === 2 ? ('19' + m[3]) : m[3];
+          setIf('pf-fechaNac', y + '-' + mo + '-' + d);
+        }
+      }
+      if (ext.nacionalidad) setIf('pf-nacionalidad', ext.nacionalidad);
+      if (ext.domicilio) setIf('pf-direccion', ext.domicilio);
+      if (ext.localidad) setIf('pf-localidad', ext.localidad);
+      if (ext.provincia) setIf('pf-provincia', ext.provincia);
+    } else if (formType === 'juridica') {
+      const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
+      if (full) setIf('pj-firmanteNombre', full);
+      if (ext.dni) setIf('pj-firmanteDni', ext.dni.replace(/\D/g, ''));
+      if (ext.cuil) setIf('pj-firmanteCuil', ext.cuil);
+    }
+  }
+
+  // Copia las imagenes del DNI (analizadas con IA en paso 1) a las secciones
+  // "DNI titular" (PF) o "DNI firmante" (PJ). Asi el cliente no tiene que
+  // volver a subir las mismas fotos en un paso posterior.
+  function populateUploadedImagesFromDni() {
+    const prefix = formType === 'fisica' ? 'pf' : 'pj';
+    const setSlot = (slotId, which) => {
+      const img = dniImages[which];
+      if (!img) return;
+      uploadedImages[slotId] = { data: img.dataUrl, name: which + '.jpg', type: img.file.type };
+      const prev = document.getElementById(slotId);
+      if (prev) {
+        prev.style.display = 'block';
+        prev.textContent = '✓ ' + (which === 'frente' ? 'Frente' : 'Dorso') + ' cargado desde paso 1';
+        const zone = prev.previousElementSibling;
+        if (zone && zone.classList.contains('upload-zone')) zone.classList.add('has-file');
+      }
+    };
+    setSlot('prev-' + prefix + '-dni1', 'frente');
+    setSlot('prev-' + prefix + '-dni2', 'dorso');
   }
 
   // Cédulas
@@ -1635,7 +1976,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           celular: celular,
           email: email,
           pdf_url: supabasePdfUrl,
-          datos: datosObj
+          datos: datosObj,
+          dni_frente_url: dniFrenteUrlUploaded || null,
+          dni_dorso_url: dniDorsoUrlUploaded || null,
+          dni_analisis: dniAnalisis || null
         })
       });
 
@@ -1643,6 +1987,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       document.getElementById('uploadingState').style.display = 'none';
       document.getElementById('uploadReady').style.display = '';
       document.getElementById('btnDownloadPDF').href = supabasePdfUrl;
+
+      // Si venimos de VWFS (?return=vwfs), mostramos boton para seguir alla.
+      if (returnTarget === 'vwfs') {
+        const ready = document.getElementById('uploadReady');
+        if (ready && !document.getElementById('btnGoToVwfs')) {
+          const btn = document.createElement('a');
+          btn.id = 'btnGoToVwfs';
+          btn.href = 'vwfs.html';
+          btn.className = 'btn btn-primary btn-block';
+          btn.style.marginTop = '12px';
+          btn.textContent = 'Continuar con VWFS →';
+          ready.appendChild(btn);
+        }
+      }
 
     } catch (e) {
       console.error('Upload error:', e);
@@ -1765,6 +2123,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     });
     document.getElementById('adminList').innerHTML = html;
   }
+
+  // Init: mostrar banner de "volves a VWFS" si corresponde
+  (function initEntry() {
+    if (returnTarget === 'vwfs') {
+      const banner = document.getElementById('returnFromVwfsBanner');
+      if (banner) banner.style.display = '';
+    }
+  })();
 
 </script>
 

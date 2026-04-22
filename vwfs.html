@@ -338,8 +338,9 @@
       <div id="entryStatus" class="info-callout" style="display:none; margin-top: 12px;"></div>
     </div>
 
-    <div class="selector-card" style="padding:16px 20px;">
-      <button class="btn btn-secondary btn-block" onclick="startFresh()">O completar desde cero</button>
+    <div class="selector-card" style="padding:16px 20px; text-align:center;">
+      <p style="margin:0 0 10px 0; font-size:13px; color:#556;">¿Todavía no cargaste el F01?</p>
+      <a href="index.html?return=vwfs" class="btn btn-secondary btn-block" style="display:inline-block; text-decoration:none; text-align:center;">Cargar F01 primero →</a>
     </div>
 
     <div style="text-align:center; padding:16px; font-size:12px;">
@@ -1358,6 +1359,24 @@
           '</div>' + detalle;
         resultEl.style.display = '';
         prefillFromDniExtraido(data.extraido || {});
+
+        // Si vinimos con un F01 match pero el F01 no tenia DNI validado,
+        // ahora guardamos el DNI tambien en la fila del F01 para que quede consistente.
+        if (matchedF01Id) {
+          try {
+            await supaFetch('/rest/v1/formularios_f01?id=eq.' + matchedF01Id, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+              body: JSON.stringify({
+                dni_frente_url: dniFrenteUrlUploaded,
+                dni_dorso_url: dniDorsoUrlUploaded,
+                dni_analisis: dniAnalisis
+              })
+            });
+          } catch (patchErr) {
+            console.warn('No se pudo actualizar DNI en F01 matched', patchErr);
+          }
+        }
       } else {
         dniAnalisisOk = false;
         resultEl.innerHTML =
@@ -1541,20 +1560,39 @@
       const match = rows.find(r => r.datos && r.datos['Fecha nac.'] === fechaNac);
 
       if (!match) {
+        // Nuevo modelo: sin F01 no se puede avanzar. Redirigimos a F01.
         statusEl.className = 'info-callout err';
-        statusEl.innerHTML = 'No encontramos un F01 previo con esos datos.<br>Podés completar el formulario desde cero.';
+        statusEl.innerHTML =
+          '<strong>Primero necesitas cargar el F01.</strong><br>' +
+          'No encontramos un F01 con esos datos. Hace click abajo para completarlo, ' +
+          'y al terminar te volvemos a traer aca automaticamente.' +
+          '<a href="index.html?return=vwfs" class="btn btn-primary btn-block" style="margin-top:12px; display:inline-block; text-decoration:none; text-align:center;">Ir a cargar el F01 →</a>';
         return;
       }
 
       prefillFromF01(match);
       matchedF01Id = match.id;
-      statusEl.className = 'info-callout ok';
-      statusEl.textContent = '¡Listo! Traemos tus datos del F01. Revisalos y editá lo que haga falta.';
-      setTimeout(() => startForm(), 900);
+
+      // Si el F01 ya tenia DNI validado por IA, reutilizamos y saltamos el paso 1.
+      const f01Calidad = match.dni_analisis && match.dni_analisis.calidad;
+      if (f01Calidad && f01Calidad.ok_global === true && match.dni_frente_url && match.dni_dorso_url) {
+        dniAnalisis = match.dni_analisis;
+        dniAnalisisOk = true;
+        dniFrenteUrlUploaded = match.dni_frente_url;
+        dniDorsoUrlUploaded = match.dni_dorso_url;
+        statusEl.className = 'info-callout ok';
+        statusEl.textContent = '¡Listo! Traemos tus datos y el DNI ya validado del F01.';
+        setTimeout(() => { startForm(); currentStep = 2; showStep(2); }, 900);
+      } else {
+        // F01 existe pero no tiene DNI validado. Avisamos y mandamos al paso 1 de DNI.
+        statusEl.className = 'info-callout ok';
+        statusEl.textContent = '¡Listo! Traemos tus datos del F01. Ahora pedimos el DNI para validarlo.';
+        setTimeout(() => startForm(), 900);
+      }
     } catch (e) {
       console.error(e);
       statusEl.className = 'info-callout err';
-      statusEl.textContent = 'Hubo un problema buscando tus datos. Podés completar desde cero.';
+      statusEl.textContent = 'Hubo un problema buscando tus datos. Probá de nuevo en unos segundos.';
     }
   }
 
