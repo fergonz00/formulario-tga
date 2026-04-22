@@ -382,8 +382,11 @@
 
       <div id="dniError" class="info-callout err" style="display:none; margin-top: 10px;"></div>
 
-      <button type="button" class="btn btn-primary btn-block" id="btnAnalyzeDni" style="margin-top: 14px; display:none;" onclick="analyzeDni()">
-        Analizar DNI con IA 🧠
+      <div id="btnAnalyzeDniHint" style="display:none; margin-top: 14px; font-size: 13px; text-align: center; color: var(--vw-cobalt); font-weight: 600;">
+        👇 Por favor apretá acá para validar el DNI y poder avanzar
+      </div>
+      <button type="button" class="btn btn-primary btn-block" id="btnAnalyzeDni" style="margin-top: 8px; display:none;" onclick="analyzeDni()">
+        Analizar DNI
       </button>
 
       <div id="dniAnalyzingState" class="info-callout" style="display:none; margin-top: 10px; background: rgba(0,64,193,0.06); border-left-color: var(--vw-cobalt);">
@@ -1258,9 +1261,11 @@
 
   function updateAnalyzeBtnVisibility() {
     const btn = document.getElementById('btnAnalyzeDni');
+    const hint = document.getElementById('btnAnalyzeDniHint');
     if (!btn) return;
     const ready = !!dniImages.frente && !!dniImages.dorso && !dniAnalisisOk;
     btn.style.display = ready ? '' : 'none';
+    if (hint) hint.style.display = ready ? '' : 'none';
   }
 
   // Sube frente + dorso al bucket privado vwfs-dnis y llama a la Edge Function
@@ -1283,6 +1288,8 @@
 
     btn.disabled = true;
     btn.style.display = 'none';
+    const hint = document.getElementById('btnAnalyzeDniHint');
+    if (hint) hint.style.display = 'none';
     loader.style.display = '';
 
     try {
