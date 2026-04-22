@@ -1265,6 +1265,7 @@
     if (!btn) return;
     const ready = !!dniImages.frente && !!dniImages.dorso && !dniAnalisisOk;
     btn.style.display = ready ? '' : 'none';
+    if (ready) btn.disabled = false;
     if (hint) hint.style.display = ready ? '' : 'none';
   }
 
