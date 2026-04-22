@@ -1568,6 +1568,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
             row(!c.blur, 'Foto nitida (sin blur)', 'Foto con blur / desenfocada') +
             row(!c.bordes_cortados, 'Los 4 bordes visibles', 'Bordes cortados / DNI fuera de encuadre') +
             row(!!c.fondo_blanco, 'Sobre fondo blanco (bordes nitidos)', 'No esta sobre fondo blanco — apoyalo en una hoja o mesa blanca') +
+            (c.vencido !== undefined ? row(!c.vencido, 'DNI vigente', 'DNI VENCIDO — no se puede usar') : '') +
             (c.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + c.motivo + '</div>' : '') +
           '</div>'
         );
