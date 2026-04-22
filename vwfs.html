@@ -347,8 +347,53 @@
     </div>
   </section>
 
-  <!-- ═══════ STEP 1: Identificación + Datos personales ═══════ -->
+  <!-- ═══════ STEP 1: Foto del DNI + análisis IA ═══════ -->
   <div class="step" id="vwfs-step1">
+
+    <div class="section-card">
+      <div class="section-title"><span class="icon">📷</span>Foto del DNI</div>
+
+      <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: var(--vw-cobalt);">
+        <strong>Primero el DNI.</strong> Subí las dos caras (frente y dorso). Cuando las subas, vamos a analizarlas con IA para confirmar que se ven bien y <strong>precargar el resto del formulario</strong>. Si quedó bien, avanzás.
+      </div>
+
+      <div class="upload-zone" id="uploadFrenteZone">
+        <div class="upload-icon">📇</div>
+        <div class="upload-text">Foto del DNI — <strong>Frente</strong></div>
+        <div class="upload-hint">Los 4 bordes tienen que verse, sin brillos ni sombras</div>
+        <input type="file" accept="image/*" id="dniFrenteFile" onchange="handleDniUpload('frente', this)">
+      </div>
+      <div class="upload-preview" id="uploadFrentePreview"></div>
+
+      <div class="upload-zone" id="uploadDorsoZone" style="margin-top: 12px;">
+        <div class="upload-icon">📇</div>
+        <div class="upload-text">Foto del DNI — <strong>Dorso</strong></div>
+        <div class="upload-hint">Los 4 bordes tienen que verse, sin brillos ni sombras</div>
+        <input type="file" accept="image/*" id="dniDorsoFile" onchange="handleDniUpload('dorso', this)">
+      </div>
+      <div class="upload-preview" id="uploadDorsoPreview"></div>
+
+      <div id="dniError" class="info-callout err" style="display:none; margin-top: 10px;"></div>
+
+      <button type="button" class="btn btn-primary btn-block" id="btnAnalyzeDni" style="margin-top: 14px; display:none;" onclick="analyzeDni()">
+        Analizar DNI con IA 🧠
+      </button>
+
+      <div id="dniAnalyzingState" class="info-callout" style="display:none; margin-top: 10px; background: rgba(0,64,193,0.06); border-left-color: var(--vw-cobalt);">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="spinner" style="width:20px; height:20px; border:3px solid rgba(0,64,193,0.2); border-top-color: var(--vw-cobalt); border-radius:50%; animation: spin 0.8s linear infinite;"></div>
+          <span>Analizando DNI con IA… (puede tardar 10–20 seg)</span>
+        </div>
+      </div>
+
+      <div id="dniAnalysisResult" style="display:none; margin-top: 10px;"></div>
+
+    </div>
+
+  </div>
+
+  <!-- ═══════ STEP 2: Identificación + Datos personales (prellenado desde DNI) ═══════ -->
+  <div class="step" id="vwfs-step2">
 
     <div class="section-card">
       <div class="section-title"><span class="icon">1</span>Identificación</div>
@@ -495,62 +540,6 @@
     </div>
 
     <div class="section-card">
-      <div class="section-title"><span class="icon">📷</span>Foto del DNI</div>
-
-      <div class="info-callout" style="background: rgba(255,140,0,0.08); border-left-color: var(--vw-amber);">
-        <strong>⭐ Recomendado:</strong> Usá la app <strong>Mi Argentina</strong> y hacé una captura de pantalla de tu DNI digital. Es la opción que mejor sale y más rápida.
-      </div>
-
-      <div class="field">
-        <label>¿Qué vas a subir?</label>
-        <div class="toggle-group">
-          <button type="button" class="toggle-btn" data-field="dniMode" data-value="miarg" onclick="setDniMode('miarg')">📱 Mi Argentina</button>
-          <button type="button" class="toggle-btn" data-field="dniMode" data-value="fisico" onclick="setDniMode('fisico')">📇 Foto del DNI físico</button>
-        </div>
-      </div>
-
-      <!-- Modo: Mi Argentina -->
-      <div class="conditional" id="dniMiargBlock">
-        <div class="upload-zone" id="uploadMiargZone">
-          <div class="upload-icon">📱</div>
-          <div class="upload-text">Tocá para subir captura de Mi Argentina</div>
-          <div class="upload-hint">Mínimo 1000×700 px · 100 KB</div>
-          <input type="file" accept="image/*" id="dniMiargFile" onchange="handleDniUpload('miarg', this)">
-        </div>
-        <div class="upload-preview" id="uploadMiargPreview"></div>
-      </div>
-
-      <!-- Modo: Foto DNI físico -->
-      <div class="conditional" id="dniFisicoBlock">
-        <div class="upload-zone" id="uploadFrenteZone">
-          <div class="upload-icon">📇</div>
-          <div class="upload-text">Foto del DNI — <strong>Frente</strong></div>
-          <div class="upload-hint">Que se vean los 4 bordes del DNI nítidos</div>
-          <input type="file" accept="image/*" id="dniFrenteFile" onchange="handleDniUpload('frente', this)">
-        </div>
-        <div class="upload-preview" id="uploadFrentePreview"></div>
-
-        <div class="upload-zone" id="uploadDorsoZone" style="margin-top: 12px;">
-          <div class="upload-icon">📇</div>
-          <div class="upload-text">Foto del DNI — <strong>Dorso</strong></div>
-          <div class="upload-hint">Que se vean los 4 bordes del DNI nítidos</div>
-          <input type="file" accept="image/*" id="dniDorsoFile" onchange="handleDniUpload('dorso', this)">
-        </div>
-        <div class="upload-preview" id="uploadDorsoPreview"></div>
-      </div>
-
-      <div id="dniError" class="info-callout err" style="display:none; margin-top: 10px;"></div>
-
-      <div class="switch-field conditional" id="dniConfirmBlock" style="margin-top: 14px;">
-        <span class="switch-label">Confirmo que el DNI se ve nítido, completo y los datos se leen bien</span>
-        <label class="switch">
-          <input type="checkbox" id="dniConfirm">
-          <span class="slider"></span>
-        </label>
-      </div>
-    </div>
-
-    <div class="section-card">
       <div class="section-title"><span class="icon">🏦</span>Cuenta en Banco Francés (BBVA)</div>
 
       <div class="field">
@@ -667,7 +656,7 @@
   </div>
 
   <!-- ═══════ STEP 2: Estado civil + cónyuge ═══════ -->
-  <div class="step" id="vwfs-step2">
+  <div class="step" id="vwfs-step3">
 
     <div class="section-card">
       <div class="section-title"><span class="icon">♥</span>Estado civil</div>
@@ -761,7 +750,7 @@
   </div>
 
   <!-- ═══════ STEP 3: Laboral + económico ═══════ -->
-  <div class="step" id="vwfs-step3">
+  <div class="step" id="vwfs-step4">
 
     <div class="section-card">
       <div class="section-title"><span class="icon">💼</span>Actividad laboral</div>
@@ -895,7 +884,7 @@
   </div>
 
   <!-- ═══════ STEP 4: Vivienda + cotitular ═══════ -->
-  <div class="step" id="vwfs-step4">
+  <div class="step" id="vwfs-step5">
 
     <div class="section-card">
       <div class="section-title"><span class="icon">🏠</span>Datos de la vivienda</div>
@@ -1017,7 +1006,7 @@
   </div>
 
   <!-- ═══════ STEP 5: Resumen ═══════ -->
-  <div class="step" id="vwfs-step5">
+  <div class="step" id="vwfs-step6">
     <div class="section-card">
       <div class="section-title"><span class="icon">✓</span>Revisá los datos</div>
       <p style="font-size:12px; color:#5A6B7F; margin-bottom:14px;">Si todo está bien, presioná "Enviar formulario" abajo.</p>
@@ -1084,18 +1073,23 @@
   }
 
   // ═══════ STATE ═══════
-  const TOTAL_STEPS = 5;
-  const STEP_LABELS = ['Identificación', 'Estado civil', 'Laboral e ingresos', 'Vivienda y cotitular', 'Resumen'];
+  const TOTAL_STEPS = 6;
+  const STEP_LABELS = ['Foto del DNI', 'Identificación', 'Estado civil', 'Laboral e ingresos', 'Vivienda y cotitular', 'Resumen'];
   let currentStep = 0;
   const toggleValues = {};
   let generatedPDFBlob = null;
   let supabasePdfUrl = '';
   let matchedF01Id = null;
-  let dniMode = null;
   const dniImages = {};
-  const DNI_MIN_WIDTH = 1000;
-  const DNI_MIN_HEIGHT = 700;
-  const DNI_MIN_BYTES = 100 * 1024;
+  const DNI_MIN_WIDTH = 800;
+  const DNI_MIN_HEIGHT = 500;
+  const DNI_MIN_BYTES = 80 * 1024;
+
+  // Resultado del analisis IA del DNI (lo guardamos acumulado para el insert final)
+  let dniAnalisis = null;          // { calidad, extraido, modelo, analizado_at }
+  let dniAnalisisOk = false;       // true si calidad.ok_global, permite avanzar al step 2
+  let dniFrenteUrlUploaded = '';   // URL publica firmada del frente en bucket vwfs-dnis
+  let dniDorsoUrlUploaded = '';    // idem dorso
 
   // ═══════ HELPERS ═══════
   function g(id) { const el = document.getElementById(id); return el ? (el.value || '') : ''; }
@@ -1152,20 +1146,7 @@
     document.getElementById('cotitBlock').classList.toggle('show', show);
   }
 
-  // ═══════ DNI UPLOAD ═══════
-  function setDniMode(mode) {
-    dniMode = mode;
-    document.getElementById('dniMiargBlock').classList.toggle('show', mode === 'miarg');
-    document.getElementById('dniFisicoBlock').classList.toggle('show', mode === 'fisico');
-    if (mode === 'miarg') {
-      removeDniImage('frente', true);
-      removeDniImage('dorso', true);
-    } else {
-      removeDniImage('miarg', true);
-    }
-    updateDniConfirmVisibility();
-  }
-
+  // ═══════ DNI UPLOAD + ANALISIS IA ═══════
   function fileToDataUrl(file) {
     return new Promise((resolve, reject) => {
       const r = new FileReader();
@@ -1184,12 +1165,22 @@
     });
   }
 
+  function resetDniAnalysisState() {
+    dniAnalisis = null;
+    dniAnalisisOk = false;
+    const res = document.getElementById('dniAnalysisResult');
+    if (res) { res.innerHTML = ''; res.style.display = 'none'; }
+  }
+
   async function handleDniUpload(which, input) {
     const err = document.getElementById('dniError');
     err.style.display = 'none';
     err.textContent = '';
     const file = input.files && input.files[0];
     if (!file) return;
+
+    // Si el usuario cambia una foto, descartamos el analisis previo.
+    resetDniAnalysisState();
 
     if (!file.type.startsWith('image/')) {
       err.textContent = 'El archivo debe ser una imagen (JPG o PNG).';
@@ -1208,7 +1199,7 @@
       const dataUrl = await fileToDataUrl(file);
       const dims = await getImgDims(dataUrl);
       if (dims.width < DNI_MIN_WIDTH || dims.height < DNI_MIN_HEIGHT) {
-        err.textContent = 'La foto tiene muy poca resolución (' + dims.width + '×' + dims.height + '). Necesitamos al menos ' + DNI_MIN_WIDTH + '×' + DNI_MIN_HEIGHT + '. Probá sacar la foto con más luz o más cerca, o usá la app Mi Argentina.';
+        err.textContent = 'La foto tiene muy poca resolución (' + dims.width + '×' + dims.height + '). Necesitamos al menos ' + DNI_MIN_WIDTH + '×' + DNI_MIN_HEIGHT + '. Sacá la foto con mejor luz o más cerca.';
         err.style.display = '';
         input.value = '';
         return;
@@ -1216,7 +1207,7 @@
 
       dniImages[which] = { dataUrl, file, w: dims.width, h: dims.height };
       showDniPreview(which);
-      updateDniConfirmVisibility();
+      updateAnalyzeBtnVisibility();
     } catch (e) {
       err.textContent = 'No se pudo procesar la imagen. Intentá con otra foto.';
       err.style.display = '';
@@ -1225,7 +1216,7 @@
   }
 
   function previewPrefix(which) {
-    return which === 'miarg' ? 'Miarg' : (which === 'frente' ? 'Frente' : 'Dorso');
+    return which === 'frente' ? 'Frente' : 'Dorso';
   }
 
   function showDniPreview(which) {
@@ -1244,7 +1235,7 @@
     prev.classList.add('show');
   }
 
-  function removeDniImage(which, silent) {
+  function removeDniImage(which) {
     delete dniImages[which];
     const prefix = previewPrefix(which);
     const zone = document.getElementById('upload' + prefix + 'Zone');
@@ -1254,17 +1245,177 @@
     if (zone) zone.classList.remove('has-file');
     if (prev) { prev.innerHTML = ''; prev.classList.remove('show'); }
     if (input) input.value = '';
-    if (!silent) {
-      document.getElementById('dniConfirm').checked = false;
-      updateDniConfirmVisibility();
+    resetDniAnalysisState();
+    updateAnalyzeBtnVisibility();
+  }
+
+  function updateAnalyzeBtnVisibility() {
+    const btn = document.getElementById('btnAnalyzeDni');
+    if (!btn) return;
+    const ready = !!dniImages.frente && !!dniImages.dorso && !dniAnalisisOk;
+    btn.style.display = ready ? '' : 'none';
+  }
+
+  // Sube frente + dorso al bucket privado vwfs-dnis y llama a la Edge Function
+  // para extraer datos y validar calidad. Si calidad ok, precarga step 2.
+  async function analyzeDni() {
+    const btn = document.getElementById('btnAnalyzeDni');
+    const loader = document.getElementById('dniAnalyzingState');
+    const resultEl = document.getElementById('dniAnalysisResult');
+    const errEl = document.getElementById('dniError');
+    errEl.style.display = 'none';
+    errEl.textContent = '';
+    resultEl.innerHTML = '';
+    resultEl.style.display = 'none';
+
+    if (!dniImages.frente || !dniImages.dorso) {
+      errEl.textContent = 'Subí el frente y el dorso del DNI antes de analizar.';
+      errEl.style.display = '';
+      return;
+    }
+
+    btn.disabled = true;
+    btn.style.display = 'none';
+    loader.style.display = '';
+
+    try {
+      // 1. Subir las dos imagenes al bucket publico vwfs-dnis
+      const timestamp = Date.now();
+      const safe = 'tmp_' + timestamp;
+      const uploadOne = async (which) => {
+        const img = dniImages[which];
+        const ext = img.file.type === 'image/png' ? 'png' : 'jpg';
+        const path = safe + '/' + which + '.' + ext;
+        const res = await supaFetch('/storage/v1/object/vwfs-dnis/' + path, {
+          method: 'POST',
+          headers: { 'Content-Type': img.file.type, 'x-upsert': 'true' },
+          body: img.file
+        });
+        if (!res.ok) {
+          const t = await res.text();
+          throw new Error('Falló subida ' + which + ': ' + t);
+        }
+        return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
+      };
+
+      const [urlFrente, urlDorso] = await Promise.all([
+        uploadOne('frente'),
+        uploadOne('dorso')
+      ]);
+      dniFrenteUrlUploaded = urlFrente;
+      dniDorsoUrlUploaded = urlDorso;
+
+      // 2. Llamar a la Edge Function analizar-dni
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-dni', {
+        method: 'POST',
+        headers: {
+          'Authorization': 'Bearer ' + SUPABASE_KEY,
+          'apikey': SUPABASE_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          dni_frente_url: urlFrente,
+          dni_dorso_url: urlDorso,
+          datero: {}
+        })
+      });
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.error || 'La IA no pudo analizar el DNI. Intentá de nuevo.');
+      }
+
+      dniAnalisis = data;
+      loader.style.display = 'none';
+
+      // 3. Mostrar resultado segun calidad
+      const cal = data.calidad || {};
+      if (cal.ok_global === true) {
+        dniAnalisisOk = true;
+        resultEl.innerHTML =
+          '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: var(--vw-green);">' +
+            '<strong>✓ DNI OK.</strong> La IA pudo leer los datos correctamente. ' +
+            'Precargamos el formulario con lo que leyó. Revisalo en el siguiente paso y editá lo que haga falta.' +
+          '</div>';
+        resultEl.style.display = '';
+        prefillFromDniExtraido(data.extraido || {});
+      } else {
+        dniAnalisisOk = false;
+        const motivos = [];
+        if (cal.frente && !cal.frente.ok) motivos.push('Frente: ' + (cal.frente.motivo || 'no se ve bien'));
+        if (cal.dorso && !cal.dorso.ok) motivos.push('Dorso: ' + (cal.dorso.motivo || 'no se ve bien'));
+        resultEl.innerHTML =
+          '<div class="info-callout err">' +
+            '<strong>✗ El DNI no cumple.</strong> ' +
+            (motivos.length ? motivos.join(' · ') : 'Volvé a sacar las fotos con mejor luz y los 4 bordes del DNI visibles.') +
+          '</div>' +
+          '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetDniForRetry()">Sacar foto de nuevo</button>';
+        resultEl.style.display = '';
+      }
+
+    } catch (e) {
+      console.error('analyzeDni error', e);
+      loader.style.display = 'none';
+      errEl.textContent = 'No pudimos analizar el DNI: ' + (e && e.message ? e.message : 'error inesperado') + '. Probá de nuevo en unos segundos.';
+      errEl.style.display = '';
+      btn.disabled = false;
+      updateAnalyzeBtnVisibility();
     }
   }
 
-  function updateDniConfirmVisibility() {
-    const ready =
-      (dniMode === 'miarg' && dniImages.miarg) ||
-      (dniMode === 'fisico' && dniImages.frente && dniImages.dorso);
-    document.getElementById('dniConfirmBlock').classList.toggle('show', !!ready);
+  // Reinicia el estado del DNI para reintentar (el cliente vuelve a sacar fotos).
+  function resetDniForRetry() {
+    removeDniImage('frente');
+    removeDniImage('dorso');
+    dniFrenteUrlUploaded = '';
+    dniDorsoUrlUploaded = '';
+  }
+
+  // Precarga campos de identificacion / domicilio a partir de lo leido del DNI.
+  // El cliente puede editar lo que este mal en el step 2.
+  function prefillFromDniExtraido(ext) {
+    if (!ext) return;
+    if (ext.nombre) setField('nombre', ext.nombre);
+    if (ext.apellido) setField('apellido', ext.apellido);
+    if (ext.dni) {
+      setField('nroDoc', ext.dni.replace(/\D/g, ''));
+      setField('tipoDoc', 'DNI');
+    }
+    if (ext.sexo) {
+      const val = ext.sexo.toUpperCase() === 'F' ? 'Femenino' : (ext.sexo.toUpperCase() === 'M' ? 'Masculino' : '');
+      if (val) setToggle('sexo', val);
+    }
+    if (ext.fecha_nacimiento) {
+      // DD/MM/YYYY -> YYYY-MM-DD para input type=date
+      const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(ext.fecha_nacimiento.trim());
+      if (m) {
+        const d = m[1].padStart(2, '0');
+        const mo = m[2].padStart(2, '0');
+        const y = m[3].length === 2 ? ('19' + m[3]) : m[3];
+        setField('fechaNac', y + '-' + mo + '-' + d);
+      }
+    }
+    if (ext.nacionalidad) setField('nacionalidad', ext.nacionalidad);
+    if (ext.domicilio) {
+      // Intentamos separar calle y numero. Si no se puede, todo a calle.
+      const dom = ext.domicilio.trim();
+      const match = /^(.+?)\s+(\d{1,6})(?:\s+(.*))?$/.exec(dom);
+      if (match) {
+        setField('domCalle', match[1].trim());
+        setField('domNro', match[2]);
+        if (match[3]) {
+          // El resto (ej "3B CABA") lo dejamos como hint en piso si se ve un caracter tipo piso/uf
+          // No pisamos piso/uf si el cliente ya los escribio.
+        }
+      } else {
+        setField('domCalle', dom);
+      }
+    }
+    if (ext.localidad) setField('domLocalidad', ext.localidad);
+    if (ext.provincia) setField('domProvincia', ext.provincia);
+    if (ext.cuil) {
+      setField('idenTribNro', ext.cuil);
+      setToggle('idenTrib', 'CUIL');
+    }
   }
 
   // ═══════ BANCO FRANCÉS ═══════
@@ -1328,23 +1479,13 @@
     err.style.display = 'none';
     err.textContent = '';
 
-    if (!dniMode) {
-      err.textContent = 'Elegí qué tipo de foto vas a subir: Mi Argentina (recomendado) o DNI físico.';
+    if (!dniImages.frente || !dniImages.dorso) {
+      err.textContent = 'Subí frente y dorso del DNI antes de avanzar.';
       err.style.display = '';
       return false;
     }
-    if (dniMode === 'miarg' && !dniImages.miarg) {
-      err.textContent = 'Subí la captura de Mi Argentina antes de avanzar.';
-      err.style.display = '';
-      return false;
-    }
-    if (dniMode === 'fisico' && (!dniImages.frente || !dniImages.dorso)) {
-      err.textContent = 'Faltan fotos del DNI. Necesitamos frente y dorso.';
-      err.style.display = '';
-      return false;
-    }
-    if (!document.getElementById('dniConfirm').checked) {
-      err.textContent = 'Confirmá que el DNI se ve nítido y completo tildando la casilla.';
+    if (!dniAnalisisOk) {
+      err.textContent = 'Tocá "Analizar DNI con IA" y esperá a que valide las fotos antes de avanzar.';
       err.style.display = '';
       return false;
     }
@@ -1513,6 +1654,8 @@
         document.getElementById('dniError').scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
+    }
+    if (currentStep === 2) {
       if (!validateBcoFrances()) {
         document.getElementById('bcoError').scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
@@ -1655,13 +1798,11 @@
     }
 
     // Documentación (DNI)
-    const dniCargado =
-      (dniMode === 'miarg' && dniImages.miarg) ||
-      (dniMode === 'fisico' && dniImages.frente && dniImages.dorso);
+    const dniCargado = !!(dniImages.frente && dniImages.dorso);
     items.push(
       ['— DOCUMENTACIÓN —', ''],
-      ['Tipo de carga', dniMode === 'miarg' ? 'Mi Argentina' : (dniMode === 'fisico' ? 'Foto DNI físico' : '')],
-      ['DNI cargado', dniCargado ? 'Sí ✓ (ver páginas adjuntas)' : 'No'],
+      ['DNI cargado', dniCargado ? 'Sí ✓ (frente + dorso)' : 'No'],
+      ['DNI validado IA', dniAnalisisOk ? 'Sí ✓' : 'No'],
     );
 
     return items;
@@ -1745,7 +1886,7 @@
     const pageW = 210, pageH = 297, margin = 10;
     const maxW = pageW - margin * 2;
     const maxH = pageH - margin * 2 - 14;
-    const toAdd = dniMode === 'miarg' ? ['miarg'] : ['frente', 'dorso'];
+    const toAdd = ['frente', 'dorso'];
     for (const which of toAdd) {
       const img = dniImages[which];
       if (!img) continue;
@@ -1753,8 +1894,7 @@
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(12);
       doc.setTextColor(0, 30, 80);
-      const title = which === 'miarg' ? 'DNI (Mi Argentina)'
-        : (which === 'frente' ? 'DNI — Frente' : 'DNI — Dorso');
+      const title = which === 'frente' ? 'DNI — Frente' : 'DNI — Dorso';
       doc.text(title, pageW / 2, margin + 5, { align: 'center' });
 
       const aspect = img.w / img.h;
@@ -1801,35 +1941,6 @@
   }
 
   // ═══════ UPLOAD ═══════
-  async function uploadDniImages(safeName, timestamp) {
-    const urls = {};
-    const toUpload = dniMode === 'miarg' ? ['miarg'] : ['frente', 'dorso'];
-    for (const which of toUpload) {
-      const img = dniImages[which];
-      if (!img) continue;
-      // Si la imagen ya existe y no se reemplazó (sin File real), mantener URL.
-      if (img.existingUrl && !(img.file instanceof File)) {
-        urls[which] = img.existingUrl;
-        continue;
-      }
-      const ext = img.file.type === 'image/png' ? 'png' : 'jpg';
-      const fileName = 'dni/VWFS_' + safeName + '_' + timestamp + '_' + which + '.' + ext;
-      try {
-        const res = await supaFetch('/storage/v1/object/formularios-vwfs/' + fileName, {
-          method: 'POST',
-          headers: { 'Content-Type': img.file.type },
-          body: img.file
-        });
-        if (res.ok) {
-          urls[which] = SUPABASE_URL + '/storage/v1/object/public/formularios-vwfs/' + fileName;
-        }
-      } catch (e) {
-        console.error('DNI upload failed for ' + which, e);
-      }
-    }
-    return urls;
-  }
-
   async function uploadToSupabase(doc, clientName) {
     try {
       const blob = doc.output('blob');
@@ -1847,7 +1958,8 @@
 
       supabasePdfUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-vwfs/' + fileName;
 
-      const dniUrls = await uploadDniImages(safe, timestamp);
+      // El DNI ya se subio al bucket vwfs-dnis en el paso 1 (analyzeDni).
+      // Reutilizamos las URLs publicas que quedaron en dniFrenteUrlUploaded / dniDorsoUrlUploaded.
 
       const items = getAllData();
       const datosObj = {};
@@ -1856,10 +1968,20 @@
         if (datosObj[l]) datosObj[l + ' (2)'] = v;
         else datosObj[l] = v;
       }
-      datosObj['DNI modo'] = dniMode === 'miarg' ? 'Mi Argentina' : 'Foto DNI físico';
-      if (dniUrls.miarg)  datosObj['DNI Mi Argentina URL'] = dniUrls.miarg;
-      if (dniUrls.frente) datosObj['DNI Frente URL'] = dniUrls.frente;
-      if (dniUrls.dorso)  datosObj['DNI Dorso URL']  = dniUrls.dorso;
+      if (dniFrenteUrlUploaded) datosObj['DNI Frente URL'] = dniFrenteUrlUploaded;
+      if (dniDorsoUrlUploaded)  datosObj['DNI Dorso URL']  = dniDorsoUrlUploaded;
+
+      const basePayload = {
+        nombre: (g('apellido') + ', ' + g('nombre')).trim(),
+        documento: g('tipoDoc') + ' ' + g('nroDoc'),
+        email: g('email'),
+        celular: g('celular'),
+        pdf_url: supabasePdfUrl,
+        datos: datosObj,
+        dni_frente_url: dniFrenteUrlUploaded || null,
+        dni_dorso_url: dniDorsoUrlUploaded || null,
+        dni_analisis: dniAnalisis || null
+      };
 
       if (editMode && editingId) {
         await supaFetch('/rest/v1/formularios_vwfs?id=eq.' + editingId, {
@@ -1868,18 +1990,14 @@
             'Content-Type': 'application/json',
             'Prefer': 'return=minimal'
           },
-          body: JSON.stringify({
-            nombre: (g('apellido') + ', ' + g('nombre')).trim(),
-            documento: g('tipoDoc') + ' ' + g('nroDoc'),
-            email: g('email'),
-            celular: g('celular'),
-            pdf_url: supabasePdfUrl,
-            datos: datosObj,
-            estado: 'a_revisar',
+          body: JSON.stringify(Object.assign({}, basePayload, {
+            estado: 'datero_cargado',
             errores_adm: null,
+            motivo_rechazo_dni: null,
+            dni_aprobado_admin: null,
             editado_por: editUser,
             editado_at: new Date().toISOString()
-          })
+          }))
         });
       } else {
         await supaFetch('/rest/v1/formularios_vwfs', {
@@ -1888,15 +2006,9 @@
             'Content-Type': 'application/json',
             'Prefer': 'return=minimal'
           },
-          body: JSON.stringify({
-            nombre: (g('apellido') + ', ' + g('nombre')).trim(),
-            documento: g('tipoDoc') + ' ' + g('nroDoc'),
-            email: g('email'),
-            celular: g('celular'),
-            f01_id: matchedF01Id,
-            pdf_url: supabasePdfUrl,
-            datos: datosObj
-          })
+          body: JSON.stringify(Object.assign({}, basePayload, {
+            f01_id: matchedF01Id
+          }))
         });
       }
 
@@ -2107,23 +2219,6 @@
       set('cotit-fechaNac', d['Fecha nac. (3)']);
     }
 
-    // DNI
-    const dniModeStr = d['DNI modo'];
-    if (dniModeStr === 'Mi Argentina') {
-      setDniMode('miarg');
-      setToggle('dniMode', 'Sí, ya tengo'); // chequear si aplica — este toggle es distinto
-      document.querySelectorAll('.toggle-btn[data-field="dniMode"]').forEach(b =>
-        b.classList.toggle('selected', b.dataset.value === 'miarg'));
-      toggleValues['dniMode'] = 'miarg';
-    } else if (dniModeStr === 'Foto DNI físico') {
-      setDniMode('fisico');
-      document.querySelectorAll('.toggle-btn[data-field="dniMode"]').forEach(b =>
-        b.classList.toggle('selected', b.dataset.value === 'fisico'));
-      toggleValues['dniMode'] = 'fisico';
-    }
-
-    document.getElementById('dniConfirm').checked = true;
-    updateDniConfirmVisibility();
   }
 
   async function loadEditRecord(id) {
@@ -2139,12 +2234,35 @@
       editingRecord = rows[0];
       prefillFromRecord(editingRecord);
 
-      const d = editingRecord.datos || {};
+      // Cargar DNI desde las columnas nuevas (fallback a datos[] para registros viejos)
+      const r = editingRecord;
+      const d = r.datos || {};
+      const frenteUrl = r.dni_frente_url || d['DNI Frente URL'] || '';
+      const dorsoUrl  = r.dni_dorso_url  || d['DNI Dorso URL']  || '';
       const dniLoads = [];
-      if (d['DNI Mi Argentina URL']) dniLoads.push(loadDniFromExistingUrl('miarg', d['DNI Mi Argentina URL']));
-      if (d['DNI Frente URL'])       dniLoads.push(loadDniFromExistingUrl('frente', d['DNI Frente URL']));
-      if (d['DNI Dorso URL'])        dniLoads.push(loadDniFromExistingUrl('dorso',  d['DNI Dorso URL']));
+      if (frenteUrl) dniLoads.push(loadDniFromExistingUrl('frente', frenteUrl));
+      if (dorsoUrl)  dniLoads.push(loadDniFromExistingUrl('dorso',  dorsoUrl));
       await Promise.all(dniLoads);
+
+      // Restaurar analisis existente si estaba (asi el vendedor no tiene que re-correr IA)
+      if (r.dni_analisis) {
+        dniAnalisis = r.dni_analisis;
+        dniFrenteUrlUploaded = frenteUrl;
+        dniDorsoUrlUploaded = dorsoUrl;
+        const cal = dniAnalisis.calidad || {};
+        if (cal.ok_global === true) {
+          dniAnalisisOk = true;
+          const resultEl = document.getElementById('dniAnalysisResult');
+          if (resultEl) {
+            resultEl.innerHTML =
+              '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: var(--vw-green);">' +
+                '<strong>✓ DNI ya analizado.</strong> El análisis de la IA fue exitoso en la carga original.' +
+              '</div>';
+            resultEl.style.display = '';
+          }
+        }
+        updateAnalyzeBtnVisibility();
+      }
 
       return true;
     } catch (e) {
