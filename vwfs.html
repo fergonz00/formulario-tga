@@ -161,11 +161,12 @@
 
   .toggle-group { display: flex; gap: 8px; flex-wrap: wrap; }
   .toggle-btn {
-    flex: 1; min-width: 70px; padding: 12px 14px;
+    flex: 1 1 auto; min-width: 90px; padding: 10px 12px;
     border: 1.5px solid var(--vw-new-horizon); border-radius: var(--radius-sm);
-    background: var(--vw-white); font-family: inherit; font-size: 14px;
+    background: var(--vw-white); font-family: inherit; font-size: 13px;
     font-weight: 500; color: var(--vw-dark-blue); cursor: pointer;
     text-align: center; transition: all var(--transition);
+    white-space: normal; word-break: break-word; line-height: 1.25;
   }
   .toggle-btn.selected {
     border-color: var(--vw-cobalt); background: rgba(0,64,193,0.06);
