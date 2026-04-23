@@ -1350,9 +1350,45 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         return;
       }
     }
+    // Step 2+: chequeo de obligatorios visibles en el step actual del tipo activo.
+    if (currentStep >= 2 && formType) {
+      const cfg = stepConfig[formType];
+      const stepEl = document.getElementById(cfg.prefix + '-step' + (currentStep - 1));
+      if (stepEl) {
+        const missing = findMissingFields(stepEl);
+        if (missing.length) {
+          alert('Completá estos campos antes de avanzar:\n\n• ' + missing.join('\n• '));
+          return;
+        }
+      }
+    }
     if (currentStep === totalSteps) { generatePDF(); return; }
     currentStep++;
     showStep(currentStep);
+  }
+
+  // Valida todos los .field visibles no marcados como optional.
+  function findMissingFields(stepEl) {
+    const missing = [];
+    stepEl.querySelectorAll('.field').forEach(field => {
+      const cond = field.closest('.conditional');
+      if (cond && !cond.classList.contains('show')) return;
+      if (field.offsetParent === null) return;
+      if (field.querySelector('.optional')) return;
+      const lbl = field.querySelector('label');
+      const lblText = lbl ? lbl.textContent.replace(/\s*\(opc.*?\)\s*/i, '').replace(/\s*\(opcional\)\s*/i, '').replace(/\s*\(opt\)\s*/i, '').trim() : '(sin nombre)';
+      const tgBtn = field.querySelector('.toggle-btn[data-field]');
+      if (tgBtn) {
+        const fname = tgBtn.dataset.field;
+        if (!toggleValues[fname]) missing.push(lblText);
+        return;
+      }
+      const inp = field.querySelector('input:not([type=file]):not([disabled]), select:not([disabled]), textarea:not([disabled])');
+      if (!inp) return;
+      const v = (inp.value || '').toString().trim();
+      if (!v) missing.push(lblText);
+    });
+    return missing;
   }
 
   function validateDniStep() {
@@ -1575,6 +1611,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       };
       const detalle = cardFor('Frente', cal.frente) + cardFor('Dorso', cal.dorso);
 
+      // F01 es mas laxo que VWFS: acepta que el DNI no este sobre fondo blanco,
+      // pero avisa que para el tramite VWFS se va a requerir re-cargarlo.
+      const faceOkNoFondo = c => c && c.legible && !c.blur && !c.bordes_cortados && !c.vencido;
+      const essentiallyOk = faceOkNoFondo(cal.frente) && faceOkNoFondo(cal.dorso);
+      const soloFaltaFondo = essentiallyOk && !cal.ok_global &&
+        (!cal.frente.fondo_blanco || !cal.dorso.fondo_blanco);
+
       if (cal.ok_global === true) {
         dniAnalisisOk = true;
         resultEl.innerHTML =
@@ -1583,8 +1626,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           '</div>' + detalle;
         resultEl.style.display = '';
         prefillFromDniExtraido(data.extraido || {});
-        // Copia los archivos al uploadedImages asi aparecen en las secciones
-        // de "DNI titular" / "DNI firmante" sin tener que re-subirlos.
+        populateUploadedImagesFromDni();
+      } else if (soloFaltaFondo) {
+        // Pasa F01 pero avisa que VWFS va a pedir re-cargar con fondo blanco
+        dniAnalisisOk = true;
+        resultEl.innerHTML =
+          '<div class="info-callout" style="background: rgba(255,140,0,0.08); border-left-color: #FF8C00;">' +
+            '<strong>⚠ DNI aceptado para F01.</strong> Se ve bien pero <strong>no esta sobre fondo blanco</strong>. ' +
+            '<br><br>Si despues de F01 vas a hacer un credito con Volkswagen Financial Services (VWFS), ahi te vamos a pedir que lo cargues de nuevo sobre fondo blanco para que los bordes se vean perfectos.' +
+          '</div>' + detalle;
+        resultEl.style.display = '';
+        prefillFromDniExtraido(data.extraido || {});
         populateUploadedImagesFromDni();
       } else {
         dniAnalisisOk = false;

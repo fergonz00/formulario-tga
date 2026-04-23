@@ -1596,9 +1596,19 @@
       prefillFromF01(match);
       matchedF01Id = match.id;
 
-      // Si el F01 ya tenia DNI validado por IA, reutilizamos y saltamos el paso 1.
+      // Si el F01 ya tenia DNI validado por IA (estricto, incluye fondo blanco), reutilizamos.
       const f01Calidad = match.dni_analisis && match.dni_analisis.calidad;
-      if (f01Calidad && f01Calidad.ok_global === true && match.dni_frente_url && match.dni_dorso_url) {
+      const f01TieneDniValido = f01Calidad && f01Calidad.ok_global === true
+        && match.dni_frente_url && match.dni_dorso_url;
+      // Caso especial: F01 tenia DNI bien leido pero faltaba fondo blanco.
+      // En VWFS somos estrictos, pedimos re-subirlo sobre blanco.
+      const soloFaltabaFondo = f01Calidad && !f01Calidad.ok_global
+        && f01Calidad.frente && f01Calidad.dorso
+        && f01Calidad.frente.legible && !f01Calidad.frente.blur && !f01Calidad.frente.bordes_cortados && !f01Calidad.frente.vencido
+        && f01Calidad.dorso.legible && !f01Calidad.dorso.blur && !f01Calidad.dorso.bordes_cortados
+        && (!f01Calidad.frente.fondo_blanco || !f01Calidad.dorso.fondo_blanco);
+
+      if (f01TieneDniValido) {
         dniAnalisis = match.dni_analisis;
         dniAnalisisOk = true;
         dniFrenteUrlUploaded = match.dni_frente_url;
@@ -1606,6 +1616,14 @@
         statusEl.className = 'info-callout ok';
         statusEl.textContent = '¡Listo! Traemos tus datos y el DNI ya validado del F01.';
         setTimeout(() => { startForm(); currentStep = 2; showStep(2); }, 900);
+      } else if (soloFaltabaFondo) {
+        statusEl.className = 'info-callout';
+        statusEl.style.background = 'rgba(255,140,0,0.08)';
+        statusEl.style.borderLeft = '4px solid #FF8C00';
+        statusEl.innerHTML = '⚠ <strong>Tu DNI del F01 no está sobre fondo blanco.</strong><br>' +
+          'Para VWFS necesitamos una foto sobre fondo blanco (para ver los bordes bien). ' +
+          'Te vamos a pedir subirlo de nuevo ahora.';
+        setTimeout(() => startForm(), 1600);
       } else {
         // F01 existe pero no tiene DNI validado. Avisamos y mandamos al paso 1 de DNI.
         statusEl.className = 'info-callout ok';
@@ -1736,6 +1754,17 @@
         return;
       }
     }
+    // De step 2 en adelante, chequeamos campos obligatorios visibles.
+    if (currentStep >= 2) {
+      const stepEl = document.getElementById('vwfs-step' + currentStep);
+      if (stepEl) {
+        const missing = findMissingFields(stepEl);
+        if (missing.length) {
+          alert('Completá estos campos antes de avanzar:\n\n• ' + missing.join('\n• '));
+          return;
+        }
+      }
+    }
     if (currentStep === 2) {
       if (!validateBcoFrances()) {
         document.getElementById('bcoError').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -1745,6 +1774,33 @@
     if (currentStep === TOTAL_STEPS) { generatePDF(); return; }
     currentStep++;
     showStep(currentStep);
+  }
+
+  // Busca todos los .field visibles (no en un conditional oculto, no marcado como optional)
+  // y devuelve los labels de los que quedaron vacios.
+  function findMissingFields(stepEl) {
+    const missing = [];
+    stepEl.querySelectorAll('.field').forEach(field => {
+      const cond = field.closest('.conditional');
+      if (cond && !cond.classList.contains('show')) return;
+      if (field.offsetParent === null) return;
+      if (field.querySelector('.optional')) return;
+      const lbl = field.querySelector('label');
+      const lblText = lbl ? lbl.textContent.replace(/\s*\(opc.*?\)\s*/i, '').replace(/\s*\(opcional\)\s*/i, '').trim() : '(sin nombre)';
+      // Caso 1: toggle-group (botones con data-field)
+      const tgBtn = field.querySelector('.toggle-btn[data-field]');
+      if (tgBtn) {
+        const fname = tgBtn.dataset.field;
+        if (!toggleValues[fname]) missing.push(lblText);
+        return;
+      }
+      // Caso 2: input / select / textarea normal
+      const inp = field.querySelector('input:not([type=file]):not([disabled]), select:not([disabled]), textarea:not([disabled])');
+      if (!inp) return;
+      const v = (inp.value || '').toString().trim();
+      if (!v) missing.push(lblText);
+    });
+    return missing;
   }
 
   function prevStep() {
