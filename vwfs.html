@@ -1421,31 +1421,28 @@
     dniDorsoUrlUploaded = '';
   }
 
-  // Precarga campos de identificacion / domicilio a partir de lo leido del DNI,
-  // pero SOLO sobre campos vacios. Si ya habian datos (por ejemplo de un F01
-  // previo), no se pisan — el panel del vendedor va a comparar despues.
+  // Precarga campos de identificacion / domicilio a partir de lo leido del DNI.
+  // En VWFS el DNI manda: si lo que habia precargado del F01 no coincide con el
+  // DNI (ej. datos del conyuge pegados en el slot del titular), el DNI lo corrige.
   function prefillFromDniExtraido(ext) {
     if (!ext) return;
-    const setIfEmpty = (id, v) => {
+    const setAlways = (id, v) => {
       if (v == null || String(v).trim() === '') return;
-      if (g(id) === '') setField(id, v);
-    };
-    const setToggleIfEmpty = (field, v) => {
-      if (v == null || String(v).trim() === '') return;
-      if (!toggleValues[field]) setToggle(field, v);
+      setField(id, String(v));
     };
 
-    setIfEmpty('nombre', ext.nombre);
-    setIfEmpty('apellido', ext.apellido);
-    if (ext.dni && g('nroDoc') === '') {
+    setAlways('nombre', ext.nombre);
+    setAlways('apellido', ext.apellido);
+    if (ext.dni) {
       setField('nroDoc', ext.dni.replace(/\D/g, ''));
-      if (g('tipoDoc') === '') setField('tipoDoc', 'DNI');
+      setField('tipoDoc', 'DNI');
     }
     if (ext.sexo) {
-      const val = ext.sexo.toUpperCase() === 'F' ? 'Femenino' : (ext.sexo.toUpperCase() === 'M' ? 'Masculino' : '');
-      if (val) setToggleIfEmpty('sexo', val);
+      const s = ext.sexo.toUpperCase();
+      const val = s === 'F' ? 'Femenino' : (s === 'M' ? 'Masculino' : '');
+      if (val) setToggle('sexo', val);
     }
-    if (ext.fecha_nacimiento && g('fechaNac') === '') {
+    if (ext.fecha_nacimiento) {
       const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(ext.fecha_nacimiento.trim());
       if (m) {
         const d = m[1].padStart(2, '0');
@@ -1454,29 +1451,26 @@
         setField('fechaNac', y + '-' + mo + '-' + d);
       }
     }
-    setIfEmpty('nacionalidad', ext.nacionalidad);
+    setAlways('nacionalidad', ext.nacionalidad);
 
-    // Domicilio: preferir calle + altura separados (si la IA los separo),
-    // sino parsear del string completo. Rellenamos individualmente por si
-    // uno estaba vacio y otro lleno.
-    if (ext.calle) setIfEmpty('domCalle', ext.calle);
-    if (ext.altura) setIfEmpty('domNro', String(ext.altura));
+    if (ext.calle) setAlways('domCalle', ext.calle);
+    if (ext.altura) setAlways('domNro', String(ext.altura));
     if (!ext.calle && !ext.altura && ext.domicilio) {
       const dom = ext.domicilio.trim();
       const match = /^(.+?)\s+(\d{1,6})(?:\s+.*)?$/.exec(dom);
       if (match) {
-        setIfEmpty('domCalle', match[1].trim());
-        setIfEmpty('domNro', match[2]);
+        setAlways('domCalle', match[1].trim());
+        setAlways('domNro', match[2]);
       } else {
-        setIfEmpty('domCalle', dom);
+        setAlways('domCalle', dom);
       }
     }
-    setIfEmpty('domLocalidad', ext.localidad);
-    setIfEmpty('domProvincia', ext.provincia);
-    if (ext.codigo_postal) setIfEmpty('domCP', String(ext.codigo_postal).replace(/^[A-Z]/i, ''));
-    if (ext.cuil && g('idenTribNro') === '') {
+    setAlways('domLocalidad', ext.localidad);
+    setAlways('domProvincia', ext.provincia);
+    if (ext.codigo_postal) setAlways('domCP', String(ext.codigo_postal).replace(/^[A-Z]/i, ''));
+    if (ext.cuil) {
       setField('idenTribNro', ext.cuil);
-      if (!toggleValues['idenTrib']) setToggle('idenTrib', 'CUIL');
+      setToggle('idenTrib', 'CUIL');
     }
   }
 
@@ -1613,6 +1607,11 @@
         dniAnalisisOk = true;
         dniFrenteUrlUploaded = match.dni_frente_url;
         dniDorsoUrlUploaded = match.dni_dorso_url;
+        // DNI manda: aplicamos extraido sobre lo que trajo prefillFromF01, asi
+        // si F01 tenia datos mezclados (ej. del conyuge), el DNI los corrige.
+        if (match.dni_analisis && match.dni_analisis.extraido) {
+          prefillFromDniExtraido(match.dni_analisis.extraido);
+        }
         statusEl.className = 'info-callout ok';
         statusEl.textContent = '¡Listo! Traemos tus datos y el DNI ya validado del F01.';
         setTimeout(() => { startForm(); currentStep = 2; showStep(2); }, 900);

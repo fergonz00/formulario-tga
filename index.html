@@ -2087,8 +2087,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       document.getElementById('uploadReady').style.display = '';
       document.getElementById('btnDownloadPDF').href = supabasePdfUrl;
 
-      // Si venimos de VWFS (?return=vwfs), mostramos boton para seguir alla.
-      if (returnTarget === 'vwfs') {
+      // Boton 'Continuar con VWFS' siempre: si vino de VWFS lo llama,
+      // si cargó F01 directo, le ofrecemos arrancar VWFS.
+      {
         const ready = document.getElementById('uploadReady');
         if (ready && !document.getElementById('btnGoToVwfs')) {
           const btn = document.createElement('a');
@@ -2096,7 +2097,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           btn.href = 'vwfs.html';
           btn.className = 'btn btn-primary btn-block';
           btn.style.marginTop = '12px';
-          btn.textContent = 'Continuar con VWFS →';
+          btn.textContent = returnTarget === 'vwfs'
+            ? 'Continuar con VWFS →'
+            : '¿Vas a sacar un crédito VW? Cargar formulario VWFS →';
           ready.appendChild(btn);
         }
       }
