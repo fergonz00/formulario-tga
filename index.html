@@ -814,6 +814,7 @@
         <button class="btn btn-primary" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:14px 20px; font-size:15px;" onclick="sharePDF()">
           <span style="font-size:18px">📤</span> Compartir link
         </button>
+        <div id="vwfsContinuationSlot"></div>
       </div>
       <p style="margin-top:16px; font-size:12px; color:#8899AA;">El link es permanente — podés reenviarlo por WhatsApp, email o como prefieras.</p>
     </div>
@@ -2333,20 +2334,19 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       document.getElementById('uploadReady').style.display = '';
       document.getElementById('btnDownloadPDF').href = supabasePdfUrl;
 
-      // Boton 'Continuar con VWFS' siempre: si vino de VWFS lo llama,
-      // si cargó F01 directo, le ofrecemos arrancar VWFS.
+      // Boton 'Continuar con VWFS' dentro del slot dedicado (mantiene layout 320px centrado)
       {
-        const ready = document.getElementById('uploadReady');
-        if (ready && !document.getElementById('btnGoToVwfs')) {
+        const slot = document.getElementById('vwfsContinuationSlot');
+        if (slot && !document.getElementById('btnGoToVwfs')) {
           const btn = document.createElement('a');
           btn.id = 'btnGoToVwfs';
           btn.href = 'vwfs.html';
-          btn.className = 'btn btn-primary btn-block';
-          btn.style.marginTop = '12px';
-          btn.textContent = returnTarget === 'vwfs'
-            ? 'Continuar con VWFS →'
-            : '¿Vas a sacar un crédito VW? Cargar formulario VWFS →';
-          ready.appendChild(btn);
+          btn.className = 'btn btn-success';
+          btn.style.cssText = 'display:flex; align-items:center; justify-content:center; gap:8px; padding:14px 20px; font-size:15px; text-decoration:none;';
+          btn.innerHTML = returnTarget === 'vwfs'
+            ? '<span style="font-size:18px">🚗</span> Continuar con VWFS →'
+            : '<span style="font-size:18px">🚗</span> ¿Sacás un crédito VW? Cargar VWFS →';
+          slot.appendChild(btn);
         }
       }
 
