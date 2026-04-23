@@ -500,13 +500,24 @@
       </div>
       <div class="row row-2">
         <div class="field">
-          <label>Teléfono fijo</label>
-          <input type="tel" id="telFijo" placeholder="Ej: 011 4444-5555">
-        </div>
-        <div class="field">
           <label>Celular</label>
           <input type="tel" id="celular" autocomplete="tel">
         </div>
+        <div class="field">
+          <label>Compañía del celular</label>
+          <select id="celularCia">
+            <option value="">— Elegir —</option>
+            <option>Claro</option>
+            <option>Movistar</option>
+            <option>Personal</option>
+            <option>Tuenti</option>
+            <option>Otra</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Segundo teléfono de contacto</label>
+        <input type="tel" id="telFijo" placeholder="Ej: 011 4444-5555 o alternativo">
       </div>
     </div>
 
@@ -546,6 +557,14 @@
           <label>CP</label>
           <input type="text" inputmode="numeric" id="domCP">
         </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-title"><span class="icon">💵</span>Ingreso del titular</div>
+      <div class="field">
+        <label>Ingreso mensual aproximado del titular ($)</label>
+        <input type="text" inputmode="numeric" id="ingresoTitular" placeholder="Ej: 1.200.000">
       </div>
     </div>
 
@@ -761,6 +780,14 @@
       </div>
     </div>
 
+    <div class="section-card">
+      <div class="section-title"><span class="icon">👨‍👩‍👧</span>Ingreso grupo familiar</div>
+      <div class="field">
+        <label>Ingreso mensual total del grupo familiar ($)</label>
+        <input type="text" inputmode="numeric" id="ingresoGrupoFamiliar" placeholder="Suma del titular + cónyuge + otros ingresos del hogar">
+      </div>
+    </div>
+
   </div>
 
   <!-- ═══════ STEP 3: Laboral + económico ═══════ -->
@@ -789,26 +816,34 @@
           <input type="text" id="actividad">
         </div>
       </div>
+    </div>
 
-      <div class="row row-2">
-        <div class="field">
-          <label>Antigüedad</label>
-          <input type="text" id="antiguedad" placeholder="Ej: 5 años">
-        </div>
-        <div class="field">
-          <label>Empresa</label>
-          <input type="text" id="empresa">
-        </div>
+    <!-- ═══ Datos de la empresa (solo si Empleado / relacion de dependencia) ═══ -->
+    <div class="section-card conditional" id="empresaBlock">
+      <div class="section-title"><span class="icon">🏢</span>Datos de la empresa donde trabaja</div>
+      <div class="info-callout" style="font-size: 12px; background: rgba(0,64,193,0.05); border-left-color: #0040C1;">
+        Completá esta sección si estás en relación de dependencia.
       </div>
 
       <div class="field">
-        <label>Teléfono comercial <span class="optional">(opc.)</span></label>
-        <input type="tel" id="telComercial">
+        <label>Razón social de la empresa</label>
+        <input type="text" id="empresa" placeholder="Ej: TGA S.A.">
+      </div>
+
+      <div class="row row-2">
+        <div class="field">
+          <label>Antigüedad en la empresa</label>
+          <input type="text" id="antiguedad" placeholder="Ej: 5 años">
+        </div>
+        <div class="field">
+          <label>Teléfono comercial</label>
+          <input type="tel" id="telComercial" placeholder="011 4444-5555">
+        </div>
       </div>
     </div>
 
-    <div class="section-card">
-      <div class="section-title"><span class="icon">🏢</span>Domicilio comercial</div>
+    <div class="section-card conditional" id="domComercialSection">
+      <div class="section-title"><span class="icon">🏢</span>Dirección comercial (donde trabajás)</div>
 
       <div class="switch-field">
         <span class="switch-label">Igual al domicilio personal</span>
@@ -851,6 +886,47 @@
           <div class="field">
             <label>CP</label>
             <input type="text" inputmode="numeric" id="comCP">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══ Dirección legal de la empresa (solo si Empleado) ═══ -->
+    <div class="section-card conditional" id="domLegalSection">
+      <div class="section-title"><span class="icon">⚖️</span>Dirección legal de la empresa</div>
+      <div class="info-callout" style="font-size: 12px; background: rgba(0,64,193,0.05); border-left-color: #0040C1;">
+        Domicilio legal o sede social registrada de la empresa (puede ser distinto al lugar donde trabajás).
+      </div>
+      <div class="switch-field">
+        <span class="switch-label">Igual a la dirección comercial</span>
+        <label class="switch">
+          <input type="checkbox" id="domLegalIgual" onchange="toggleDomLegal()">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="conditional show" id="domLegalBlock" style="margin-top: 12px;">
+        <div class="row row-2">
+          <div class="field">
+            <label>Calle</label>
+            <input type="text" id="legalCalle">
+          </div>
+          <div class="field">
+            <label>Número</label>
+            <input type="text" inputmode="numeric" id="legalNro">
+          </div>
+        </div>
+        <div class="field">
+          <label>Provincia</label>
+          <input type="text" id="legalProvincia">
+        </div>
+        <div class="row row-2">
+          <div class="field">
+            <label>Localidad</label>
+            <input type="text" id="legalLocalidad">
+          </div>
+          <div class="field">
+            <label>CP</label>
+            <input type="text" inputmode="numeric" id="legalCP">
           </div>
         </div>
       </div>
@@ -1141,8 +1217,25 @@
       toggleValues[btn.dataset.field] = btn.dataset.value;
       btn.parentElement.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
+      if (btn.dataset.field === 'sitLaboral') toggleEmpresaSections();
     });
   });
+
+  // Secciones de empresa solo si relacion de dependencia (Empleado)
+  function toggleEmpresaSections() {
+    const isEmpleado = toggleValues['sitLaboral'] === 'Empleado';
+    const empresa = document.getElementById('empresaBlock');
+    const comercial = document.getElementById('domComercialSection');
+    const legal = document.getElementById('domLegalSection');
+    if (empresa) empresa.classList.toggle('show', isEmpleado);
+    if (comercial) comercial.classList.toggle('show', isEmpleado);
+    if (legal) legal.classList.toggle('show', isEmpleado);
+  }
+
+  function toggleDomLegal() {
+    const hidden = document.getElementById('domLegalIgual').checked;
+    document.getElementById('domLegalBlock').classList.toggle('show', !hidden);
+  }
 
   function toggleConyuge() {
     const v = g('estadoCivil');
@@ -1879,14 +1972,18 @@
 
       ['— CONTACTO —', ''],
       ['E-mail', g('email')],
-      ['Tel. fijo', g('telFijo')],
       ['Celular', g('celular')],
+      ['Compañía celular', g('celularCia')],
+      ['2º tel. contacto', g('telFijo')],
 
       ['— DOM. PERSONAL —', ''],
       ['Dirección', [g('domCalle'), g('domNro'), g('domPiso'), g('domUF')].filter(Boolean).join(' ')],
       ['Provincia', g('domProvincia')],
       ['Localidad', g('domLocalidad')],
       ['CP', g('domCP')],
+
+      ['— INGRESO TITULAR —', ''],
+      ['Ingreso aprox. titular', fmtARS(g('ingresoTitular'))],
 
       ['— BANCO FRANCÉS —', ''],
       ['Cuenta BBVA', toggleValues['bcoFrances'] || ''],
@@ -1919,13 +2016,17 @@
       );
     }
 
+    if (g('ingresoGrupoFamiliar')) {
+      items.push(['— GRUPO FAMILIAR —', ''], ['Ingreso grupo familiar', fmtARS(g('ingresoGrupoFamiliar'))]);
+    }
+
     items.push(
       ['— LABORAL —', ''],
       ['Situación laboral', toggleValues['sitLaboral'] || ''],
       ['Ocupación', g('ocupacion')],
       ['Actividad', g('actividad')],
       ['Antigüedad', g('antiguedad')],
-      ['Empresa', g('empresa')],
+      ['Razón social empresa', g('empresa')],
       ['Tel. comercial', g('telComercial')],
     );
 
@@ -1940,6 +2041,20 @@
         ['Localidad', g('comLocalidad')],
         ['CP', g('comCP')],
       );
+    }
+
+    const domLegalEl = document.getElementById('domLegalIgual');
+    const igualLegal = domLegalEl ? domLegalEl.checked : false;
+    if (g('legalCalle') || g('legalNro')) {
+      items.push(
+        ['— DOM. LEGAL EMPRESA —', ''],
+        ['Dirección', [g('legalCalle'), g('legalNro')].filter(Boolean).join(' ')],
+        ['Provincia', g('legalProvincia')],
+        ['Localidad', g('legalLocalidad')],
+        ['CP', g('legalCP')],
+      );
+    } else if (igualLegal) {
+      items.push(['Dom. legal empresa', 'Igual al comercial']);
     }
 
     items.push(
