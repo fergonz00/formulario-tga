@@ -1499,6 +1499,36 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     if (res) { res.innerHTML = ''; res.style.display = 'none'; }
   }
 
+  // Redibuja la imagen en canvas para bakear la rotacion EXIF y garantizar
+  // que las dimensiones visibles coincidan con las del archivo (evita que
+  // jsPDF la estire despues en el PDF).
+  async function normalizeImageFromFile(file) {
+    const dataUrlRaw = await fileToDataUrl(file);
+    let bitmap;
+    try {
+      bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    } catch (_e) {
+      const img = new Image();
+      await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = dataUrlRaw; });
+      bitmap = img;
+    }
+    const w = bitmap.width || bitmap.naturalWidth;
+    const h = bitmap.height || bitmap.naturalHeight;
+    const MAX_W = 1800;
+    const scale = w > MAX_W ? MAX_W / w : 1;
+    const outW = Math.round(w * scale);
+    const outH = Math.round(h * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = outW; canvas.height = outH;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(bitmap, 0, 0, outW, outH);
+    const isPng = file.type === 'image/png';
+    const mime = isPng ? 'image/png' : 'image/jpeg';
+    const quality = isPng ? undefined : 0.92;
+    const dataUrl = canvas.toDataURL(mime, quality);
+    return { dataUrl, w: outW, h: outH, mime };
+  }
+
   async function handleDniUpload(which, input) {
     const err = document.getElementById('dniError');
     err.style.display = 'none';
@@ -1517,13 +1547,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       err.style.display = ''; input.value = ''; return;
     }
     try {
-      const dataUrl = await fileToDataUrl(file);
-      const dims = await getImgDims(dataUrl);
-      if (dims.width < DNI_MIN_WIDTH || dims.height < DNI_MIN_HEIGHT) {
-        err.textContent = 'La foto tiene muy poca resolucion (' + dims.width + '×' + dims.height + '). Minimo ' + DNI_MIN_WIDTH + '×' + DNI_MIN_HEIGHT + '.';
+      const norm = await normalizeImageFromFile(file);
+      if (norm.w < DNI_MIN_WIDTH || norm.h < DNI_MIN_HEIGHT) {
+        err.textContent = 'La foto tiene muy poca resolucion (' + norm.w + 'x' + norm.h + '). Minimo ' + DNI_MIN_WIDTH + 'x' + DNI_MIN_HEIGHT + '.';
         err.style.display = ''; input.value = ''; return;
       }
-      dniImages[which] = { dataUrl, file, w: dims.width, h: dims.height };
+      const blob = await (await fetch(norm.dataUrl)).blob();
+      const normFile = new File([blob], (file.name || 'dni') + '.jpg', { type: norm.mime });
+      dniImages[which] = { dataUrl: norm.dataUrl, file: normFile, w: norm.w, h: norm.h };
       showDniPreview(which);
       updateAnalyzeBtnVisibility();
     } catch (e) {
@@ -1809,13 +1840,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       err.textContent = 'La foto pesa muy poco. Sacala con mas resolucion.'; err.style.display = ''; input.value = ''; return;
     }
     try {
-      const dataUrl = await fileToDataUrl(file);
-      const dims = await getImgDims(dataUrl);
-      if (dims.width < DNI_MIN_WIDTH || dims.height < DNI_MIN_HEIGHT) {
-        err.textContent = 'Muy poca resolucion (' + dims.width + 'x' + dims.height + ').';
+      const norm = await normalizeImageFromFile(file);
+      if (norm.w < DNI_MIN_WIDTH || norm.h < DNI_MIN_HEIGHT) {
+        err.textContent = 'Muy poca resolucion (' + norm.w + 'x' + norm.h + ').';
         err.style.display = ''; input.value = ''; return;
       }
-      conyDniImages[which] = { dataUrl, file, w: dims.width, h: dims.height };
+      const blob = await (await fetch(norm.dataUrl)).blob();
+      const normFile = new File([blob], (file.name || 'dniCony') + '.jpg', { type: norm.mime });
+      conyDniImages[which] = { dataUrl: norm.dataUrl, file: normFile, w: norm.w, h: norm.h };
       showConyDniPreview(which);
       updateConyAnalyzeBtnVisibility();
     } catch (e) {

@@ -260,6 +260,44 @@
     display: inline-block; vertical-align: middle;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ═══ Tiles dentro del detalle del cliente ═══ */
+  .tiles { display: flex; flex-direction: column; gap: 8px; margin-top: 6px; }
+  .tile {
+    background: white; border: 1.5px solid var(--vw-new-horizon);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+    transition: border-color var(--transition);
+  }
+  .tile:hover { border-color: var(--vw-cobalt); }
+  .tile-link {
+    display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+    text-decoration: none; color: inherit; cursor: pointer;
+  }
+  .tile-link:hover { background: var(--vw-new-horizon-20); }
+  .tile-header {
+    width: 100%; display: flex; align-items: center; gap: 12px;
+    padding: 12px 14px; background: transparent; border: none;
+    font-family: inherit; cursor: pointer; text-align: left;
+    color: var(--vw-dark-blue);
+  }
+  .tile-header:hover { background: var(--vw-new-horizon-20); }
+  .tile-icon { font-size: 22px; flex-shrink: 0; }
+  .tile-body { flex: 1; min-width: 0; }
+  .tile-title { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
+  .tile-sub { font-size: 12px; color: #5A6B7F; }
+  .tile-chev {
+    font-size: 20px; color: #8899AA; flex-shrink: 0;
+    transition: transform var(--transition);
+  }
+  .tile-expand.open .tile-chev { transform: rotate(90deg); color: var(--vw-cobalt); }
+  .tile-content {
+    display: none;
+    padding: 0 14px 14px;
+    border-top: 1px solid var(--vw-new-horizon-20);
+    margin-top: 0;
+  }
+  .tile-expand.open .tile-content { display: block; padding-top: 12px; }
 </style>
 </head>
 <body>
@@ -631,13 +669,14 @@
     if (r) document.getElementById('detailContent').innerHTML = renderDetail(r);
   }
 
-  // ═══════ RENDER DETAIL ═══════
+  // ═══════ RENDER DETAIL (rediseño en tiles colapsables) ═══════
   function renderDetail(r) {
     const isVwfs = currentTab === 'vwfs';
     const est = ESTADOS[r.estado] || ESTADOS.a_revisar;
     const fecha = new Date(r.created_at).toLocaleString('es-AR');
     const nombre = r.nombre || (r.datos && (r.datos['Razón social'] || r.datos['Nombre'])) || 'Sin nombre';
     const documento = r.documento || (r.datos && (r.datos['Documento'] || r.datos['CUIT'])) || '—';
+    const datos = r.datos || {};
 
     let html = `
       <div class="detail-header">
@@ -646,6 +685,7 @@
         ${isVwfs ? `<div style="margin-top:8px;"><span class="chip ${est.chip}">${escapeHtml(est.label)}</span></div>` : ''}
       </div>`;
 
+    // Banners de contexto al tope (rechazo, asignaciones faltantes)
     if (isVwfs) {
       if (r.estado === 'rechazado' && r.errores_adm) {
         html += `<div class="error-banner"><strong>Motivo del rechazo:</strong><br>${escapeHtml(r.errores_adm)}</div>`;
@@ -653,92 +693,137 @@
       if (r.estado === 'rechazado_dni' && r.motivo_rechazo_dni) {
         html += `<div class="error-banner"><strong>DNI rechazado por admin:</strong><br>${escapeHtml(r.motivo_rechazo_dni)}<br><small>Pedirle al cliente un DNI nuevo.</small></div>`;
       }
-      if (r.revisado_por) {
-        html += `<div class="kv"><span class="k">Revisado por</span><span class="v">${escapeHtml(r.revisado_por)}${r.revisado_at ? ' · ' + new Date(r.revisado_at).toLocaleString('es-AR') : ''}</span></div>`;
-      }
-      if (r.editado_por) {
-        html += `<div class="kv"><span class="k">Última edición</span><span class="v">${escapeHtml(r.editado_por)}${r.editado_at ? ' · ' + new Date(r.editado_at).toLocaleString('es-AR') : ''}</span></div>`;
-      }
     }
-
     if (!r.vendedor) {
-      html += `<div class="info-banner">⚠️ <strong>Falta asignar vendedor.</strong> Elegí uno abajo.</div>`;
+      html += `<div class="info-banner">⚠️ <strong>Falta asignar vendedor.</strong> Abrí la tarjeta "Vendedor" abajo.</div>`;
     }
     if (isAdminOrOwner() && !r.administrativa) {
-      html += `<div class="info-banner">⚠️ <strong>Falta asignar administrativa.</strong> Elegíla abajo.</div>`;
+      html += `<div class="info-banner">⚠️ <strong>Falta asignar administrativa.</strong> Abrí la tarjeta "Administrativa".</div>`;
     }
 
-    // PDF principal
+    // ═══ TARJETAS (cada una abre/cierra al click) ═══
+    html += '<div class="tiles">';
+
+    // Tile: PDF del formulario (accion directa, no expande)
     if (r.pdf_url) {
-      html += `<div style="margin:14px 0;"><a class="btn btn-primary btn-block" href="${r.pdf_url}" target="_blank">📄 Abrir PDF completo</a></div>`;
+      html += `
+        <a class="tile tile-link" href="${r.pdf_url}" target="_blank">
+          <div class="tile-icon">📄</div>
+          <div class="tile-body">
+            <div class="tile-title">PDF del formulario</div>
+            <div class="tile-sub">Abrir en nueva pestaña</div>
+          </div>
+        </a>`;
     }
 
-    // ═══ DNI (VWFS + F01) ═══
+    // Tile: DNI (frente + dorso + IA)
     if (r.dni_frente_url || r.dni_dorso_url || r.dni_analisis) {
-      html += '<div class="section-sep">DNI</div>';
-      html += renderDniSection(r, isVwfs);
+      const cal = r.dni_analisis && r.dni_analisis.calidad;
+      const dniStatus = cal
+        ? (cal.ok_global === true
+            ? '<span style="color:var(--vw-green); font-weight:700;">✓ Validado</span>'
+            : '<span style="color:var(--vw-red); font-weight:700;">✗ Con problemas</span>')
+        : 'Sin análisis IA';
+      html += buildTile('dni', '📷', 'DNI del titular', dniStatus, renderDniSection(r, isVwfs));
     }
 
-    // ═══ Datos del formulario ═══
-    html += '<div class="section-sep">Datos del formulario</div>';
-    const datos = r.datos || {};
-    for (const [k, v] of Object.entries(datos)) {
-      if (!v) continue;
-      if (k.endsWith('URL')) continue;
-      html += `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(v)}</span></div>`;
-    }
-
-    // ═══ Otros adjuntos (URL keys en datos) ═══
-    const adjuntos = [];
-    for (const [k, v] of Object.entries(datos)) {
-      if (typeof v === 'string' && k.endsWith(' URL') && v.startsWith('http')) {
-        const lbl = k.replace(/ URL$/, '');
-        adjuntos.push([lbl, v]);
-      }
-    }
-    if (adjuntos.length) {
-      html += '<div class="section-sep">Documentación adjunta</div>';
-      for (const [lbl, url] of adjuntos) {
-        html += renderAdjunto(lbl, url);
-      }
-    }
-
-    // ═══ Asignaciones ═══
-    html += '<div class="section-sep">Asignaciones</div>';
+    // Tile: Vendedor
     const vendedorOptions =
       '<option value="">— Elegir vendedor —</option>' +
       VENDEDORES.map(v => `<option value="${escapeHtml(v)}"${v === r.vendedor ? ' selected' : ''}>${escapeHtml(v)}</option>`).join('');
-    html += `
-      <div class="card" style="padding:14px; margin-bottom:10px;">
-        <div class="field" style="margin-bottom:8px;"><label>Vendedor</label>
-          <select id="vendedorSelect">${vendedorOptions}</select></div>
-        <button class="btn btn-primary btn-block" onclick="doAssignVendedor(${r.id})">Guardar vendedor</button>
-      </div>`;
+    html += buildTile('vendedor', '💼', 'Vendedor',
+      r.vendedor ? escapeHtml(r.vendedor) : '<span style="color:var(--vw-red);">Sin asignar</span>',
+      `<div class="field" style="margin-bottom:8px;"><label>Elegí vendedor</label>
+        <select id="vendedorSelect">${vendedorOptions}</select></div>
+      <button class="btn btn-primary btn-block" onclick="doAssignVendedor(${r.id})">Guardar vendedor</button>`);
+
+    // Tile: Administrativa (solo admin/owner)
     if (isAdminOrOwner()) {
       const admOptions =
         '<option value="">— Elegir administrativa —</option>' +
         ADMINISTRATIVAS.map(a => `<option value="${escapeHtml(a)}"${a === r.administrativa ? ' selected' : ''}>${escapeHtml(a)}</option>`).join('');
-      html += `
-        <div class="card" style="padding:14px; margin-bottom:10px;">
-          <div class="field" style="margin-bottom:8px;"><label>Administrativa</label>
-            <select id="administrativaSelect">${admOptions}</select></div>
-          <button class="btn btn-primary btn-block" onclick="doAssignAdministrativa(${r.id})">Guardar administrativa</button>
-        </div>`;
+      html += buildTile('admin', '🛡️', 'Administrativa',
+        r.administrativa ? escapeHtml(r.administrativa) : '<span style="color:var(--vw-red);">Sin asignar</span>',
+        `<div class="field" style="margin-bottom:8px;"><label>Elegí administrativa</label>
+          <select id="administrativaSelect">${admOptions}</select></div>
+        <button class="btn btn-primary btn-block" onclick="doAssignAdministrativa(${r.id})">Guardar administrativa</button>`);
     }
 
-    // ═══ Comprobantes (solo VWFS) ═══
-    if (isVwfs) {
-      html += renderComprobantesSection(r);
-      html += renderArchivosSection(r);
+    // Tile: Datos del formulario
+    const datosEntries = Object.entries(datos).filter(([k,v]) => v && !k.endsWith('URL'));
+    let datosBody = '';
+    for (const [k, v] of datosEntries) {
+      datosBody += `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(v)}</span></div>`;
+    }
+    html += buildTile('datos', '📋', 'Datos del formulario', datosEntries.length + ' campos', datosBody || '<div style="color:#5A6B7F;">Sin datos.</div>');
+
+    // Tile: Documentación adjunta (los campos URL de datos)
+    const adjuntos = [];
+    for (const [k, v] of Object.entries(datos)) {
+      if (typeof v === 'string' && k.endsWith(' URL') && v.startsWith('http')) {
+        adjuntos.push([k.replace(/ URL$/, ''), v]);
+      }
+    }
+    if (adjuntos.length) {
+      let adjBody = '';
+      for (const [lbl, url] of adjuntos) adjBody += renderAdjunto(lbl, url);
+      html += buildTile('adjuntos', '📎', 'Documentación adjunta', adjuntos.length + ' archivo(s)', adjBody);
     }
 
-    // ═══ Acciones ═══
+    // Tile: Comprobantes (solo VWFS)
     if (isVwfs) {
-      html += '<div class="section-sep">Acciones</div>';
-      html += renderAccionesVwfs(r);
+      const listComp = comprobantesCache[r.id] || [];
+      const total = listComp.reduce((acc, c) => acc + (Number(c.monto) || 0), 0);
+      html += buildTile('comprobantes', '💰', 'Comprobantes de pago',
+        listComp.length + ' · Total ' + fmtARS(total),
+        renderComprobantesSection(r));
     }
+
+    // Tile: Archivos adicionales (solo VWFS)
+    if (isVwfs) {
+      const listArch = archivosCache[r.id] || [];
+      html += buildTile('archivos', '📁', 'Archivos adicionales', listArch.length + ' archivo(s)', renderArchivosSection(r));
+    }
+
+    // Tile: Acciones (solo VWFS)
+    if (isVwfs) {
+      html += buildTile('acciones', '✅', 'Acciones',
+        isAdminOrOwner() ? 'Aprobar · Rechazar · Editar' : 'Editar datero',
+        renderAccionesVwfs(r));
+    }
+
+    // Historial de revisión (rev/editado)
+    if (isVwfs && (r.revisado_por || r.editado_por)) {
+      let histBody = '';
+      if (r.revisado_por) histBody += `<div class="kv"><span class="k">Revisado por</span><span class="v">${escapeHtml(r.revisado_por)}${r.revisado_at ? ' · ' + new Date(r.revisado_at).toLocaleString('es-AR') : ''}</span></div>`;
+      if (r.editado_por)  histBody += `<div class="kv"><span class="k">Última edición</span><span class="v">${escapeHtml(r.editado_por)}${r.editado_at ? ' · ' + new Date(r.editado_at).toLocaleString('es-AR') : ''}</span></div>`;
+      html += buildTile('historial', '🕓', 'Historial', '', histBody);
+    }
+
+    html += '</div>'; // .tiles
 
     return html;
+  }
+
+  // Construye una tarjeta colapsable con header clickable y body oculto.
+  function buildTile(id, icon, title, sub, body) {
+    return `
+      <div class="tile tile-expand" id="tile-${id}">
+        <button type="button" class="tile-header" onclick="toggleTile('${id}')">
+          <div class="tile-icon">${icon}</div>
+          <div class="tile-body">
+            <div class="tile-title">${title}</div>
+            ${sub ? `<div class="tile-sub">${sub}</div>` : ''}
+          </div>
+          <div class="tile-chev">›</div>
+        </button>
+        <div class="tile-content">${body}</div>
+      </div>`;
+  }
+
+  function toggleTile(id) {
+    const el = document.getElementById('tile-' + id);
+    if (el) el.classList.toggle('open');
   }
 
   function renderDniSection(r, isVwfs) {
@@ -828,7 +913,8 @@
       </div>`;
   }
 
-  // Comparacion simple datero <-> extraido (Levenshtein normalizada)
+  // Comparacion datero <-> extraido (Levenshtein normalizada, con normalizacion
+  // especifica por tipo: fecha a YYYY-MM-DD, nombre/apellido tolerante al orden).
   function computeMismatches(datos, extraido) {
     const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim();
     const sim = (a, b) => {
@@ -849,20 +935,63 @@
       for (const k of keys) if (datos[k]) return datos[k];
       return '';
     };
+
+    // Normaliza fechas a ISO YYYY-MM-DD para comparar 'sin importar el formato'.
+    const toISODate = (s) => {
+      if (!s) return '';
+      const str = String(s).trim();
+      const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(str);
+      if (iso) return iso[1] + '-' + iso[2] + '-' + iso[3];
+      const dmy = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(str);
+      if (dmy) {
+        let y = dmy[3];
+        if (y.length === 2) y = (+y < 50 ? '20' : '19') + y;
+        return y + '-' + dmy[2].padStart(2, '0') + '-' + dmy[1].padStart(2, '0');
+      }
+      return str;
+    };
+
+    // Similitud de nombre/apellido tolerante al orden de las palabras
+    // (ej. 'Juan Carlos' vs 'Carlos Juan' → alta similitud).
+    const simWords = (a, b) => {
+      const wa = norm(a).split(' ').filter(Boolean).sort().join(' ');
+      const wb = norm(b).split(' ').filter(Boolean).sort().join(' ');
+      return sim(wa, wb);
+    };
+
+    const fnDatero = toISODate(get(['Fecha nac.', 'Fecha de nacimiento']));
+    const fnDni    = toISODate(extraido.fecha_nacimiento);
+
+    const nombreDatero   = get(['Nombre', 'Nombres']);
+    const nombreDni      = extraido.nombre || '';
+    const apellidoDatero = get(['Apellido', 'Apellidos']);
+    const apellidoDni    = extraido.apellido || '';
+
     const checks = [
-      { campo: 'Nombre',     datero: get(['Nombre', 'Nombres']),              dni: extraido.nombre,     umbral: 0.9 },
-      { campo: 'Apellido',   datero: get(['Apellido', 'Apellidos']),          dni: extraido.apellido,   umbral: 0.9 },
-      { campo: 'DNI',        datero: (get(['Documento']) + '').replace(/\D/g, ''), dni: (extraido.dni || '').replace(/\D/g, ''), umbral: 1.0 },
-      { campo: 'F. nac.',    datero: get(['Fecha nac.', 'Fecha de nacimiento']), dni: extraido.fecha_nacimiento, umbral: 0.9 },
-      { campo: 'Domicilio',  datero: get(['Dirección', 'Domicilio']),         dni: extraido.domicilio,  umbral: 0.6 },
-      { campo: 'Localidad',  datero: get(['Localidad']),                       dni: extraido.localidad,  umbral: 0.85 },
-      { campo: 'Provincia',  datero: get(['Provincia']),                       dni: extraido.provincia,  umbral: 0.85 },
+      { campo: 'Nombre',    datero: nombreDatero,   dni: nombreDni,   sim: simWords(nombreDatero, nombreDni),     umbral: 0.9 },
+      { campo: 'Apellido',  datero: apellidoDatero, dni: apellidoDni, sim: simWords(apellidoDatero, apellidoDni), umbral: 0.9 },
+      { campo: 'DNI',       datero: (get(['Documento']) + '').replace(/\D/g, ''), dni: (extraido.dni || '').replace(/\D/g, ''), umbral: 1.0 },
+      { campo: 'F. nac.',   datero: fnDatero, dni: fnDni, sim: (fnDatero && fnDatero === fnDni) ? 1 : 0, umbral: 1.0 },
+      { campo: 'Domicilio', datero: get(['Dirección', 'Domicilio']), dni: extraido.domicilio,  umbral: 0.6 },
+      { campo: 'Localidad', datero: get(['Localidad']),               dni: extraido.localidad,  umbral: 0.85 },
+      { campo: 'Provincia', datero: get(['Provincia']),               dni: extraido.provincia,  umbral: 0.85 },
     ];
     const out = [];
     for (const c of checks) {
       if (!c.dni && !c.datero) continue;
-      const s = sim(c.datero, c.dni);
-      out.push({ campo: c.campo, datero: c.datero || '—', dni: c.dni || '—', ok: s >= c.umbral, sim: s });
+      const s = c.sim != null ? c.sim : sim(c.datero, c.dni);
+      // Formato amigable para mostrar la fecha (DD/MM/YYYY)
+      let dateroShow = c.datero || '—';
+      let dniShow = c.dni || '—';
+      if (c.campo === 'F. nac.') {
+        const fmt = iso => {
+          const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '');
+          return m ? m[3] + '/' + m[2] + '/' + m[1] : (iso || '—');
+        };
+        dateroShow = fmt(c.datero);
+        dniShow = fmt(c.dni);
+      }
+      out.push({ campo: c.campo, datero: dateroShow, dni: dniShow, ok: s >= c.umbral, sim: s });
     }
     return out;
   }
@@ -905,7 +1034,6 @@
       </tr></tfoot>` : '';
 
     return `
-      <div class="section-sep">Comprobantes de pago</div>
       <div class="card" style="padding:12px;">
         <div style="overflow-x:auto;">
           <table class="comp-table">
@@ -1139,7 +1267,6 @@
       }).join('');
     }
     return `
-      <div class="section-sep">Archivos adicionales</div>
       <div class="card" style="padding:12px;">
         <div style="font-size:12px; color:#5A6B7F; margin-bottom:8px;">Actas de divorcio / defunción, recibos, documentación varia.</div>
         <div style="overflow-x:auto;">
