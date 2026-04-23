@@ -1718,6 +1718,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         if (mm) { setIf('pf-dniCalle', mm[1].trim()); setIf('pf-dniNro', mm[2]); }
         else setIf('pf-dniCalle', dom);
       }
+      if (ext.barrio) setIf('pf-dniBarrio', ext.barrio);
       if (ext.localidad) setIf('pf-dniLocalidad', ext.localidad);
       if (ext.provincia) setIf('pf-dniProvincia', ext.provincia);
       if (ext.codigo_postal) setIf('pf-dniCP', String(ext.codigo_postal).replace(/^[A-Z]/i, ''));
