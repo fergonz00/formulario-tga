@@ -1086,6 +1086,10 @@
   let generatedPDFBlob = null;
   let supabasePdfUrl = '';
   let matchedF01Id = null;
+  // URLs del DNI del conyuge heredadas del F01 matcheado (para que aparezcan
+  // como adjuntos en el panel VWFS sin tener que re-subir).
+  let conyDniFrenteUrlFromF01 = '';
+  let conyDniDorsoUrlFromF01 = '';
   const dniImages = {};
   const DNI_MIN_WIDTH = 800;
   const DNI_MIN_HEIGHT = 500;
@@ -1242,17 +1246,26 @@
   // Redibuja la imagen en canvas aplicando rotacion EXIF manualmente para
   // que funcione en todos los browsers (incluido iOS Safari). Garantiza
   // que las dims coincidan con lo que se ve y que jsPDF no lo estire.
+  //
+  // Estrategia robusta: forzar createImageBitmap({imageOrientation:'none'})
+  // para obtener pixeles crudos SIN rotacion automatica del browser. Asi
+  // aplicamos la rotacion nosotros mismos y no hay ambigüedad.
   async function normalizeImageFromFile(file) {
     const orientation = await getJpegOrientation(file);
-    const dataUrlRaw = await fileToDataUrl(file);
-    const imgEl = new Image();
-    await new Promise((res, rej) => { imgEl.onload = res; imgEl.onerror = rej; imgEl.src = dataUrlRaw; });
-    // Dims crudas del pixel del JPEG (sin rotar). En Chrome modernos, naturalWidth
-    // puede venir ya rotado — para protegernos, si EXIF=1 asumimos que nat dims
-    // son crudas, y si EXIF indica rotacion, asumimos nat dims son crudas tambien
-    // (comportamiento consistente al dibujar en canvas).
-    const rawW = imgEl.naturalWidth;
-    const rawH = imgEl.naturalHeight;
+    let bmp;
+    try {
+      bmp = await createImageBitmap(file, { imageOrientation: 'none' });
+    } catch (_e) {
+      // Fallback: browsers muy viejos sin createImageBitmap(opts).
+      // En estos Image tampoco auto-rota, asi que las dims de naturalWidth
+      // son crudas — la rotacion manual funciona igual.
+      const dataUrlRaw = await fileToDataUrl(file);
+      const imgEl = new Image();
+      await new Promise((res, rej) => { imgEl.onload = res; imgEl.onerror = rej; imgEl.src = dataUrlRaw; });
+      bmp = imgEl;
+    }
+    const rawW = bmp.width || bmp.naturalWidth;
+    const rawH = bmp.height || bmp.naturalHeight;
     const swap = orientation >= 5 && orientation <= 8;
     const visualW = swap ? rawH : rawW;
     const visualH = swap ? rawW : rawH;
@@ -1276,7 +1289,7 @@
       case 7: ctx.rotate(0.5 * Math.PI); ctx.translate(sw, -sh); ctx.scale(-1, 1); break;
       case 8: ctx.rotate(-0.5 * Math.PI); ctx.translate(-sw, 0); break;   // 90° CCW
     }
-    ctx.drawImage(imgEl, 0, 0, sw, sh);
+    ctx.drawImage(bmp, 0, 0, sw, sh);
     const isPng = file.type === 'image/png';
     const mime = isPng ? 'image/png' : 'image/jpeg';
     const quality = isPng ? undefined : 0.92;
@@ -1694,6 +1707,11 @@
 
       prefillFromF01(match);
       matchedF01Id = match.id;
+      // Guardamos las URLs del DNI conyuge del F01 para propagarlas al VWFS.
+      if (match.datos) {
+        conyDniFrenteUrlFromF01 = match.datos['DNI Cónyuge Frente URL'] || '';
+        conyDniDorsoUrlFromF01  = match.datos['DNI Cónyuge Dorso URL']  || '';
+      }
 
       // Si el F01 ya tenia DNI validado por IA (estricto, incluye fondo blanco), reutilizamos.
       const f01Calidad = match.dni_analisis && match.dni_analisis.calidad;
@@ -2264,6 +2282,9 @@
       }
       if (dniFrenteUrlUploaded) datosObj['DNI Frente URL'] = dniFrenteUrlUploaded;
       if (dniDorsoUrlUploaded)  datosObj['DNI Dorso URL']  = dniDorsoUrlUploaded;
+      // DNI del conyuge (heredado del F01 matcheado): queda adjunto para el panel.
+      if (conyDniFrenteUrlFromF01) datosObj['DNI Cónyuge Frente URL'] = conyDniFrenteUrlFromF01;
+      if (conyDniDorsoUrlFromF01)  datosObj['DNI Cónyuge Dorso URL']  = conyDniDorsoUrlFromF01;
 
       const basePayload = {
         nombre: (g('apellido') + ', ' + g('nombre')).trim(),

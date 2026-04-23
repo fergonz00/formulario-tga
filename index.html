@@ -1559,15 +1559,22 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     return 1;
   }
 
-  // Redibuja la imagen aplicando EXIF manualmente (funciona en todos los
-  // browsers, incluido iOS Safari).
+  // Redibuja aplicando EXIF manualmente. Forzamos imageOrientation:'none' en
+  // createImageBitmap para evitar la auto-rotacion del browser y poder
+  // controlar el resultado nosotros.
   async function normalizeImageFromFile(file) {
     const orientation = await getJpegOrientation(file);
-    const dataUrlRaw = await fileToDataUrl(file);
-    const imgEl = new Image();
-    await new Promise((res, rej) => { imgEl.onload = res; imgEl.onerror = rej; imgEl.src = dataUrlRaw; });
-    const rawW = imgEl.naturalWidth;
-    const rawH = imgEl.naturalHeight;
+    let bmp;
+    try {
+      bmp = await createImageBitmap(file, { imageOrientation: 'none' });
+    } catch (_e) {
+      const dataUrlRaw = await fileToDataUrl(file);
+      const imgEl = new Image();
+      await new Promise((res, rej) => { imgEl.onload = res; imgEl.onerror = rej; imgEl.src = dataUrlRaw; });
+      bmp = imgEl;
+    }
+    const rawW = bmp.width || bmp.naturalWidth;
+    const rawH = bmp.height || bmp.naturalHeight;
     const swap = orientation >= 5 && orientation <= 8;
     const visualW = swap ? rawH : rawW;
     const visualH = swap ? rawW : rawH;
@@ -1590,7 +1597,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       case 7: ctx.rotate(0.5 * Math.PI); ctx.translate(sw, -sh); ctx.scale(-1, 1); break;
       case 8: ctx.rotate(-0.5 * Math.PI); ctx.translate(-sw, 0); break;
     }
-    ctx.drawImage(imgEl, 0, 0, sw, sh);
+    ctx.drawImage(bmp, 0, 0, sw, sh);
     const isPng = file.type === 'image/png';
     const mime = isPng ? 'image/png' : 'image/jpeg';
     const quality = isPng ? undefined : 0.92;
@@ -2273,8 +2280,33 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     doc.text('Documento generado desde formulario digital — Tito González Automotores — 100 Aniversario (desde 1926)', pageW/2, y, { align: 'center' });
 
     // ── Images ──
+    // Antes de iterar uploadedImages, copiamos las del conyuge analizadas con IA
+    // (conyDniImages) a uploadedImages para que el PDF las incluya.
+    if (formType === 'fisica' && typeof conyDniImages === 'object') {
+      if (conyDniImages.frente) {
+        uploadedImages['prev-pf-dniConFrente'] = {
+          data: conyDniImages.frente.dataUrl,
+          name: 'cony-frente.jpg',
+          type: conyDniImages.frente.file ? conyDniImages.frente.file.type : 'image/jpeg'
+        };
+      }
+      if (conyDniImages.dorso) {
+        uploadedImages['prev-pf-dniConDorso'] = {
+          data: conyDniImages.dorso.dataUrl,
+          name: 'cony-dorso.jpg',
+          type: conyDniImages.dorso.file ? conyDniImages.dorso.file.type : 'image/jpeg'
+        };
+      }
+    }
     const imageKeys = formType === 'fisica'
-      ? [['prev-pf-dni1','DNI Titular — Frente'],['prev-pf-dni2','DNI Titular — Dorso'],['prev-pf-dniCon','DNI Cónyuge'],['prev-pf-dniT2','DNI 2° Titular']]
+      ? [
+          ['prev-pf-dni1','DNI Titular — Frente'],
+          ['prev-pf-dni2','DNI Titular — Dorso'],
+          ['prev-pf-dniConFrente','DNI Cónyuge — Frente'],
+          ['prev-pf-dniConDorso', 'DNI Cónyuge — Dorso'],
+          ['prev-pf-dniCon','DNI Cónyuge (legacy)'],
+          ['prev-pf-dniT2','DNI 2° Titular']
+        ]
       : [['prev-pj-dni1','DNI Firmante — Frente'],['prev-pj-dni2','DNI Firmante — Dorso']];
 
     const hasImages = imageKeys.filter(([k]) => uploadedImages[k]);
@@ -2356,10 +2388,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     const urls = {};
     const keys = formType === 'fisica'
       ? [
-          ['prev-pf-dni1',   'DNI Titular Frente'],
-          ['prev-pf-dni2',   'DNI Titular Dorso'],
-          ['prev-pf-dniCon', 'DNI Cónyuge'],
-          ['prev-pf-dniT2',  'DNI 2° Titular']
+          ['prev-pf-dni1',        'DNI Titular Frente'],
+          ['prev-pf-dni2',        'DNI Titular Dorso'],
+          ['prev-pf-dniConFrente','DNI Cónyuge Frente'],
+          ['prev-pf-dniConDorso', 'DNI Cónyuge Dorso'],
+          ['prev-pf-dniT2',       'DNI 2° Titular']
         ]
       : [
           ['prev-pj-dni1', 'DNI Firmante Frente'],
