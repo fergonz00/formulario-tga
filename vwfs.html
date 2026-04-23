@@ -1688,9 +1688,26 @@
       if (val) { ec.value = val.value; ec.classList.add('prefilled'); }
       toggleConyuge();
     }
-    // Cónyuge (el F01 guarda 'Nombre' y 'CUIL' en la sección cónyuge pero con keys que se sobrescriben).
-    // Solo podemos leer si el backend preservó la estructura.
-    // No autocompletamos cónyuge con esa heurística por ahora.
+
+    // Cónyuge — ahora F01 guarda con keys unicas 'Nombre cónyuge' / 'CUIL cónyuge'.
+    // Precargamos apellido + nombre del cónyuge si aparecen.
+    const conyNombreCompleto = d['Nombre cónyuge'] || '';
+    if (conyNombreCompleto) {
+      const partsC = conyNombreCompleto.trim().split(/\s+/);
+      if (partsC.length >= 2) {
+        setField('cony-apellido', partsC[0]);
+        setField('cony-nombre', partsC.slice(1).join(' '));
+      } else {
+        setField('cony-nombre', conyNombreCompleto);
+      }
+    }
+    if (d['CUIL cónyuge']) {
+      setField('cony-idenTribNro', d['CUIL cónyuge']);
+      setToggle('cony-idenTrib', 'CUIL');
+    }
+    if (d['Nupcias cónyuge']) {
+      setToggle('nupcias', d['Nupcias cónyuge']);
+    }
 
     setField('ocupacion', d['Ocupación']);
     setField('actividad', d['Profesión / Actividad']);

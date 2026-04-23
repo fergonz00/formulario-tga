@@ -1800,7 +1800,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         ['Localidad', g('pf-realLocalidad')], ['Provincia', g('pf-realProvincia')], ['CP', g('pf-realCP')]);
     }
     if (g('pf-conyugeNombre')) {
-      items.push(['— CÓNYUGE —',''], ['Nombre', g('pf-conyugeNombre')], ['CUIL', g('pf-conyugeCuil')], ['Nupcias', toggleValues['nupcias']||'']);
+      items.push(['— CÓNYUGE —',''], ['Nombre cónyuge', g('pf-conyugeNombre')], ['CUIL cónyuge', g('pf-conyugeCuil')], ['Nupcias cónyuge', toggleValues['nupcias']||'']);
     }
     if (document.getElementById('pf-tiene2do').checked) {
       items.push(['— 2º TITULAR —',''], ['Nombre', g('pf-t2nombre')], ['Doc.', g('pf-t2tipoDoc')+' '+g('pf-t2nroDoc')],
