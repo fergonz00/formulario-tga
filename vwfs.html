@@ -767,25 +767,6 @@
         <label>Fecha de nacimiento</label>
         <input type="date" id="cony-fechaNac">
       </div>
-
-      <div class="row row-2">
-        <div class="field">
-          <label>Ingresos fijos ($)</label>
-          <input type="text" inputmode="numeric" id="cony-ingFijos">
-        </div>
-        <div class="field">
-          <label>Ingresos variables ($) <span class="optional">(opc.)</span></label>
-          <input type="text" inputmode="numeric" id="cony-ingVar">
-        </div>
-      </div>
-    </div>
-
-    <div class="section-card">
-      <div class="section-title"><span class="icon">👨‍👩‍👧</span>Ingreso grupo familiar</div>
-      <div class="field">
-        <label>Ingreso mensual total del grupo familiar ($)</label>
-        <input type="text" inputmode="numeric" id="ingresoGrupoFamiliar" placeholder="Suma del titular + cónyuge + otros ingresos del hogar">
-      </div>
     </div>
 
   </div>
@@ -842,113 +823,47 @@
       </div>
     </div>
 
-    <div class="section-card conditional" id="domComercialSection">
-      <div class="section-title"><span class="icon">🏢</span>Dirección comercial (donde trabajás)</div>
-
-      <div class="switch-field">
-        <span class="switch-label">Igual al domicilio personal</span>
-        <label class="switch">
-          <input type="checkbox" id="domComIgual" onchange="toggleDomComercial()">
-          <span class="slider"></span>
-        </label>
-      </div>
-
-      <div class="conditional show" id="domComercialBlock" style="margin-top: 12px;">
-        <div class="row row-2">
-          <div class="field">
-            <label>Calle</label>
-            <input type="text" id="comCalle">
-          </div>
-          <div class="field">
-            <label>Número</label>
-            <input type="text" inputmode="numeric" id="comNro">
-          </div>
-        </div>
-        <div class="row row-2">
-          <div class="field">
-            <label>Piso <span class="optional">(opc.)</span></label>
-            <input type="text" id="comPiso">
-          </div>
-          <div class="field">
-            <label>UF <span class="optional">(opc.)</span></label>
-            <input type="text" id="comUF">
-          </div>
-        </div>
-        <div class="field">
-          <label>Provincia</label>
-          <input type="text" id="comProvincia">
-        </div>
-        <div class="row row-2">
-          <div class="field">
-            <label>Localidad</label>
-            <input type="text" id="comLocalidad">
-          </div>
-          <div class="field">
-            <label>CP</label>
-            <input type="text" inputmode="numeric" id="comCP">
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- ═══ Dirección legal de la empresa (solo si Empleado) ═══ -->
     <div class="section-card conditional" id="domLegalSection">
       <div class="section-title"><span class="icon">⚖️</span>Dirección legal de la empresa</div>
       <div class="info-callout" style="font-size: 12px; background: rgba(0,64,193,0.05); border-left-color: #0040C1;">
-        Domicilio legal o sede social registrada de la empresa (puede ser distinto al lugar donde trabajás).
+        Domicilio legal o sede social registrada de la empresa.
       </div>
-      <div class="switch-field">
-        <span class="switch-label">Igual a la dirección comercial</span>
-        <label class="switch">
-          <input type="checkbox" id="domLegalIgual" onchange="toggleDomLegal()">
-          <span class="slider"></span>
-        </label>
-      </div>
-      <div class="conditional show" id="domLegalBlock" style="margin-top: 12px;">
-        <div class="row row-2">
-          <div class="field">
-            <label>Calle</label>
-            <input type="text" id="legalCalle">
-          </div>
-          <div class="field">
-            <label>Número</label>
-            <input type="text" inputmode="numeric" id="legalNro">
-          </div>
+      <div class="row row-2">
+        <div class="field">
+          <label>Calle</label>
+          <input type="text" id="legalCalle">
         </div>
         <div class="field">
-          <label>Provincia</label>
-          <input type="text" id="legalProvincia">
+          <label>Número</label>
+          <input type="text" inputmode="numeric" id="legalNro">
         </div>
-        <div class="row row-2">
-          <div class="field">
-            <label>Localidad</label>
-            <input type="text" id="legalLocalidad">
-          </div>
-          <div class="field">
-            <label>CP</label>
-            <input type="text" inputmode="numeric" id="legalCP">
-          </div>
+      </div>
+      <div class="field">
+        <label>Provincia</label>
+        <input type="text" id="legalProvincia">
+      </div>
+      <div class="row row-2">
+        <div class="field">
+          <label>Localidad</label>
+          <input type="text" id="legalLocalidad">
+        </div>
+        <div class="field">
+          <label>CP</label>
+          <input type="text" inputmode="numeric" id="legalCP">
         </div>
       </div>
     </div>
 
     <div class="section-card">
-      <div class="section-title"><span class="icon">💰</span>Ingresos y grupo familiar</div>
-
-      <div class="row row-2">
-        <div class="field">
-          <label>Ingresos fijos ($)</label>
-          <input type="text" inputmode="numeric" id="ingFijos">
-        </div>
-        <div class="field">
-          <label>Ingresos variables ($) <span class="optional">(opc.)</span></label>
-          <input type="text" inputmode="numeric" id="ingVar">
-        </div>
+      <div class="section-title"><span class="icon">👨‍👩‍👧</span>Ingreso grupo familiar</div>
+      <div class="field">
+        <label>Ingreso mensual total del grupo familiar ($)</label>
+        <input type="text" inputmode="numeric" id="ingresoGrupoFamiliar" placeholder="Suma del titular + cónyuge + otros ingresos del hogar">
       </div>
-
       <div class="row row-2">
         <div class="field">
-          <label>Grupo familiar</label>
+          <label>Cantidad de personas en el grupo familiar</label>
           <input type="text" inputmode="numeric" id="grupoFamiliar" placeholder="Nº personas">
         </div>
         <div class="field">
@@ -1225,16 +1140,9 @@
   function toggleEmpresaSections() {
     const isEmpleado = toggleValues['sitLaboral'] === 'Empleado';
     const empresa = document.getElementById('empresaBlock');
-    const comercial = document.getElementById('domComercialSection');
     const legal = document.getElementById('domLegalSection');
     if (empresa) empresa.classList.toggle('show', isEmpleado);
-    if (comercial) comercial.classList.toggle('show', isEmpleado);
     if (legal) legal.classList.toggle('show', isEmpleado);
-  }
-
-  function toggleDomLegal() {
-    const hidden = document.getElementById('domLegalIgual').checked;
-    document.getElementById('domLegalBlock').classList.toggle('show', !hidden);
   }
 
   function toggleConyuge() {
@@ -1259,11 +1167,6 @@
     } else {
       noticeEl.style.display = 'none';
     }
-  }
-
-  function toggleDomComercial() {
-    const hidden = document.getElementById('domComIgual').checked;
-    document.getElementById('domComercialBlock').classList.toggle('show', !hidden);
   }
 
   function toggleCotit() {
@@ -1860,6 +1763,40 @@
       setToggle('nupcias', d['Nupcias cónyuge']);
     }
 
+    // Si el F01 tiene el analisis IA del DNI del conyuge, sacamos los datos
+    // de ahi (fecha nac, DNI numero, sexo, apellido, nombre) y pre-rellenamos.
+    try {
+      const raw = d['DNI Cónyuge análisis IA'];
+      if (raw) {
+        const conyAn = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        const ext = (conyAn && conyAn.extraido) || {};
+        if (ext.apellido) setField('cony-apellido', ext.apellido);
+        if (ext.nombre)   setField('cony-nombre',   ext.nombre);
+        if (ext.dni) {
+          setField('cony-nroDoc', ext.dni.replace(/\D/g, ''));
+          setField('cony-tipoDoc', 'DNI');
+        }
+        if (ext.sexo) {
+          const s = ext.sexo.toUpperCase();
+          const sx = s === 'F' ? 'Femenino' : (s === 'M' ? 'Masculino' : '');
+          if (sx) setToggle('cony-sexo', sx);
+        }
+        if (ext.fecha_nacimiento) {
+          const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(String(ext.fecha_nacimiento).trim());
+          if (m) {
+            const dd = m[1].padStart(2, '0'), mo = m[2].padStart(2, '0');
+            const y = m[3].length === 2 ? ('19' + m[3]) : m[3];
+            setField('cony-fechaNac', y + '-' + mo + '-' + dd);
+          }
+        }
+        if (ext.nacionalidad) setField('cony-nacionalidad', ext.nacionalidad);
+        if (ext.cuil && !g('cony-idenTribNro')) {
+          setField('cony-idenTribNro', ext.cuil);
+          setToggle('cony-idenTrib', 'CUIL');
+        }
+      }
+    } catch (_e) { /* ignore parse errors */ }
+
     setField('ocupacion', d['Ocupación']);
     setField('actividad', d['Profesión / Actividad']);
 
@@ -2047,13 +1984,7 @@
         ['Sexo', toggleValues['cony-sexo'] || ''],
         ['Fecha nac.', g('cony-fechaNac')],
         ['Nacionalidad', g('cony-nacionalidad')],
-        ['Ingresos fijos', fmtARS(g('cony-ingFijos'))],
-        ['Ingresos variables', fmtARS(g('cony-ingVar'))],
       );
-    }
-
-    if (g('ingresoGrupoFamiliar')) {
-      items.push(['— GRUPO FAMILIAR —', ''], ['Ingreso grupo familiar', fmtARS(g('ingresoGrupoFamiliar'))]);
     }
 
     items.push(
@@ -2066,21 +1997,6 @@
       ['Tel. comercial', g('telComercial')],
     );
 
-    const igualDom = document.getElementById('domComIgual').checked;
-    if (igualDom) {
-      items.push(['Dom. comercial', 'Igual al personal']);
-    } else {
-      items.push(
-        ['— DOM. COMERCIAL —', ''],
-        ['Dirección', [g('comCalle'), g('comNro'), g('comPiso'), g('comUF')].filter(Boolean).join(' ')],
-        ['Provincia', g('comProvincia')],
-        ['Localidad', g('comLocalidad')],
-        ['CP', g('comCP')],
-      );
-    }
-
-    const domLegalEl = document.getElementById('domLegalIgual');
-    const igualLegal = domLegalEl ? domLegalEl.checked : false;
     if (g('legalCalle') || g('legalNro')) {
       items.push(
         ['— DOM. LEGAL EMPRESA —', ''],
@@ -2089,18 +2005,19 @@
         ['Localidad', g('legalLocalidad')],
         ['CP', g('legalCP')],
       );
-    } else if (igualLegal) {
-      items.push(['Dom. legal empresa', 'Igual al comercial']);
+    }
+
+    if (g('ingresoGrupoFamiliar') || g('grupoFamiliar') || g('personasCargo')) {
+      items.push(
+        ['— GRUPO FAMILIAR —', ''],
+        ['Ingreso grupo familiar', fmtARS(g('ingresoGrupoFamiliar'))],
+        ['Grupo familiar', g('grupoFamiliar')],
+        ['Personas a cargo', g('personasCargo')],
+        ['Cond. IVA', toggleValues['tipoIva'] || ''],
+      );
     }
 
     items.push(
-      ['— INGRESOS —', ''],
-      ['Ingresos fijos', fmtARS(g('ingFijos'))],
-      ['Ingresos variables', fmtARS(g('ingVar'))],
-      ['Grupo familiar', g('grupoFamiliar')],
-      ['Personas a cargo', g('personasCargo')],
-      ['Cond. IVA', toggleValues['tipoIva'] || ''],
-
       ['— VIVIENDA —', ''],
       ['Situación', toggleValues['sitVivienda'] || ''],
       ['Años residencia', g('anosResidencia')],
@@ -2494,30 +2411,23 @@
     setToggle('cony-sexo',    d['Sexo (2)']);
     set('cony-fechaNac',      d['Fecha nac. (2)']);
     set('cony-nacionalidad',  d['Nacionalidad (2)']);
-    set('cony-ingFijos', parseARS(d['Ingresos fijos']));
-    set('cony-ingVar',   parseARS(d['Ingresos variables']));
 
     // Laboral
     setToggle('sitLaboral', d['Situación laboral']);
     set('ocupacion',  d['Ocupación']);
     set('actividad',  d['Actividad']);
     set('antiguedad', d['Antigüedad']);
-    set('empresa',    d['Empresa']);
+    set('empresa',    d['Razón social empresa'] || d['Empresa']);
     set('telComercial', d['Tel. comercial']);
 
-    if (d['Dom. comercial'] === 'Igual al personal') {
-      document.getElementById('domComIgual').checked = true;
-      toggleDomComercial();
-    } else {
-      set('comCalle',      d['Dirección (2)'] || '');
-      set('comProvincia',  d['Provincia (2)']);
-      set('comLocalidad',  d['Localidad (2)']);
-      set('comCP',         d['CP (2)']);
-    }
+    // Direccion legal empresa
+    set('legalCalle',     d['Dirección (2)'] || '');
+    set('legalProvincia', d['Provincia (2)']);
+    set('legalLocalidad', d['Localidad (2)']);
+    set('legalCP',        d['CP (2)']);
 
-    // Ingresos cliente
-    set('ingFijos', parseARS(d['Ingresos fijos']));
-    set('ingVar',   parseARS(d['Ingresos variables']));
+    // Ingreso grupo familiar
+    set('ingresoGrupoFamiliar', parseARS(d['Ingreso grupo familiar']));
     set('grupoFamiliar',  d['Grupo familiar']);
     set('personasCargo',  d['Personas a cargo']);
     setToggle('tipoIva',  d['Cond. IVA']);
