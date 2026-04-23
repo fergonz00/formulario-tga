@@ -682,6 +682,10 @@
           <option>Concubino/a NSC</option>
         </select>
       </div>
+      <div class="info-callout" id="actaNotice" style="display:none; margin-top: 10px; background: rgba(255,140,0,0.08); border-left-color: var(--vw-amber);">
+        <strong>⚠ Documentación adicional requerida para VWFS.</strong>
+        <div id="actaNoticeText" style="margin-top: 6px;"></div>
+      </div>
     </div>
 
     <div class="section-card conditional" id="conyugeBlock">
@@ -1144,6 +1148,24 @@
     const v = g('estadoCivil');
     const show = v === 'Casado/a' || v.startsWith('Concubino');
     document.getElementById('conyugeBlock').classList.toggle('show', show);
+
+    // Banner para clientes Divorciado/Viudo: VWFS necesita acta adicional.
+    // No obliga a subirla aca (el vendedor/admin la carga despues), solo avisa.
+    const noticeEl = document.getElementById('actaNotice');
+    const noticeTxt = document.getElementById('actaNoticeText');
+    if (!noticeEl || !noticeTxt) return;
+    let txt = '';
+    if (v === 'Divorciado/a') {
+      txt = 'Por favor, pasale el <strong>acta de divorcio</strong> a tu asesor de ventas o a administración. Es necesario para VWFS.';
+    } else if (v === 'Viudo/a') {
+      txt = 'Por favor, pasale el <strong>acta de defunción</strong> del cónyuge a tu asesor de ventas o a administración. Es necesario para VWFS.';
+    }
+    if (txt) {
+      noticeTxt.innerHTML = txt;
+      noticeEl.style.display = '';
+    } else {
+      noticeEl.style.display = 'none';
+    }
   }
 
   function toggleDomComercial() {

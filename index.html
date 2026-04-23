@@ -468,8 +468,35 @@
           </div>
         </div>
         <div style="height:12px"></div>
-        <div class="upload-zone"><div class="upload-icon">📷</div><div class="upload-text">Foto del DNI del cónyuge</div><div class="upload-hint">Frente</div><input type="file" accept="image/*" onchange="handleUpload(this,'prev-pf-dniCon')"></div>
-        <div class="upload-preview" id="prev-pf-dniCon">✓ Cargado</div>
+        <div class="section-title" style="font-size:14px;"><div class="icon" style="font-size:18px;">📷</div> DNI del cónyuge</div>
+        <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: #0040C1; font-size:12px;">
+          Frente y dorso. Al analizar, verificamos que sea legible, nítido y con los bordes visibles.
+        </div>
+        <div class="upload-zone" id="conyUploadFrenteZone">
+          <div class="upload-icon">📇</div>
+          <div class="upload-text">Cónyuge — <strong>Frente</strong></div>
+          <div class="upload-hint">Apoyalo sobre fondo blanco — los 4 bordes visibles</div>
+          <input type="file" accept="image/*" id="conyDniFrenteFile" onchange="handleConyDniUpload('frente', this)">
+        </div>
+        <div class="upload-preview" id="conyUploadFrentePreview"></div>
+        <div class="upload-zone" id="conyUploadDorsoZone" style="margin-top: 10px;">
+          <div class="upload-icon">📇</div>
+          <div class="upload-text">Cónyuge — <strong>Dorso</strong></div>
+          <div class="upload-hint">Apoyalo sobre fondo blanco — los 4 bordes visibles</div>
+          <input type="file" accept="image/*" id="conyDniDorsoFile" onchange="handleConyDniUpload('dorso', this)">
+        </div>
+        <div class="upload-preview" id="conyUploadDorsoPreview"></div>
+        <div id="conyDniError" class="info-callout err" style="display:none; margin-top: 10px;"></div>
+        <div id="conyBtnAnalyzeHint" style="display:none; margin-top: 10px; font-size: 13px; text-align: center; color: #0040C1; font-weight: 600;">
+          👇 Apretá acá para validar el DNI del cónyuge
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="conyBtnAnalyzeDni" style="margin-top: 6px; display:none;" onclick="analyzeConyDni()">
+          Analizar DNI del cónyuge
+        </button>
+        <div id="conyDniAnalyzingState" style="display:none; padding:10px; background:#F2F5F8; border-radius:8px; margin-top:10px; font-size:13px;">
+          <span class="spinner"></span> Analizando DNI del cónyuge…
+        </div>
+        <div id="conyDniAnalysisResult" style="display:none; margin-top: 10px;"></div>
       </div>
       <div class="field"><label>Porcentaje de titularidad</label><input type="text" id="pf-porcTit" value="100%"></div>
     </div>
@@ -1751,6 +1778,217 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     setSlot('prev-' + prefix + '-dni2', 'dorso');
   }
 
+  // ═══════ DNI del CÓNYUGE: IA + regla relajada (solo F01) ═══════
+  const conyDniImages = {};
+  let conyDniAnalisis = null;
+  let conyDniAnalisisOk = false;
+  let conyDniFrenteUrlUploaded = '';
+  let conyDniDorsoUrlUploaded = '';
+
+  function resetConyDniAnalysisState() {
+    conyDniAnalisis = null;
+    conyDniAnalisisOk = false;
+    const res = document.getElementById('conyDniAnalysisResult');
+    if (res) { res.innerHTML = ''; res.style.display = 'none'; }
+  }
+
+  async function handleConyDniUpload(which, input) {
+    const err = document.getElementById('conyDniError');
+    err.style.display = 'none'; err.textContent = '';
+    const file = input.files && input.files[0];
+    if (!file) return;
+    resetConyDniAnalysisState();
+    if (!file.type.startsWith('image/')) {
+      err.textContent = 'El archivo debe ser una imagen.'; err.style.display = ''; input.value = ''; return;
+    }
+    if (file.size < DNI_MIN_BYTES) {
+      err.textContent = 'La foto pesa muy poco. Sacala con mas resolucion.'; err.style.display = ''; input.value = ''; return;
+    }
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      const dims = await getImgDims(dataUrl);
+      if (dims.width < DNI_MIN_WIDTH || dims.height < DNI_MIN_HEIGHT) {
+        err.textContent = 'Muy poca resolucion (' + dims.width + 'x' + dims.height + ').';
+        err.style.display = ''; input.value = ''; return;
+      }
+      conyDniImages[which] = { dataUrl, file, w: dims.width, h: dims.height };
+      showConyDniPreview(which);
+      updateConyAnalyzeBtnVisibility();
+    } catch (e) {
+      err.textContent = 'No se pudo procesar.'; err.style.display = ''; input.value = '';
+    }
+  }
+
+  function showConyDniPreview(which) {
+    const prefix = which === 'frente' ? 'Frente' : 'Dorso';
+    const zone = document.getElementById('conyUpload' + prefix + 'Zone');
+    const prev = document.getElementById('conyUpload' + prefix + 'Preview');
+    const img = conyDniImages[which];
+    if (!zone || !prev || !img) return;
+    zone.classList.add('has-file');
+    prev.style.display = 'block';
+    prev.innerHTML =
+      '<img src="' + img.dataUrl + '" alt="Vista previa" style="max-width:100%; border-radius:8px; max-height:180px; object-fit:contain;">' +
+      '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:12px; color:#556;">' +
+        '<span>✓ ' + img.w + 'x' + img.h + ' px</span>' +
+        '<button type="button" onclick="removeConyDniImage(\'' + which + '\')" style="border:none; background:transparent; color:#E4002B; font-weight:600; cursor:pointer;">Quitar</button>' +
+      '</div>';
+  }
+
+  function removeConyDniImage(which) {
+    delete conyDniImages[which];
+    const prefix = which === 'frente' ? 'Frente' : 'Dorso';
+    const zone = document.getElementById('conyUpload' + prefix + 'Zone');
+    const prev = document.getElementById('conyUpload' + prefix + 'Preview');
+    const input = document.getElementById('conyDni' + prefix + 'File');
+    if (zone) zone.classList.remove('has-file');
+    if (prev) { prev.innerHTML = ''; prev.style.display = 'none'; }
+    if (input) input.value = '';
+    resetConyDniAnalysisState();
+    updateConyAnalyzeBtnVisibility();
+  }
+
+  function updateConyAnalyzeBtnVisibility() {
+    const btn = document.getElementById('conyBtnAnalyzeDni');
+    const hint = document.getElementById('conyBtnAnalyzeHint');
+    if (!btn) return;
+    const ready = !!conyDniImages.frente && !!conyDniImages.dorso && !conyDniAnalisisOk;
+    btn.style.display = ready ? '' : 'none';
+    if (ready) btn.disabled = false;
+    if (hint) hint.style.display = ready ? '' : 'none';
+  }
+
+  function resetConyDniForRetry() {
+    removeConyDniImage('frente');
+    removeConyDniImage('dorso');
+    conyDniFrenteUrlUploaded = '';
+    conyDniDorsoUrlUploaded = '';
+  }
+
+  async function analyzeConyDni() {
+    const btn = document.getElementById('conyBtnAnalyzeDni');
+    const loader = document.getElementById('conyDniAnalyzingState');
+    const resultEl = document.getElementById('conyDniAnalysisResult');
+    const errEl = document.getElementById('conyDniError');
+    errEl.style.display = 'none'; errEl.textContent = '';
+    resultEl.innerHTML = ''; resultEl.style.display = 'none';
+
+    if (!conyDniImages.frente || !conyDniImages.dorso) {
+      errEl.textContent = 'Subi el frente y el dorso del DNI del conyuge.';
+      errEl.style.display = ''; return;
+    }
+    btn.disabled = true; btn.style.display = 'none';
+    const hint = document.getElementById('conyBtnAnalyzeHint');
+    if (hint) hint.style.display = 'none';
+    loader.style.display = '';
+
+    try {
+      const timestamp = Date.now();
+      const safe = 'cony_tmp_' + timestamp;
+      const uploadOne = async (which) => {
+        const img = conyDniImages[which];
+        const extn = img.file.type === 'image/png' ? 'png' : 'jpg';
+        const path = safe + '/' + which + '.' + extn;
+        const res = await supaFetch('/storage/v1/object/vwfs-dnis/' + path, {
+          method: 'POST',
+          headers: { 'Content-Type': img.file.type, 'x-upsert': 'true' },
+          body: img.file
+        });
+        if (!res.ok) { const t = await res.text(); throw new Error('Fallo subida ' + which + ': ' + t); }
+        return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
+      };
+      const [urlF, urlD] = await Promise.all([uploadOne('frente'), uploadOne('dorso')]);
+      conyDniFrenteUrlUploaded = urlF;
+      conyDniDorsoUrlUploaded = urlD;
+
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-dni', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dni_frente_url: urlF, dni_dorso_url: urlD, datero: {} })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'La IA no pudo analizar el DNI del conyuge.');
+
+      conyDniAnalisis = data;
+      loader.style.display = 'none';
+
+      const cal = data.calidad || {};
+      const cardFor = (label, c) => {
+        if (!c) return '';
+        const row = (ok, txtOk, txtBad) =>
+          '<div style="display:flex; gap:6px; align-items:center; font-size:13px; padding:2px 0;">' +
+            '<span style="color:' + (ok ? '#00873C' : '#E4002B') + '; font-weight:700;">' + (ok ? '✓' : '✗') + '</span>' +
+            '<span>' + (ok ? txtOk : txtBad) + '</span></div>';
+        return '<div style="background:#fff; border:1px solid #DAE4ED; border-radius:10px; padding:10px 12px; margin-top:8px;">' +
+          '<div style="font-weight:700; margin-bottom:4px;">' + label + '</div>' +
+          row(!!c.legible, 'Legible', 'No se lee bien') +
+          row(!c.blur, 'Foto nitida (sin blur)', 'Foto con blur') +
+          row(!c.bordes_cortados, 'Los 4 bordes visibles', 'Bordes cortados') +
+          row(!!c.fondo_blanco, 'Sobre fondo blanco', 'No esta sobre fondo blanco') +
+          (c.vencido !== undefined ? row(!c.vencido, 'DNI vigente', 'DNI VENCIDO - no sirve') : '') +
+          (c.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + c.motivo + '</div>' : '') +
+          '</div>';
+      };
+      const detalle = cardFor('Frente', cal.frente) + cardFor('Dorso', cal.dorso);
+
+      // Misma regla relajada que el titular en F01: pasa sin fondo blanco
+      // si todo lo demas esta bien, pero advierte.
+      const faceOkNoFondo = c => c && c.legible && !c.blur && !c.bordes_cortados && !c.vencido;
+      const essentiallyOk = faceOkNoFondo(cal.frente) && faceOkNoFondo(cal.dorso);
+      const soloFaltaFondo = essentiallyOk && !cal.ok_global &&
+        (!cal.frente.fondo_blanco || !cal.dorso.fondo_blanco);
+
+      if (cal.ok_global === true) {
+        conyDniAnalisisOk = true;
+        resultEl.innerHTML =
+          '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: #00873C;">' +
+            '<strong>✓ DNI del cónyuge OK.</strong> Se lee bien y esta completo.' +
+          '</div>' + detalle;
+        resultEl.style.display = '';
+        // Precarga nombre y CUIL del conyuge si campos vacios
+        if (data.extraido) {
+          const ext = data.extraido;
+          const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
+          if (full && !g('pf-conyugeNombre')) setField('pf-conyugeNombre', full);
+          if (ext.cuil && !g('pf-conyugeCuil')) setField('pf-conyugeCuil', ext.cuil);
+        }
+      } else if (soloFaltaFondo) {
+        conyDniAnalisisOk = true;
+        resultEl.innerHTML =
+          '<div class="info-callout" style="background: rgba(255,140,0,0.08); border-left-color: #FF8C00;">' +
+            '<strong>⚠ DNI del cónyuge aceptado para F01.</strong> Se ve bien pero no esta sobre fondo blanco. ' +
+            'Si despues vas a sacar credito VWFS, te vamos a pedir cargarlo sobre fondo blanco.' +
+          '</div>' + detalle;
+        resultEl.style.display = '';
+        if (data.extraido) {
+          const ext = data.extraido;
+          const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
+          if (full && !g('pf-conyugeNombre')) setField('pf-conyugeNombre', full);
+          if (ext.cuil && !g('pf-conyugeCuil')) setField('pf-conyugeCuil', ext.cuil);
+        }
+      } else {
+        conyDniAnalisisOk = false;
+        resultEl.innerHTML =
+          '<div class="info-callout err"><strong>✗ El DNI del cónyuge no cumple.</strong> Mira el detalle y subilo de nuevo.</div>' +
+          detalle +
+          '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetConyDniForRetry()">Volver a subir</button>';
+        resultEl.style.display = '';
+      }
+    } catch (e) {
+      console.error('analyzeConyDni error', e);
+      loader.style.display = 'none';
+      errEl.textContent = 'No pudimos analizar el DNI del conyuge: ' + (e.message || 'error');
+      errEl.style.display = '';
+      btn.disabled = false;
+      updateConyAnalyzeBtnVisibility();
+    }
+  }
+
+  function setField(id, value) {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = value;
+  }
+
   // Cédulas
   function toggleCedulaAzul(prefix) {
     const has = document.getElementById(prefix + '-cedAzul').checked;
@@ -2060,6 +2298,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 
       const datosObj = Object.fromEntries(allData.filter(([l,v]) => l && v && !l.startsWith('—')));
       Object.assign(datosObj, dniUrls);
+
+      // DNI del cónyuge (si se analizó con IA): guardamos URLs y resumen de análisis.
+      if (conyDniFrenteUrlUploaded) datosObj['DNI Cónyuge Frente URL'] = conyDniFrenteUrlUploaded;
+      if (conyDniDorsoUrlUploaded)  datosObj['DNI Cónyuge Dorso URL']  = conyDniDorsoUrlUploaded;
+      if (conyDniAnalisis) datosObj['DNI Cónyuge análisis IA'] = JSON.stringify(conyDniAnalisis);
 
       // 3. Insert record
       await supaFetch('/rest/v1/formularios_f01', {

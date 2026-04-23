@@ -359,6 +359,7 @@
   let currentTab = 'vwfs';
   const rowsCache = { vwfs: null, f01: null };
   const comprobantesCache = {}; // { vwfsId: [row,...] }
+  const archivosCache = {};      // { vwfsId: [row,...] }
   let filter = 'all';
   let currentDetailId = null;
 
@@ -587,7 +588,9 @@
     document.getElementById('detailContent').innerHTML = '<div class="loading">Cargando…</div>';
     document.getElementById('detailBackdrop').classList.add('show');
     // Precargar comprobantes si es VWFS
-    if (currentTab === 'vwfs') await loadComprobantes(id);
+    if (currentTab === 'vwfs') {
+      await Promise.all([loadComprobantes(id), loadArchivos(id)]);
+    }
     document.getElementById('detailContent').innerHTML = renderDetail(r);
   }
 
@@ -606,6 +609,19 @@
     } catch (e) {
       console.warn('No pude cargar comprobantes', e);
       comprobantesCache[vwfsId] = [];
+    }
+  }
+
+  async function loadArchivos(vwfsId) {
+    try {
+      const res = await supaFetch('/rest/v1/archivos_cliente?vwfs_id=eq.' + vwfsId + '&eliminado=eq.false&order=subido_at.desc', {
+        headers: { 'Accept': 'application/json' }
+      });
+      const rows = await res.json();
+      archivosCache[vwfsId] = Array.isArray(rows) ? rows : [];
+    } catch (e) {
+      console.warn('No pude cargar archivos', e);
+      archivosCache[vwfsId] = [];
     }
   }
 
@@ -713,6 +729,7 @@
     // ═══ Comprobantes (solo VWFS) ═══
     if (isVwfs) {
       html += renderComprobantesSection(r);
+      html += renderArchivosSection(r);
     }
 
     // ═══ Acciones ═══
@@ -972,9 +989,9 @@
     loader.style.display = '';
 
     try {
-      // 1. Subir al bucket
+      // 1. Subir al bucket (en subcarpeta /comprobantes/)
       const timestamp = Date.now();
-      const path = 'vwfs-' + vwfsId + '/' + timestamp + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = 'vwfs-' + vwfsId + '/comprobantes/' + timestamp + '_' + file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const upRes = await supaFetch('/storage/v1/object/comprobantes-pago/' + path, {
         method: 'POST',
         headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
@@ -1091,6 +1108,147 @@
       });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       if (currentDetailId) { await loadComprobantes(currentDetailId); refreshDetail(); }
+    } catch (e) {
+      alert('No se pudo eliminar: ' + e.message);
+    }
+  }
+
+  // ═══════ ARCHIVOS ADICIONALES (actas, docs extra) ═══════
+  const CATEGORIAS_ARCHIVO = ['Acta de divorcio', 'Acta de defunción', 'Acta de matrimonio', 'Recibo de sueldo', 'Constancia de ingresos', 'Documentación varia', 'Otro'];
+
+  function renderArchivosSection(r) {
+    const list = archivosCache[r.id] || [];
+    const canDelete = isAdminOrOwner();
+    let rows = '';
+    if (!list.length) {
+      rows = '<tr><td colspan="5" style="text-align:center; padding:18px; color:#5A6B7F;">Sin archivos cargados todavía</td></tr>';
+    } else {
+      rows = list.map(a => {
+        const fecha = a.subido_at ? new Date(a.subido_at).toLocaleString('es-AR', {day:'2-digit', month:'2-digit', year:'2-digit'}) : '—';
+        return `
+          <tr>
+            <td>${escapeHtml(a.categoria || '—')}${a.categoria === 'Otro' && a.descripcion ? ': ' + escapeHtml(a.descripcion) : ''}</td>
+            <td style="font-size:12px; color:#5A6B7F;">${escapeHtml(a.file_name || '—')}</td>
+            <td style="font-size:12px; color:#5A6B7F;">${fecha}${a.subido_por ? ' · ' + escapeHtml(a.subido_por) : ''}</td>
+            <td>
+              <a href="${a.file_url}" target="_blank" class="btn btn-secondary" style="font-size:11px; padding:6px 10px;">Abrir</a>
+              <a href="${a.file_url}" download class="btn btn-primary" style="font-size:11px; padding:6px 10px;">⬇</a>
+            </td>
+            ${canDelete ? `<td><button class="btn btn-danger" style="font-size:11px; padding:6px 10px;" onclick="doDeleteArchivo(${a.id})">🗑</button></td>` : ''}
+          </tr>`;
+      }).join('');
+    }
+    return `
+      <div class="section-sep">Archivos adicionales</div>
+      <div class="card" style="padding:12px;">
+        <div style="font-size:12px; color:#5A6B7F; margin-bottom:8px;">Actas de divorcio / defunción, recibos, documentación varia.</div>
+        <div style="overflow-x:auto;">
+          <table class="comp-table">
+            <thead><tr><th>Categoría</th><th>Archivo</th><th>Subido</th><th>Acciones</th>${canDelete ? '<th></th>' : ''}</tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+        <button class="btn btn-primary btn-block" style="margin-top:10px;" onclick="openArchivoUploader(${r.id})">+ Subir archivo</button>
+      </div>
+      <div id="archivoUploader" style="display:none; margin-top:10px;"></div>`;
+  }
+
+  function openArchivoUploader(vwfsId) {
+    const box = document.getElementById('archivoUploader');
+    const catOpts = CATEGORIAS_ARCHIVO.map(c => `<option value="${c}">${c}</option>`).join('');
+    box.innerHTML = `
+      <div class="card" style="padding:14px;">
+        <div style="font-weight:700; margin-bottom:10px;">Nuevo archivo</div>
+        <div class="field"><label>Archivo (imagen o PDF)</label>
+          <input type="file" id="archFile" accept="image/*,application/pdf,.doc,.docx">
+        </div>
+        <div class="field"><label>Categoría</label>
+          <select id="archCat" onchange="toggleArchDesc()"><option value="">— Elegir —</option>${catOpts}</select>
+        </div>
+        <div class="field" id="archDescBlock" style="display:none;"><label>Descripción</label>
+          <input type="text" id="archDesc" placeholder="Ej: Acta de matrimonio del cónyuge, recibo junio 2026">
+        </div>
+        <div class="error-banner" id="archError" style="display:none;"></div>
+        <div class="action-row two">
+          <button class="btn btn-secondary" onclick="cancelArchivoUpload()">Cancelar</button>
+          <button class="btn btn-primary" id="archSaveBtn" onclick="uploadArchivo(${vwfsId})">Subir</button>
+        </div>
+      </div>`;
+    box.style.display = '';
+    box.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  function cancelArchivoUpload() {
+    const box = document.getElementById('archivoUploader');
+    if (box) { box.innerHTML = ''; box.style.display = 'none'; }
+  }
+
+  function toggleArchDesc() {
+    const v = document.getElementById('archCat').value;
+    document.getElementById('archDescBlock').style.display = v === 'Otro' ? '' : 'none';
+  }
+
+  async function uploadArchivo(vwfsId) {
+    const err = document.getElementById('archError');
+    const btn = document.getElementById('archSaveBtn');
+    err.style.display = 'none'; err.textContent = '';
+    const fileInput = document.getElementById('archFile');
+    const cat = document.getElementById('archCat').value;
+    if (!fileInput.files || !fileInput.files[0]) { err.textContent = 'Seleccioná un archivo.'; err.style.display = ''; return; }
+    if (!cat) { err.textContent = 'Elegí una categoría.'; err.style.display = ''; return; }
+    const desc = cat === 'Otro' ? (document.getElementById('archDesc').value || '').trim() : '';
+    if (cat === 'Otro' && !desc) { err.textContent = 'Describí el archivo cuando seleccionás "Otro".'; err.style.display = ''; return; }
+    const file = fileInput.files[0];
+    btn.disabled = true;
+    try {
+      const timestamp = Date.now();
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = 'vwfs-' + vwfsId + '/' + timestamp + '_' + safeName;
+      const upRes = await supaFetch('/storage/v1/object/archivos-cliente/' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': file.type || 'application/octet-stream', 'x-upsert': 'true' },
+        body: file
+      });
+      if (!upRes.ok) { const t = await upRes.text(); throw new Error('Fallo subida: ' + t); }
+      const fileUrl = SUPABASE_URL + '/storage/v1/object/public/archivos-cliente/' + path;
+      const insertRes = await supaFetch('/rest/v1/archivos_cliente', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          vwfs_id: vwfsId,
+          file_url: fileUrl,
+          file_name: file.name,
+          categoria: cat,
+          descripcion: desc || null,
+          subido_por: currentUser
+        })
+      });
+      if (!insertRes.ok) throw new Error('Fallo guardar: HTTP ' + insertRes.status);
+      cancelArchivoUpload();
+      await loadArchivos(vwfsId);
+      refreshDetail();
+    } catch (e) {
+      btn.disabled = false;
+      err.textContent = 'No se pudo subir: ' + (e.message || 'error');
+      err.style.display = '';
+    }
+  }
+
+  async function doDeleteArchivo(archId) {
+    if (!isAdminOrOwner()) { alert('No tenés permisos para eliminar.'); return; }
+    if (!confirm('¿Eliminar este archivo? Solo admin/owner puede hacerlo.')) return;
+    try {
+      const res = await supaFetch('/rest/v1/archivos_cliente?id=eq.' + archId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          eliminado: true,
+          eliminado_por: currentUser,
+          eliminado_at: new Date().toISOString()
+        })
+      });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (currentDetailId) { await loadArchivos(currentDetailId); refreshDetail(); }
     } catch (e) {
       alert('No se pudo eliminar: ' + e.message);
     }
