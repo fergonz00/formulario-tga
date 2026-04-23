@@ -488,17 +488,26 @@
         </div>
         <div id="conyDniAnalysisResult" style="display:none; margin-top: 10px;"></div>
 
-        <!-- Los datos vienen precargados del DNI; el cliente puede editar si la IA leyó algo mal. -->
-        <div style="height:12px"></div>
-        <div class="field"><label>Nombre y apellido</label><input type="text" id="pf-conyugeNombre"></div>
-        <div class="field"><label>CUIL del cónyuge</label><input type="text" id="pf-conyugeCuil" placeholder="20-12345678-9" inputmode="numeric"></div>
-        <div class="field">
-          <label>Cantidad de nupcias</label>
-          <div class="toggle-group">
-            <button type="button" class="toggle-btn" data-field="nupcias" data-value="1">1ª</button>
-            <button type="button" class="toggle-btn" data-field="nupcias" data-value="2">2ª</button>
-            <button type="button" class="toggle-btn" data-field="nupcias" data-value="3+">3ª+</button>
+        <!-- Los datos del conyuge quedan ocultos hasta que la IA valide el DNI. -->
+        <div class="conditional" id="pf-conyugeDataBlock">
+          <div style="height:12px"></div>
+          <div class="info-callout" style="background: rgba(0,135,60,0.06); border-left-color: #00873C; font-size: 12px;">
+            Los datos se precargaron desde el DNI. Editá si la IA leyó algo mal.
           </div>
+          <div class="field"><label>Nombre y apellido</label><input type="text" id="pf-conyugeNombre"></div>
+          <div class="field"><label>CUIL del cónyuge</label><input type="text" id="pf-conyugeCuil" placeholder="20-12345678-9" inputmode="numeric"></div>
+          <div class="field">
+            <label>Cantidad de nupcias</label>
+            <div class="toggle-group">
+              <button type="button" class="toggle-btn" data-field="nupcias" data-value="1">1ª</button>
+              <button type="button" class="toggle-btn" data-field="nupcias" data-value="2">2ª</button>
+              <button type="button" class="toggle-btn" data-field="nupcias" data-value="3+">3ª+</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="pf-conyugeLockMsg" class="info-callout" style="margin-top: 10px; background: rgba(255,140,0,0.08); border-left-color: #FF8C00; font-size: 12px;">
+          ⚠ Primero subí y analizá el DNI del cónyuge. Los datos se completan automáticamente después.
         </div>
       </div>
       <div class="field"><label>Porcentaje de titularidad</label><input type="text" id="pf-porcTit" value="100%"></div>
@@ -1386,6 +1395,18 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const cfg = stepConfig[formType];
       const stepEl = document.getElementById(cfg.prefix + '-step' + (currentStep - 1));
       if (stepEl) {
+        // Si esta casado/a, el DNI del conyuge tiene que estar analizado OK antes de avanzar.
+        if (formType === 'fisica') {
+          const ec = document.getElementById('pf-estadoCivil');
+          const isCasado = ec && ec.value === 'Casado/a';
+          const conyBlockVisible = document.getElementById('pf-conyugeBlock')?.classList.contains('show');
+          if (isCasado && conyBlockVisible && !conyDniAnalisisOk) {
+            alert('Primero subí y analizá el DNI del cónyuge antes de avanzar.\n\n(Está marcado como Casado/a pero el DNI del cónyuge aún no fue validado.)');
+            const resultEl = document.getElementById('conyDniAnalysisResult') || document.getElementById('pf-conyugeLockMsg');
+            if (resultEl) resultEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+          }
+        }
         const missing = findMissingFields(stepEl);
         if (missing.length) {
           alert('Completá estos campos antes de avanzar:\n\n• ' + missing.join('\n• '));
@@ -1825,6 +1846,21 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     conyDniAnalisisOk = false;
     const res = document.getElementById('conyDniAnalysisResult');
     if (res) { res.innerHTML = ''; res.style.display = 'none'; }
+    updateConyDataBlockVisibility();
+  }
+
+  // Muestra/oculta los campos de texto del conyuge segun si ya se valido el DNI.
+  function updateConyDataBlockVisibility() {
+    const dataBlock = document.getElementById('pf-conyugeDataBlock');
+    const lockMsg = document.getElementById('pf-conyugeLockMsg');
+    if (!dataBlock || !lockMsg) return;
+    if (conyDniAnalisisOk) {
+      dataBlock.classList.add('show');
+      lockMsg.style.display = 'none';
+    } else {
+      dataBlock.classList.remove('show');
+      lockMsg.style.display = '';
+    }
   }
 
   async function handleConyDniUpload(which, input) {
@@ -2010,6 +2046,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetConyDniForRetry()">Volver a subir</button>';
         resultEl.style.display = '';
       }
+      updateConyDataBlockVisibility();
     } catch (e) {
       console.error('analyzeConyDni error', e);
       loader.style.display = 'none';
