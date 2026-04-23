@@ -457,20 +457,10 @@
       <div class="conditional" id="pf-conyugeBlock">
         <div class="divider"></div>
         <div class="section-title"><div class="icon">💍</div> Datos del cónyuge</div>
-        <div class="field"><label>Nombre y apellido</label><input type="text" id="pf-conyugeNombre"></div>
-        <div class="field"><label>CUIL del cónyuge</label><input type="text" id="pf-conyugeCuil" placeholder="20-12345678-9" inputmode="numeric"></div>
-        <div class="field">
-          <label>Cantidad de nupcias</label>
-          <div class="toggle-group">
-            <button type="button" class="toggle-btn" data-field="nupcias" data-value="1">1ª</button>
-            <button type="button" class="toggle-btn" data-field="nupcias" data-value="2">2ª</button>
-            <button type="button" class="toggle-btn" data-field="nupcias" data-value="3+">3ª+</button>
-          </div>
-        </div>
-        <div style="height:12px"></div>
-        <div class="section-title" style="font-size:14px;"><div class="icon" style="font-size:18px;">📷</div> DNI del cónyuge</div>
-        <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: #0040C1; font-size:12px;">
-          Frente y dorso. Al analizar, verificamos que sea legible, nítido y con los bordes visibles.
+
+        <!-- PRIMERO el DNI. De ahí autocompletamos nombre + CUIL. -->
+        <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: #0040C1; font-size:13px;">
+          <strong>Primero el DNI del cónyuge.</strong> Subí frente y dorso y analizalo. De ahí sacamos nombre y CUIL automáticamente.
         </div>
         <div class="upload-zone" id="conyUploadFrenteZone">
           <div class="upload-icon">📇</div>
@@ -497,6 +487,19 @@
           <span class="spinner"></span> Analizando DNI del cónyuge…
         </div>
         <div id="conyDniAnalysisResult" style="display:none; margin-top: 10px;"></div>
+
+        <!-- Los datos vienen precargados del DNI; el cliente puede editar si la IA leyó algo mal. -->
+        <div style="height:12px"></div>
+        <div class="field"><label>Nombre y apellido</label><input type="text" id="pf-conyugeNombre"></div>
+        <div class="field"><label>CUIL del cónyuge</label><input type="text" id="pf-conyugeCuil" placeholder="20-12345678-9" inputmode="numeric"></div>
+        <div class="field">
+          <label>Cantidad de nupcias</label>
+          <div class="toggle-group">
+            <button type="button" class="toggle-btn" data-field="nupcias" data-value="1">1ª</button>
+            <button type="button" class="toggle-btn" data-field="nupcias" data-value="2">2ª</button>
+            <button type="button" class="toggle-btn" data-field="nupcias" data-value="3+">3ª+</button>
+          </div>
+        </div>
       </div>
       <div class="field"><label>Porcentaje de titularidad</label><input type="text" id="pf-porcTit" value="100%"></div>
     </div>
