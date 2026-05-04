@@ -456,6 +456,29 @@
       err.style.display = ''; return;
     }
     try {
+      // 1) Buscar primero en tasador_usuarios (fuente de verdad del ecosistema TGA)
+      const tuRes = await supaFetch('/rest/v1/tasador_usuarios?usuario=eq.' + encodeURIComponent(user)
+        + '&clave=eq.' + encodeURIComponent(pass) + '&activo=eq.true&select=usuario,nombre,roles,rol',
+        { headers: { 'Accept': 'application/json' } });
+      const tuData = await tuRes.json();
+
+      if (Array.isArray(tuData) && tuData.length > 0) {
+        const u = tuData[0];
+        const roles = Array.isArray(u.roles) && u.roles.length ? u.roles : (u.rol ? [u.rol] : []);
+        let role;
+        if (roles.includes('f01_owner')) role = 'owner';
+        else if (roles.includes('f01_admin')) role = 'administracion';
+        else if (roles.includes('vendedor')) role = 'ventas';
+        else {
+          err.textContent = 'Tu usuario no tiene acceso al panel F01.';
+          err.style.display = ''; return;
+        }
+        enterPanel(user, role);
+        saveSession(user, role);
+        return;
+      }
+
+      // 2) Fallback: cuentas compartidas legacy en f01_admins (administracion / ventas)
       const res = await supaFetch('/rest/v1/f01_admins?usuario=eq.' + encodeURIComponent(user)
         + '&clave=eq.' + encodeURIComponent(pass), { headers: { 'Accept': 'application/json' } });
       const data = await res.json();
