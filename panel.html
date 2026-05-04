@@ -151,6 +151,18 @@
   .row-item .row-name { font-weight: 700; font-size: 14px; margin-bottom: 2px; }
   .row-item .row-meta { font-size: 12px; color: #5A6B7F; }
   .row-item .row-state { flex-shrink: 0; margin-left: 12px; }
+  .row-item.selected { background: #FFF7E6; box-shadow: 0 0 0 2px var(--vw-cobalt) inset; }
+  .row-item .row-check { width: 18px; height: 18px; margin-right: 12px; cursor: pointer; flex-shrink: 0; }
+
+  .action-bar {
+    display: flex; gap: 8px; flex-wrap: wrap; align-items: center;
+    margin-bottom: 12px; padding: 10px 12px;
+    background: white; border-radius: var(--radius);
+    box-shadow: var(--shadow-sm);
+  }
+  .action-bar button { border: none; cursor: pointer; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+  .action-bar .btn-action { background: #F0F2F5; color: #1F2937; }
+  .action-bar .btn-action:hover { background: #E0E5EB; }
 
   .chip {
     font-size: 11px; padding: 3px 10px; border-radius: 10px;
@@ -338,6 +350,12 @@
       <button class="tab-btn" data-tab="f01" onclick="setTab('f01')">F01 <span class="tab-count" id="tab-cnt-f01">0</span></button>
     </div>
 
+    <div class="action-bar">
+      <button class="btn-action" type="button" onclick="copyFormLink()">📋 Copiar link p/ cliente</button>
+      <button class="btn-action" type="button" onclick="openPublicForm()">🔗 Ir al formulario</button>
+      <button class="btn btn-danger" type="button" id="btnBulkDelete" onclick="bulkDelete()" style="display:none;">🗑 Borrar seleccionados (0)</button>
+    </div>
+
     <div class="row-filters" id="rowFilters">
       <div class="rf-item">
         <label>Vendedor</label>
@@ -394,6 +412,7 @@
   // ═══════ STATE ═══════
   let currentUser = null;       // nombre de usuario logueado
   let currentRole = 'ventas';   // 'ventas' | 'administracion' | 'owner'
+  let selectedIds = new Set();  // IDs marcados para borrado masivo (owner only)
   let currentTab = 'vwfs';
   const rowsCache = { vwfs: null, f01: null };
   const comprobantesCache = {}; // { vwfsId: [row,...] }
@@ -529,13 +548,82 @@
 
   function doLogout() { clearSession(); window.location.reload(); }
 
+  // ═══════ ACCIONES POR TAB (copiar link / abrir formulario público) ═══════
+  const PUBLIC_FORM_URLS = {
+    vwfs: 'https://f01.titogonzalez.online/vwfs.html',
+    f01:  'https://f01.titogonzalez.online/'
+  };
+
+  async function copyFormLink() {
+    const url = PUBLIC_FORM_URLS[currentTab];
+    if (!url) return;
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('Link copiado:\n' + url);
+    } catch {
+      prompt('Copiá el link manualmente:', url);
+    }
+  }
+
+  function openPublicForm() {
+    const url = PUBLIC_FORM_URLS[currentTab];
+    if (url) window.open(url, '_blank', 'noopener');
+  }
+
+  // ═══════ SELECCIÓN MÚLTIPLE / BORRADO MASIVO (solo owner) ═══════
+  function toggleRowCheck(id) {
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+    updateBulkDeleteButton();
+    const row = document.querySelector('.row-item[data-id="' + id + '"]');
+    if (row) row.classList.toggle('selected', selectedIds.has(id));
+  }
+
+  function updateBulkDeleteButton() {
+    const btn = document.getElementById('btnBulkDelete');
+    if (!btn) return;
+    const n = selectedIds.size;
+    btn.style.display = (isOwner() && n > 0) ? '' : 'none';
+    btn.textContent = '🗑 Borrar seleccionados (' + n + ')';
+  }
+
+  async function bulkDelete() {
+    if (!isOwner()) { alert('No tenés permisos para borrar.'); return; }
+    const ids = Array.from(selectedIds);
+    if (!ids.length) return;
+    const cfg = TAB_CONFIG[currentTab];
+    if (!confirm('¿Borrar ' + ids.length + ' formulario(s) de ' + cfg.label + '?\n\nLos formularios quedan marcados como eliminados (recuperables manualmente desde la base).')) return;
+    try {
+      const body = {
+        eliminado: true,
+        eliminado_por: currentUser,
+        eliminado_at: new Date().toISOString()
+      };
+      const res = await supaFetch('/rest/v1/' + cfg.table + '?id=in.(' + ids.join(',') + ')', {
+        method: 'PATCH',
+        body: JSON.stringify(body),
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }
+      });
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        throw new Error('Error al borrar: ' + (errText || res.status));
+      }
+      selectedIds.clear();
+      rowsCache[currentTab] = null;
+      await loadTab(currentTab);
+      updateBulkDeleteButton();
+    } catch (e) {
+      alert(e.message || 'Error al borrar.');
+    }
+  }
+
   // ═══════ LOAD ROWS ═══════
   async function loadTab(tab) {
     const cfg = TAB_CONFIG[tab];
     const list = document.getElementById('rowList');
     list.innerHTML = '<div class="loading">Cargando…</div>';
     try {
-      const res = await supaFetch('/rest/v1/' + cfg.table + '?order=created_at.desc&limit=500', {
+      const res = await supaFetch('/rest/v1/' + cfg.table + '?eliminado=eq.false&order=created_at.desc&limit=500', {
         headers: { 'Accept': 'application/json' }
       });
       const rows = await res.json();
@@ -550,6 +638,8 @@
 
   async function setTab(tab) {
     currentTab = tab;
+    selectedIds.clear();
+    updateBulkDeleteButton();
     document.querySelectorAll('.tab-btn').forEach(b =>
       b.classList.toggle('active', b.dataset.tab === tab));
     filter = 'all';
@@ -611,8 +701,11 @@
       else meta += ' · <span style="color:var(--vw-red); font-weight:700;">Sin vendedor</span>';
       if (isAdminOrOwner() && r.administrativa) meta += ' · Adm: ' + escapeHtml(r.administrativa);
       const stateHtml = isVwfs ? `<div class="row-state"><span class="chip ${est.chip}">${escapeHtml(est.label)}</span></div>` : '';
+      const checkbox = isOwner() ? `<input type="checkbox" class="row-check" ${selectedIds.has(r.id) ? 'checked' : ''} onclick="event.stopPropagation(); toggleRowCheck(${r.id})">` : '';
+      const selectedCls = selectedIds.has(r.id) ? 'selected' : '';
       return `
-        <div class="row-item" onclick="openDetail(${r.id})">
+        <div class="row-item ${selectedCls}" data-id="${r.id}" onclick="openDetail(${r.id})">
+          ${checkbox}
           <div class="row-main">
             <div class="row-name">${escapeHtml(nombre)}</div>
             <div class="row-meta">${meta}</div>
