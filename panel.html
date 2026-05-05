@@ -451,13 +451,48 @@
   let filterAdministrativa = '';
 
   // ═══════ SESSION ═══════
-  function saveSession(user, role) {
+  // Cookie compartida con todas las apps de *.titogonzalez.online (SSO).
+  const SHARED_COOKIE = 'tga_session';
+  const SHARED_DOMAIN = '.titogonzalez.online';
+
+  function setSharedCookie(payload) {
+    if (!payload) return;
+    try {
+      const safe = Object.assign({}, payload);
+      delete safe.clave;
+      const value = encodeURIComponent(JSON.stringify(safe));
+      const maxAge = 7 * 24 * 60 * 60;
+      document.cookie = SHARED_COOKIE + '=' + value + '; path=/; domain=' + SHARED_DOMAIN + '; max-age=' + maxAge + '; Secure; SameSite=Lax';
+    } catch (e) { console.error('setSharedCookie:', e); }
+  }
+  function getSharedCookie() {
+    const m = document.cookie.match(new RegExp('(?:^|;\\s*)' + SHARED_COOKIE + '=([^;]+)'));
+    if (!m) return null;
+    try { return JSON.parse(decodeURIComponent(m[1])); } catch { return null; }
+  }
+  function clearSharedCookie() {
+    document.cookie = SHARED_COOKIE + '=; path=/; domain=' + SHARED_DOMAIN + '; max-age=0; Secure; SameSite=Lax';
+  }
+
+  // Mapea roles del ecosistema TGA al rol del panel F01.
+  // Devuelve null si el usuario no tiene un rol valido para este panel.
+  function rolPanelDesde(roles, rol) {
+    const arr = Array.isArray(roles) && roles.length ? roles : (rol ? [rol] : []);
+    if (arr.includes('f01_owner')) return 'owner';
+    if (arr.includes('f01_admin')) return 'administracion';
+    if (arr.includes('vendedor')) return 'ventas';
+    return null;
+  }
+
+  function saveSession(user, role, sharedPayload) {
     sessionStorage.setItem('vwfs_admin_user', user);
     sessionStorage.setItem('vwfs_admin_role', role || 'ventas');
+    if (sharedPayload) setSharedCookie(sharedPayload);
   }
   function clearSession() {
     sessionStorage.removeItem('vwfs_admin_user');
     sessionStorage.removeItem('vwfs_admin_role');
+    clearSharedCookie();
   }
   function getSession() {
     const user = sessionStorage.getItem('vwfs_admin_user');
@@ -483,17 +518,14 @@
 
       if (Array.isArray(tuData) && tuData.length > 0) {
         const u = tuData[0];
-        const roles = Array.isArray(u.roles) && u.roles.length ? u.roles : (u.rol ? [u.rol] : []);
-        let role;
-        if (roles.includes('f01_owner')) role = 'owner';
-        else if (roles.includes('f01_admin')) role = 'administracion';
-        else if (roles.includes('vendedor')) role = 'ventas';
-        else {
+        const role = rolPanelDesde(u.roles, u.rol);
+        if (!role) {
           err.textContent = 'Tu usuario no tiene acceso al panel F01.';
           err.style.display = ''; return;
         }
         enterPanel(user, role);
-        saveSession(user, role);
+        // Guardamos sesion local + cookie compartida (SSO con tasador / portal / precios).
+        saveSession(user, role, Object.assign({ usuario: user }, u));
         return;
       }
 
@@ -1612,9 +1644,27 @@
     if (e.key === 'Enter') document.getElementById('adminPass').focus();
   });
 
-  // Auto-login si hay sesión
-  const session = getSession();
-  if (session) enterPanel(session.user, session.role);
+  // Auto-login. Prioridad: cookie compartida del ecosistema TGA > sesion local del panel.
+  (function autoLogin() {
+    const cookieUser = getSharedCookie();
+    if (cookieUser && cookieUser.usuario) {
+      const role = rolPanelDesde(cookieUser.roles, cookieUser.rol);
+      if (role) {
+        enterPanel(cookieUser.usuario, role);
+        saveSession(cookieUser.usuario, role, cookieUser);
+        return;
+      }
+      // Hay sesion en el ecosistema pero el usuario no tiene acceso al panel F01.
+      const err = document.getElementById('loginError');
+      if (err) {
+        err.textContent = 'Tu usuario (' + cookieUser.usuario + ') no tiene acceso al panel F01. Iniciá con otra cuenta.';
+        err.style.display = '';
+      }
+      return;
+    }
+    const session = getSession();
+    if (session) enterPanel(session.user, session.role);
+  })();
 </script>
 
 </body>
