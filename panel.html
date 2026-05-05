@@ -1670,5 +1670,60 @@
   })();
 </script>
 
+<!-- ===== Banner de impersonacion cross-app (lee cookie tga_session compartida) ===== -->
+<script>
+(function tgaImpersonateBanner() {
+  function getCk() {
+    var m = document.cookie.match(/(?:^|;\s*)tga_session=([^;]+)/);
+    if (!m) return null;
+    try { return JSON.parse(decodeURIComponent(m[1])); } catch (e) { return null; }
+  }
+  function setCk(v) {
+    var value = encodeURIComponent(JSON.stringify(v));
+    var maxAge = 7 * 24 * 60 * 60;
+    document.cookie = 'tga_session=' + value + '; path=/; domain=.titogonzalez.online; max-age=' + maxAge + '; Secure; SameSite=Lax';
+  }
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];});
+  }
+  window.tgaVolverASesionOriginal = function() {
+    var c = getCk();
+    if (!c || !c._impersonatedBy) return;
+    var orig = Object.assign({}, c._impersonatedBy);
+    delete orig._impersonatedBy;
+    setCk(orig);
+    try { localStorage.removeItem('tasadorSession'); } catch (e) {}
+    try { localStorage.removeItem('portal_tga_session'); } catch (e) {}
+    try { sessionStorage.removeItem('vwfs_admin_user'); sessionStorage.removeItem('vwfs_admin_role'); } catch (e) {}
+    location.reload();
+  };
+  function render() {
+    var c = getCk();
+    var banner = document.getElementById('tgaImpersonateBanner');
+    if (!c || !c._impersonatedBy) {
+      if (banner) { banner.remove(); document.body.style.paddingTop = ''; }
+      return;
+    }
+    if (!banner) {
+      banner = document.createElement('div');
+      banner.id = 'tgaImpersonateBanner';
+      banner.style.cssText = 'position:fixed; top:0; left:0; right:0; background:#9A3412; color:#fff; padding:8px 14px; font-size:13px; font-weight:600; z-index:99999; display:flex; justify-content:space-between; align-items:center; gap:12px; box-shadow:0 2px 6px rgba(0,0,0,0.2); flex-wrap:wrap; font-family:system-ui,sans-serif';
+      document.body.appendChild(banner);
+      document.body.style.paddingTop = '36px';
+    }
+    var cur = esc(c.usuario || '?');
+    var curN = c.nombre ? ' (' + esc(c.nombre) + ')' : '';
+    var origU = esc(c._impersonatedBy.usuario || '?');
+    banner.innerHTML = '<span>👤 Estás viendo como <strong>' + cur + '</strong>' + curN + '</span>'
+      + '<button onclick="tgaVolverASesionOriginal()" style="background:#fff; color:#9A3412; border:none; padding:5px 12px; border-radius:5px; cursor:pointer; font-weight:700; font-size:12px">← Volver a ' + origU + '</button>';
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', render);
+  } else {
+    render();
+  }
+})();
+</script>
+
 </body>
 </html>
