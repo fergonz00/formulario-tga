@@ -1695,18 +1695,13 @@
       const match = rows.find(r => r.datos && r.datos['Fecha nac.'] === fechaNac);
 
       if (!match) {
-        // No hay F01 cargado: en vez de bloquear, dejamos avanzar y que el
-        // cliente complete el VWFS desde cero. Le prellenamos los 3 datos
-        // que ya tipeó en la entry para que no los repita.
-        statusEl.className = 'info-callout';
-        statusEl.style.background = 'rgba(255,140,0,0.08)';
-        statusEl.style.borderLeft = '4px solid #FF8C00';
-        statusEl.innerHTML = '<strong>No tenemos un F01 a tu nombre.</strong><br>' +
-          'Vas a tener que completar todos los datos a mano. Arrancamos en 1 segundo…';
-        setField('tipoDoc', tipoDoc);
-        setField('nroDoc', nroDoc);
-        setField('fechaNac', fechaNac);
-        setTimeout(() => startForm(), 1400);
+        // Nuevo modelo: sin F01 no se puede avanzar. Redirigimos a F01.
+        statusEl.className = 'info-callout err';
+        statusEl.innerHTML =
+          '<strong>Primero necesitas cargar el F01.</strong><br>' +
+          'No encontramos un F01 con esos datos. Hace click abajo para completarlo, ' +
+          'y al terminar te volvemos a traer aca automaticamente.' +
+          '<a href="index.html?return=vwfs" class="btn btn-primary btn-block" style="margin-top:12px; display:inline-block; text-decoration:none; text-align:center;">Ir a cargar el F01 →</a>';
         return;
       }
 
