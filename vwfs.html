@@ -1695,13 +1695,18 @@
       const match = rows.find(r => r.datos && r.datos['Fecha nac.'] === fechaNac);
 
       if (!match) {
-        // Nuevo modelo: sin F01 no se puede avanzar. Redirigimos a F01.
-        statusEl.className = 'info-callout err';
-        statusEl.innerHTML =
-          '<strong>Primero necesitas cargar el F01.</strong><br>' +
-          'No encontramos un F01 con esos datos. Hace click abajo para completarlo, ' +
-          'y al terminar te volvemos a traer aca automaticamente.' +
-          '<a href="index.html?return=vwfs" class="btn btn-primary btn-block" style="margin-top:12px; display:inline-block; text-decoration:none; text-align:center;">Ir a cargar el F01 →</a>';
+        // No hay F01 cargado: en vez de bloquear, dejamos avanzar y que el
+        // cliente complete el VWFS desde cero. Le prellenamos los 3 datos
+        // que ya tipeó en la entry para que no los repita.
+        statusEl.className = 'info-callout';
+        statusEl.style.background = 'rgba(255,140,0,0.08)';
+        statusEl.style.borderLeft = '4px solid #FF8C00';
+        statusEl.innerHTML = '<strong>No tenemos un F01 a tu nombre.</strong><br>' +
+          'Vas a tener que completar todos los datos a mano. Arrancamos en 1 segundo…';
+        setField('tipoDoc', tipoDoc);
+        setField('nroDoc', nroDoc);
+        setField('fechaNac', fechaNac);
+        setTimeout(() => startForm(), 1400);
         return;
       }
 
@@ -2137,7 +2142,7 @@
   }
 
   // ═══════ PDF GENERATION ═══════
-  function generatePDF() {
+  async function generatePDF() {
     if (!window.jspdf) { alert('El generador de PDF aún no cargó. Esperá unos segundos.'); return; }
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ unit: 'mm', format: 'a4' });
@@ -2186,7 +2191,7 @@
       }
     }
 
-    addDniPagesToPdf(doc);
+    await addDniPagesToPdf(doc);
 
     generatedPDFBlob = doc.output('blob');
     goToSuccessScreen();
@@ -2194,7 +2199,26 @@
     uploadToSupabase(doc, fullName);
   }
 
-  function addDniPagesToPdf(doc) {
+  // Re-renderiza un dataUrl a un canvas para "bakearle" la rotación EXIF
+  // (el browser auto-rota al cargar Image, así que el canvas captura los
+  // píxeles ya rotados). jsPDF no lee EXIF, por eso si la JPEG original
+  // tiene EXIF orientation 6/8/etc el PDF salía con la foto estirada/achatada.
+  function flattenImageDataUrl(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.92), width: w, height: h });
+      };
+      img.onerror = () => reject(new Error('No se pudo cargar imagen para flatten'));
+      img.src = dataUrl;
+    });
+  }
+
+  async function addDniPagesToPdf(doc) {
     const pageW = 210, pageH = 297, margin = 10;
     const maxW = pageW - margin * 2;
     const maxH = pageH - margin * 2 - 14;
@@ -2209,14 +2233,15 @@
       const title = which === 'frente' ? 'DNI — Frente' : 'DNI — Dorso';
       doc.text(title, pageW / 2, margin + 5, { align: 'center' });
 
-      const aspect = img.w / img.h;
-      let drawW = maxW, drawH = drawW / aspect;
-      if (drawH > maxH) { drawH = maxH; drawW = drawH * aspect; }
-      const x = (pageW - drawW) / 2;
-      const y = margin + 10;
-      const fmt = img.dataUrl.startsWith('data:image/png') ? 'PNG' : 'JPEG';
       try {
-        doc.addImage(img.dataUrl, fmt, x, y, drawW, drawH);
+        // Flatten EXIF antes de medir y agregar — único camino a jsPDF.
+        const flat = await flattenImageDataUrl(img.dataUrl);
+        const aspect = flat.width / flat.height;
+        let drawW = maxW, drawH = drawW / aspect;
+        if (drawH > maxH) { drawH = maxH; drawW = drawH * aspect; }
+        const x = (pageW - drawW) / 2;
+        const y = margin + 10;
+        doc.addImage(flat.dataUrl, 'JPEG', x, y, drawW, drawH);
       } catch (e) {
         console.error('addImage failed', e);
         doc.setFont('helvetica', 'normal');

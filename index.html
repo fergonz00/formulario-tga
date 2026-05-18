@@ -2326,17 +2326,19 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           const imgData = uploadedImages[key];
           if (!imgData) continue;
           try {
-            const dims = await getImageDimensions(imgData.data);
+            // Flatten EXIF antes de medir + agregar: jsPDF no lee EXIF, así que
+            // si la foto del celular viene con orientation 6/8 el browser ya la
+            // muestra rotada pero los bytes están sin rotar → PDF salía achatado.
+            const flat = await flattenImageDataUrl(imgData.data);
             const maxW = contentW, maxH = 100;
-            const ratio = Math.min(maxW / dims.width, maxH / dims.height);
-            const w = dims.width * ratio, h = dims.height * ratio;
+            const ratio = Math.min(maxW / flat.width, maxH / flat.height);
+            const w = flat.width * ratio, h = flat.height * ratio;
             if (iy + h + 12 > pageH - margin) { doc.addPage(); iy = margin; }
             doc.setTextColor(0, 30, 80); doc.setFontSize(9); doc.setFont('helvetica', 'bold');
             doc.text(label, margin, iy); iy += 5;
             doc.setDrawColor(218, 228, 237); doc.setLineWidth(0.5);
             doc.rect(margin, iy, w, h);
-            const format = imgData.type.includes('png') ? 'PNG' : 'JPEG';
-            doc.addImage(imgData.data, format, margin, iy, w, h, undefined, 'MEDIUM');
+            doc.addImage(flat.dataUrl, 'JPEG', margin, iy, w, h, undefined, 'MEDIUM');
             iy += h + 10;
           } catch (e) {
             doc.setFontSize(8); doc.setFont('helvetica','italic'); doc.setTextColor(150,150,150);
@@ -2378,6 +2380,25 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const img = new Image();
       img.onload = () => resolve({ width: img.width, height: img.height });
       img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
+
+  // Re-renderiza un dataUrl a un canvas para "bakearle" la rotación EXIF
+  // (el browser auto-rota al cargar Image, así que el canvas captura los
+  // píxeles ya rotados). jsPDF no lee EXIF, por eso si la JPEG original
+  // tiene EXIF orientation 6/8/etc el PDF salía con la foto estirada/achatada.
+  function flattenImageDataUrl(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.92), width: w, height: h });
+      };
+      img.onerror = () => reject(new Error('No se pudo cargar imagen para flatten'));
       img.src = dataUrl;
     });
   }
