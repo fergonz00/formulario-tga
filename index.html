@@ -1514,6 +1514,20 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     });
   }
 
+  // Convierte un dataURL (base64) a Uint8Array. Subimos el binario como bytes
+  // con Content-Type explicito en vez de mandar un Blob/File: los navegadores
+  // viejos (Edge Legacy) mandaban el body Blob de forma que el proxy de
+  // Supabase rechazaba con "400 Bad Request". Bytes + Content-Type es universal.
+  function dataUrlToBytes(dataUrl) {
+    const comma = dataUrl.indexOf(',');
+    const b64 = dataUrl.slice(comma + 1);
+    const bin = atob(b64);
+    const len = bin.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+
   function resetDniAnalysisState() {
     dniAnalisis = null;
     dniAnalisisOk = false;
@@ -1659,7 +1673,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       // excepcion -> "no se pudo procesar". El Blob ya tiene .type y .size y
       // sirve como body del upload a Supabase.
       const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
-      dniImages[which] = { dataUrl: norm.dataUrl, file: blob, w: norm.w, h: norm.h };
+      dniImages[which] = { dataUrl: norm.dataUrl, file: blob, mime: norm.mime, w: norm.w, h: norm.h };
       showDniPreview(which);
       updateAnalyzeBtnVisibility();
     } catch (e) {
@@ -1743,12 +1757,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const safe = 'tmp_' + timestamp;
       const uploadOne = async (which) => {
         const img = dniImages[which];
-        const ext = img.file.type === 'image/png' ? 'png' : 'jpg';
+        const mime = img.mime || (img.file && img.file.type) || 'image/jpeg';
+        const ext = mime === 'image/png' ? 'png' : 'jpg';
         const path = safe + '/' + which + '.' + ext;
         const res = await supaFetch('/storage/v1/object/vwfs-dnis/' + path, {
           method: 'POST',
-          headers: { 'Content-Type': img.file.type, 'x-upsert': 'true' },
-          body: img.file
+          headers: { 'Content-Type': mime, 'x-upsert': 'true' },
+          body: dataUrlToBytes(img.dataUrl)
         });
         if (!res.ok) { const t = await res.text(); throw new Error('Fallo subida ' + which + ': ' + t); }
         return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
@@ -1979,7 +1994,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       }
       // Blob directo (sin `new File`, incompatible con navegadores viejos).
       const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
-      conyDniImages[which] = { dataUrl: norm.dataUrl, file: blob, w: norm.w, h: norm.h };
+      conyDniImages[which] = { dataUrl: norm.dataUrl, file: blob, mime: norm.mime, w: norm.w, h: norm.h };
       showConyDniPreview(which);
       updateConyAnalyzeBtnVisibility();
     } catch (e) {
@@ -2056,12 +2071,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const safe = 'cony_tmp_' + timestamp;
       const uploadOne = async (which) => {
         const img = conyDniImages[which];
-        const extn = img.file.type === 'image/png' ? 'png' : 'jpg';
+        const mime = img.mime || (img.file && img.file.type) || 'image/jpeg';
+        const extn = mime === 'image/png' ? 'png' : 'jpg';
         const path = safe + '/' + which + '.' + extn;
         const res = await supaFetch('/storage/v1/object/vwfs-dnis/' + path, {
           method: 'POST',
-          headers: { 'Content-Type': img.file.type, 'x-upsert': 'true' },
-          body: img.file
+          headers: { 'Content-Type': mime, 'x-upsert': 'true' },
+          body: dataUrlToBytes(img.dataUrl)
         });
         if (!res.ok) { const t = await res.text(); throw new Error('Fallo subida ' + which + ': ' + t); }
         return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
