@@ -1654,9 +1654,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         err.textContent = 'La foto tiene muy poca resolucion (' + norm.w + 'x' + norm.h + '). Minimo ' + DNI_MIN_WIDTH + 'x' + DNI_MIN_HEIGHT + '.';
         err.style.display = ''; input.value = ''; return;
       }
+      // Usamos el Blob directo: NO construimos `new File(...)` porque ese
+      // constructor no existe en navegadores viejos (Edge Legacy) y tiraba
+      // excepcion -> "no se pudo procesar". El Blob ya tiene .type y .size y
+      // sirve como body del upload a Supabase.
       const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
-      const normFile = new File([blob], (file.name || 'dni') + '.jpg', { type: norm.mime });
-      dniImages[which] = { dataUrl: norm.dataUrl, file: normFile, w: norm.w, h: norm.h };
+      dniImages[which] = { dataUrl: norm.dataUrl, file: blob, w: norm.w, h: norm.h };
       showDniPreview(which);
       updateAnalyzeBtnVisibility();
     } catch (e) {
@@ -1974,9 +1977,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         err.textContent = 'Muy poca resolucion (' + norm.w + 'x' + norm.h + ').';
         err.style.display = ''; input.value = ''; return;
       }
+      // Blob directo (sin `new File`, incompatible con navegadores viejos).
       const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
-      const normFile = new File([blob], (file.name || 'dniCony') + '.jpg', { type: norm.mime });
-      conyDniImages[which] = { dataUrl: norm.dataUrl, file: normFile, w: norm.w, h: norm.h };
+      conyDniImages[which] = { dataUrl: norm.dataUrl, file: blob, w: norm.w, h: norm.h };
       showConyDniPreview(which);
       updateConyAnalyzeBtnVisibility();
     } catch (e) {
