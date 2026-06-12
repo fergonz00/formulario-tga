@@ -1565,17 +1565,37 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   async function normalizeImageFromFile(file) {
     const orientation = await getJpegOrientation(file);
     let bmp;
+    // autoOriented = true cuando el decoder ya aplico la orientacion EXIF por su
+    // cuenta (fallbacks). En ese caso NO debemos rotar de nuevo manualmente.
+    let autoOriented = false;
     try {
+      // Camino preferido: pixeles crudos, rotamos nosotros con el EXIF leido.
       bmp = await createImageBitmap(file, { imageOrientation: 'none' });
-    } catch (_e) {
-      const dataUrlRaw = await fileToDataUrl(file);
-      const imgEl = new Image();
-      await new Promise((res, rej) => { imgEl.onload = res; imgEl.onerror = rej; imgEl.src = dataUrlRaw; });
-      bmp = imgEl;
+    } catch (_e1) {
+      try {
+        // Algunos navegadores de escritorio soportan createImageBitmap pero no
+        // el argumento de opciones: reintentamos sin opciones (auto-orienta).
+        bmp = await createImageBitmap(file);
+        autoOriented = true;
+      } catch (_e2) {
+        // Ultimo recurso: <img>. Si el navegador no puede decodificar el
+        // formato (p.ej. HEIC de iPhone en una PC) onerror dispara y avisamos.
+        const dataUrlRaw = await fileToDataUrl(file);
+        const imgEl = new Image();
+        await new Promise((res, rej) => {
+          imgEl.onload = res;
+          imgEl.onerror = () => rej(Object.assign(new Error('No se pudo decodificar la imagen'), { code: 'DECODE' }));
+          imgEl.src = dataUrlRaw;
+        });
+        bmp = imgEl;
+        autoOriented = true;
+      }
     }
+    const effOrientation = autoOriented ? 1 : orientation;
     const rawW = bmp.width || bmp.naturalWidth;
     const rawH = bmp.height || bmp.naturalHeight;
-    const swap = orientation >= 5 && orientation <= 8;
+    if (!rawW || !rawH) throw Object.assign(new Error('Imagen sin dimensiones'), { code: 'DECODE' });
+    const swap = effOrientation >= 5 && effOrientation <= 8;
     const visualW = swap ? rawH : rawW;
     const visualH = swap ? rawW : rawH;
     const MAX_W = 1800;
@@ -1588,7 +1608,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     const ctx = canvas.getContext('2d');
     const sw = Math.round(rawW * scale);
     const sh = Math.round(rawH * scale);
-    switch (orientation) {
+    switch (effOrientation) {
       case 2: ctx.translate(outW, 0);  ctx.scale(-1, 1); break;
       case 3: ctx.translate(outW, outH); ctx.rotate(Math.PI); break;
       case 4: ctx.translate(0, outH);  ctx.scale(1, -1); break;
@@ -1602,7 +1622,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     const mime = isPng ? 'image/png' : 'image/jpeg';
     const quality = isPng ? undefined : 0.92;
     const dataUrl = canvas.toDataURL(mime, quality);
-    return { dataUrl, w: outW, h: outH, mime };
+    // Generamos el Blob directo del canvas (mas robusto y liviano que volver a
+    // hacer fetch() del dataURL, que ademas puede fallar bajo CSP estricto).
+    const blob = await new Promise((resolve) => {
+      if (canvas.toBlob) canvas.toBlob((b) => resolve(b), mime, quality);
+      else resolve(null);
+    });
+    return { dataUrl, blob, w: outW, h: outH, mime };
   }
 
   async function handleDniUpload(which, input) {
@@ -1628,15 +1654,27 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         err.textContent = 'La foto tiene muy poca resolucion (' + norm.w + 'x' + norm.h + '). Minimo ' + DNI_MIN_WIDTH + 'x' + DNI_MIN_HEIGHT + '.';
         err.style.display = ''; input.value = ''; return;
       }
-      const blob = await (await fetch(norm.dataUrl)).blob();
+      const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
       const normFile = new File([blob], (file.name || 'dni') + '.jpg', { type: norm.mime });
       dniImages[which] = { dataUrl: norm.dataUrl, file: normFile, w: norm.w, h: norm.h };
       showDniPreview(which);
       updateAnalyzeBtnVisibility();
     } catch (e) {
-      err.textContent = 'No se pudo procesar la imagen. Intenta con otra foto.';
+      console.error('Error al procesar DNI:', e);
+      err.textContent = dniProcessErrorMsg(file);
       err.style.display = ''; input.value = '';
     }
+  }
+
+  // Mensaje de error util cuando el navegador no puede decodificar la imagen.
+  // Caso tipico en PC: foto HEIC/HEIF de iPhone que Chrome/Edge/Firefox no abren.
+  function dniProcessErrorMsg(file) {
+    const isHeic = /hei[cf]/i.test(file && file.type || '') || /\.(heic|heif)$/i.test(file && file.name || '');
+    if (isHeic) {
+      return 'Esta foto esta en formato HEIC (iPhone) y la computadora no puede abrirla. ' +
+             'Convertila a JPG, o subila directo desde el celular.';
+    }
+    return 'No se pudo procesar la imagen. Probá con otra foto en formato JPG o PNG (no PDF ni HEIC).';
   }
 
   function previewPrefix(which) { return which === 'frente' ? 'Frente' : 'Dorso'; }
@@ -1936,13 +1974,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         err.textContent = 'Muy poca resolucion (' + norm.w + 'x' + norm.h + ').';
         err.style.display = ''; input.value = ''; return;
       }
-      const blob = await (await fetch(norm.dataUrl)).blob();
+      const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
       const normFile = new File([blob], (file.name || 'dniCony') + '.jpg', { type: norm.mime });
       conyDniImages[which] = { dataUrl: norm.dataUrl, file: normFile, w: norm.w, h: norm.h };
       showConyDniPreview(which);
       updateConyAnalyzeBtnVisibility();
     } catch (e) {
-      err.textContent = 'No se pudo procesar.'; err.style.display = ''; input.value = '';
+      console.error('Error al procesar DNI conyuge:', e);
+      err.textContent = dniProcessErrorMsg(file); err.style.display = ''; input.value = '';
     }
   }
 
