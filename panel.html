@@ -359,7 +359,16 @@
       <button class="btn btn-danger" type="button" id="btnBulkDelete" onclick="bulkDelete()" style="display:none;">🗑 Borrar seleccionados (0)</button>
     </div>
 
+    <div style="margin-bottom:10px;">
+      <input type="text" id="searchBox" placeholder="🔍 Buscar por nombre, apellido o DNI..." oninput="setSearch(this.value)"
+        style="width:100%;padding:10px 14px;border:1.5px solid var(--vw-new-horizon);border-radius:var(--radius-sm);font-family:inherit;font-size:14px;">
+    </div>
+
     <div class="row-filters" id="rowFilters">
+      <div class="rf-item">
+        <label>Mes</label>
+        <select id="monthFilter" onchange="setMonthFilter(this.value)"></select>
+      </div>
       <div class="rf-item">
         <label>Vendedor</label>
         <select id="vendedorFilter" onchange="setVendedorFilter(this.value)"></select>
@@ -452,6 +461,8 @@
 
   let filterVendedor = '';
   let filterAdministrativa = '';
+  let filterSearch = '';
+  let filterMonth = '';   // '' hasta que carguen los datos; luego YYYY-MM del mes vigente, o '__all__'
 
   // ═══════ SESSION ═══════
   // Cookie compartida con todas las apps de *.titogonzalez.online (SSO).
@@ -580,6 +591,51 @@
 
   function setVendedorFilter(v) { filterVendedor = v; renderList(); }
   function setAdministrativaFilter(v) { filterAdministrativa = v; renderList(); }
+  function setSearch(v) { filterSearch = v; renderList(); }
+  function setMonthFilter(v) { filterMonth = v; renderList(); }
+
+  // ═══════ BÚSQUEDA + FILTRO DE MES ═══════
+  function rowMesKey(r) {
+    const d = r && r.created_at ? new Date(r.created_at) : null;
+    if (!d || isNaN(d)) return '';
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function rowMesLabel(key) {
+    const [y, m] = key.split('-');
+    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    return meses[parseInt(m, 10) - 1] + ' ' + y;
+  }
+  // Llena el <select> de meses con "Mes actual" por defecto, meses anteriores y "Todos".
+  function buildMonthFilter() {
+    const sel = document.getElementById('monthFilter');
+    if (!sel) return;
+    const now = new Date();
+    const curKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const rows = currentRows();
+    const keys = Array.from(new Set(rows.map(rowMesKey).filter(Boolean)));
+    if (!keys.includes(curKey)) keys.push(curKey);
+    keys.sort().reverse();
+    // Default al mes vigente; si el mes elegido no existe en este tab, volver al vigente.
+    if (!filterMonth) filterMonth = curKey;
+    if (filterMonth !== '__all__' && !keys.includes(filterMonth)) filterMonth = curKey;
+    let opts = '';
+    keys.forEach(k => {
+      const lbl = (k === curKey ? 'Mes actual — ' : '') + rowMesLabel(k);
+      opts += `<option value="${k}"${k === filterMonth ? ' selected' : ''}>${lbl}</option>`;
+    });
+    opts += `<option value="__all__"${filterMonth === '__all__' ? ' selected' : ''}>Todos los meses</option>`;
+    sel.innerHTML = opts;
+  }
+  // Coincidencia de texto: nombre/razón social, documento, y DNI por dígitos.
+  function matchesSearch(r) {
+    const q = (filterSearch || '').toLowerCase().trim();
+    if (!q) return true;
+    const nombre = (r.nombre || (r.datos && (r.datos['Razón social'] || r.datos['Nombre'])) || '').toLowerCase();
+    const doc = (r.documento || (r.datos && (r.datos['Documento'] || r.datos['CUIT'])) || '').toLowerCase();
+    const qDigits = q.replace(/\D/g, '');
+    const docDigits = doc.replace(/\D/g, '');
+    return nombre.includes(q) || doc.includes(q) || (qDigits && docDigits.includes(qDigits));
+  }
 
   function doLogout() { clearSession(); window.location.reload(); }
 
@@ -665,6 +721,7 @@
       rowsCache[tab] = Array.isArray(rows) ? rows : [];
       updateTabCounts();
       updateFilterCounts();
+      buildMonthFilter();
       renderList();
     } catch (e) {
       list.innerHTML = '<div class="error-banner">Error cargando formularios ' + cfg.label + '.</div>';
@@ -682,7 +739,7 @@
       c.classList.toggle('active', c.dataset.filter === 'all'));
     document.getElementById('filters').style.display = tab === 'f01' ? 'none' : '';
     if (!rowsCache[tab]) await loadTab(tab);
-    else { updateFilterCounts(); renderList(); }
+    else { updateFilterCounts(); buildMonthFilter(); renderList(); }
   }
 
   function currentRows() { return rowsCache[currentTab] || []; }
@@ -714,6 +771,8 @@
   function renderList() {
     const list = document.getElementById('rowList');
     let rows = currentRows();
+    if (filterMonth && filterMonth !== '__all__') rows = rows.filter(r => rowMesKey(r) === filterMonth);
+    if (filterSearch) rows = rows.filter(matchesSearch);
     if (filter !== 'all') rows = rows.filter(r => r.estado === filter);
     if (filterVendedor === '__none__') rows = rows.filter(r => !r.vendedor);
     else if (filterVendedor) rows = rows.filter(r => r.vendedor === filterVendedor);

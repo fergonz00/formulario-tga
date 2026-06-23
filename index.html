@@ -352,7 +352,25 @@
   </div>
 
   <!-- ═══════════════════════════════════════ -->
-  <!-- ═══════ PASO 1 COMÚN: DNI + ANÁLISIS IA ═ -->
+  <!-- ═══════ PASO 1 COMÚN: VENDEDOR ═════════ -->
+  <!-- ═══════════════════════════════════════ -->
+  <div class="step" id="common-step-vendedor">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">💼</div> Vendedor</div>
+      <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: #0040C1;">
+        <strong>¿Quién es el vendedor?</strong> Elegí el vendedor asignado a esta operación antes de cargar los datos.
+      </div>
+      <div class="field">
+        <label>Vendedor asignado</label>
+        <select id="commonVendedor">
+          <option value="">— Elegí vendedor —</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- ═══════ PASO 2 COMÚN: DNI + ANÁLISIS IA ═ -->
   <!-- ═══════════════════════════════════════ -->
   <div class="step" id="common-step-dni">
     <div class="section-card">
@@ -857,8 +875,12 @@
         <div style="display:flex;align-items:center;gap:8px"><div class="icon">📋</div> Formularios recibidos</div>
         <button onclick="adminLogout()" style="background:none;border:1px solid var(--vw-new-horizon);border-radius:8px;padding:6px 12px;font-size:12px;font-weight:600;cursor:pointer;color:var(--vw-dark-blue)">Salir</button>
       </div>
-      <div style="margin-bottom:14px">
-        <input type="text" id="adminSearch" placeholder="Buscar por nombre..." oninput="filterFormularios()" style="width:100%;padding:10px 14px;border:1.5px solid var(--vw-new-horizon);border-radius:var(--radius-sm);font-family:inherit;font-size:14px;">
+      <div style="margin-bottom:10px">
+        <input type="text" id="adminSearch" placeholder="Buscar por nombre, apellido o DNI..." oninput="filterFormularios()" style="width:100%;padding:10px 14px;border:1.5px solid var(--vw-new-horizon);border-radius:var(--radius-sm);font-family:inherit;font-size:14px;">
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+        <span style="font-size:12px;font-weight:600;color:#5A6B7F;flex-shrink:0;">📅 Mes:</span>
+        <select id="adminMonthFilter" onchange="filterFormularios()" style="flex:1;padding:8px 12px;border:1.5px solid var(--vw-new-horizon);border-radius:var(--radius-sm);font-family:inherit;font-size:13px;background:white;"></select>
       </div>
       <div id="adminList" style="font-size:13px;">Cargando...</div>
     </div>
@@ -1259,10 +1281,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   let generatedPDFBlob = null;
   const uploadedImages = {};
 
+  // Paso 1 (común) = Vendedor, paso 2 (común) = Foto del DNI, luego los pasos por tipo.
   const stepConfig = {
-    fisica: { prefix: 'pf', steps: 6, labels: ['Foto del DNI','Datos del titular','Domicilios','2º Titular','Operación y cédulas','Resumen'] },
-    juridica: { prefix: 'pj', steps: 5, labels: ['Foto del DNI','Datos de la empresa','Datos del firmante','Operación y cédulas','Resumen'] }
+    fisica: { prefix: 'pf', steps: 7, labels: ['Vendedor','Foto del DNI','Datos del titular','Domicilios','2º Titular','Operación y cédulas','Resumen'] },
+    juridica: { prefix: 'pj', steps: 6, labels: ['Vendedor','Foto del DNI','Datos de la empresa','Datos del firmante','Operación y cédulas','Resumen'] }
   };
+
+  // Lista fija de vendedores (igual que panel.html).
+  const VENDEDORES = [
+    'Antonio Loisi','Daniel López','Gisela Buena','Inés Alonso','Jorge Fazzini',
+    'José Castro','Julián Naddeo','Marta Castro','TG — Ventas de Gerencia'
+  ];
 
   // ═══════ STATE para analisis IA del DNI ═══════
   const dniImages = {};         // { frente: {dataUrl, file, w, h}, dorso: {...} }
@@ -1356,10 +1385,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   function showStep(n) {
     const cfg = stepConfig[formType];
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-    // n=1 es el paso comun de DNI + IA. n>1 se mapea a pf-step{n-1} o pj-step{n-1}.
+    // n=1 = paso comun Vendedor. n=2 = paso comun DNI + IA. n>2 se mapea a pf-step{n-2} o pj-step{n-2}.
     const stepEl = n === 1
-      ? document.getElementById('common-step-dni')
-      : document.getElementById(cfg.prefix + '-step' + (n - 1));
+      ? document.getElementById('common-step-vendedor')
+      : n === 2
+        ? document.getElementById('common-step-dni')
+        : document.getElementById(cfg.prefix + '-step' + (n - 2));
     if (stepEl) stepEl.classList.add('active');
 
     const steps = document.querySelectorAll('.progress-step');
@@ -1386,15 +1417,22 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 
   function nextStep() {
     if (currentStep === 1) {
+      const vsel = document.getElementById('commonVendedor');
+      if (!vsel || !vsel.value) {
+        alert('Elegí el vendedor asignado antes de avanzar.');
+        return;
+      }
+    }
+    if (currentStep === 2) {
       if (!validateDniStep()) {
         document.getElementById('dniError').scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
     }
-    // Step 2+: chequeo de obligatorios visibles en el step actual del tipo activo.
-    if (currentStep >= 2 && formType) {
+    // Step 3+: chequeo de obligatorios visibles en el step actual del tipo activo.
+    if (currentStep >= 3 && formType) {
       const cfg = stepConfig[formType];
-      const stepEl = document.getElementById(cfg.prefix + '-step' + (currentStep - 1));
+      const stepEl = document.getElementById(cfg.prefix + '-step' + (currentStep - 2));
       if (stepEl) {
         // Si esta casado/a, el DNI del conyuge tiene que estar analizado OK antes de avanzar.
         if (formType === 'fisica') {
@@ -2550,6 +2588,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           documento: documento,
           celular: celular,
           email: email,
+          vendedor: (document.getElementById('commonVendedor') || {}).value || null,
           pdf_url: supabasePdfUrl,
           datos: datosObj,
           dni_frente_url: dniFrenteUrlUploaded || null,
@@ -2663,19 +2702,58 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         headers: { 'Content-Type': 'application/json' }
       });
       adminFormularios = await res.json();
-      renderFormularios(adminFormularios);
+      buildMonthFilter();
+      filterFormularios();
     } catch (e) {
       document.getElementById('adminList').innerHTML = '<p style="color:var(--vw-red)">Error cargando formularios</p>';
     }
   }
 
+  // Clave YYYY-MM de un registro (a partir de created_at).
+  function mesKey(f) {
+    const d = f && f.created_at ? new Date(f.created_at) : null;
+    if (!d || isNaN(d)) return '';
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function mesLabel(key) {
+    const [y, m] = key.split('-');
+    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    return meses[parseInt(m, 10) - 1] + ' ' + y;
+  }
+
+  // Llena el <select> de meses: "Mes actual" por defecto, meses anteriores presentes y "Todos".
+  function buildMonthFilter() {
+    const sel = document.getElementById('adminMonthFilter');
+    if (!sel) return;
+    const now = new Date();
+    const curKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const keys = Array.from(new Set(adminFormularios.map(mesKey).filter(Boolean)));
+    if (!keys.includes(curKey)) keys.push(curKey);
+    keys.sort().reverse();
+    let opts = '';
+    keys.forEach(k => {
+      const lbl = (k === curKey ? 'Mes actual — ' : '') + mesLabel(k);
+      opts += '<option value="' + k + '"' + (k === curKey ? ' selected' : '') + '>' + lbl + '</option>';
+    });
+    opts += '<option value="__all__">Todos los meses</option>';
+    sel.innerHTML = opts;
+  }
+
   function filterFormularios() {
-    const q = document.getElementById('adminSearch').value.toLowerCase();
-    const filtered = adminFormularios.filter(f =>
-      (f.nombre || '').toLowerCase().includes(q) ||
-      (f.documento || '').toLowerCase().includes(q) ||
-      (f.tipo || '').toLowerCase().includes(q)
-    );
+    const q = (document.getElementById('adminSearch').value || '').toLowerCase().trim();
+    const qDigits = q.replace(/\D/g, '');
+    const mes = (document.getElementById('adminMonthFilter') || {}).value || '__all__';
+    const filtered = adminFormularios.filter(f => {
+      if (mes !== '__all__' && mesKey(f) !== mes) return false;
+      if (!q) return true;
+      const nombre = (f.nombre || '').toLowerCase();
+      const doc = (f.documento || '').toLowerCase();
+      const docDigits = doc.replace(/\D/g, '');
+      return nombre.includes(q) ||
+        doc.includes(q) ||
+        (f.tipo || '').toLowerCase().includes(q) ||
+        (qDigits && docDigits.includes(qDigits));
+    });
     renderFormularios(filtered);
   }
 
@@ -2691,7 +2769,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--vw-new-horizon-20);">';
       html += '<div>';
       html += '<div style="font-weight:600;font-size:14px;">' + tipoLabel + ' ' + (f.nombre || 'Sin nombre') + '</div>';
-      html += '<div style="font-size:11px;color:#8899AA;">' + fecha + ' — ' + (f.documento || '') + '</div>';
+      const vendTxt = f.vendedor ? ' — 💼 ' + f.vendedor : '';
+      html += '<div style="font-size:11px;color:#8899AA;">' + fecha + ' — ' + (f.documento || '') + vendTxt + '</div>';
       html += '</div>';
       if (f.pdf_url) {
         html += '<a href="' + f.pdf_url + '" target="_blank" style="background:var(--vw-cobalt);color:white;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;flex-shrink:0;">Ver PDF</a>';
@@ -2701,8 +2780,13 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     document.getElementById('adminList').innerHTML = html;
   }
 
-  // Init: mostrar banner de "volves a VWFS" si corresponde
+  // Init: poblar dropdown de vendedores + banner de "volves a VWFS" si corresponde
   (function initEntry() {
+    const vsel = document.getElementById('commonVendedor');
+    if (vsel) {
+      vsel.innerHTML = '<option value="">— Elegí vendedor —</option>' +
+        VENDEDORES.map(v => '<option value="' + v.replace(/"/g, '&quot;') + '">' + v + '</option>').join('');
+    }
     if (returnTarget === 'vwfs') {
       const banner = document.getElementById('returnFromVwfsBanner');
       if (banner) banner.style.display = '';
