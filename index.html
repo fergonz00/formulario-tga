@@ -352,25 +352,7 @@
   </div>
 
   <!-- ═══════════════════════════════════════ -->
-  <!-- ═══════ PASO 1 COMÚN: VENDEDOR ═════════ -->
-  <!-- ═══════════════════════════════════════ -->
-  <div class="step" id="common-step-vendedor">
-    <div class="section-card">
-      <div class="section-title"><div class="icon">💼</div> Vendedor</div>
-      <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: #0040C1;">
-        <strong>¿Quién es el vendedor?</strong> Elegí el vendedor asignado a esta operación antes de cargar los datos.
-      </div>
-      <div class="field">
-        <label>Vendedor asignado</label>
-        <select id="commonVendedor">
-          <option value="">— Elegí vendedor —</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
-  <!-- ═══════════════════════════════════════ -->
-  <!-- ═══════ PASO 2 COMÚN: DNI + ANÁLISIS IA ═ -->
+  <!-- ═══════ PASO 1 COMÚN: DNI + ANÁLISIS IA ═ -->
   <!-- ═══════════════════════════════════════ -->
   <div class="step" id="common-step-dni">
     <div class="section-card">
@@ -1281,17 +1263,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   let generatedPDFBlob = null;
   const uploadedImages = {};
 
-  // Paso 1 (común) = Vendedor, paso 2 (común) = Foto del DNI, luego los pasos por tipo.
+  // Paso 1 (común) = Foto del DNI, luego los pasos por tipo. El vendedor lo asigna
+  // ventas/administración desde el panel — el cliente NO lo elige.
   const stepConfig = {
-    fisica: { prefix: 'pf', steps: 7, labels: ['Vendedor','Foto del DNI','Datos del titular','Domicilios','2º Titular','Operación y cédulas','Resumen'] },
-    juridica: { prefix: 'pj', steps: 6, labels: ['Vendedor','Foto del DNI','Datos de la empresa','Datos del firmante','Operación y cédulas','Resumen'] }
+    fisica: { prefix: 'pf', steps: 6, labels: ['Foto del DNI','Datos del titular','Domicilios','2º Titular','Operación y cédulas','Resumen'] },
+    juridica: { prefix: 'pj', steps: 5, labels: ['Foto del DNI','Datos de la empresa','Datos del firmante','Operación y cédulas','Resumen'] }
   };
-
-  // Lista fija de vendedores (igual que panel.html).
-  const VENDEDORES = [
-    'Antonio Loisi','Daniel López','Gisela Buena','Inés Alonso','Jorge Fazzini',
-    'José Castro','Julián Naddeo','Marta Castro','Tomas Bandiera','TG — Ventas de Gerencia'
-  ];
 
   // ═══════ STATE para analisis IA del DNI ═══════
   const dniImages = {};         // { frente: {dataUrl, file, w, h}, dorso: {...} }
@@ -1385,12 +1362,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   function showStep(n) {
     const cfg = stepConfig[formType];
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-    // n=1 = paso comun Vendedor. n=2 = paso comun DNI + IA. n>2 se mapea a pf-step{n-2} o pj-step{n-2}.
+    // n=1 = paso comun DNI + IA. n>1 se mapea a pf-step{n-1} o pj-step{n-1}.
     const stepEl = n === 1
-      ? document.getElementById('common-step-vendedor')
-      : n === 2
-        ? document.getElementById('common-step-dni')
-        : document.getElementById(cfg.prefix + '-step' + (n - 2));
+      ? document.getElementById('common-step-dni')
+      : document.getElementById(cfg.prefix + '-step' + (n - 1));
     if (stepEl) stepEl.classList.add('active');
 
     const steps = document.querySelectorAll('.progress-step');
@@ -1417,22 +1392,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 
   function nextStep() {
     if (currentStep === 1) {
-      const vsel = document.getElementById('commonVendedor');
-      if (!vsel || !vsel.value) {
-        alert('Elegí el vendedor asignado antes de avanzar.');
-        return;
-      }
-    }
-    if (currentStep === 2) {
       if (!validateDniStep()) {
         document.getElementById('dniError').scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
       }
     }
-    // Step 3+: chequeo de obligatorios visibles en el step actual del tipo activo.
-    if (currentStep >= 3 && formType) {
+    // Step 2+: chequeo de obligatorios visibles en el step actual del tipo activo.
+    if (currentStep >= 2 && formType) {
       const cfg = stepConfig[formType];
-      const stepEl = document.getElementById(cfg.prefix + '-step' + (currentStep - 2));
+      const stepEl = document.getElementById(cfg.prefix + '-step' + (currentStep - 1));
       if (stepEl) {
         // Si esta casado/a, el DNI del conyuge tiene que estar analizado OK antes de avanzar.
         if (formType === 'fisica') {
@@ -2588,7 +2556,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           documento: documento,
           celular: celular,
           email: email,
-          vendedor: (document.getElementById('commonVendedor') || {}).value || null,
+          vendedor: null, // lo asigna ventas/administración desde el panel, no el cliente
           pdf_url: supabasePdfUrl,
           datos: datosObj,
           dni_frente_url: dniFrenteUrlUploaded || null,
@@ -2780,13 +2748,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     document.getElementById('adminList').innerHTML = html;
   }
 
-  // Init: poblar dropdown de vendedores + banner de "volves a VWFS" si corresponde
+  // Init: banner de "volves a VWFS" si corresponde
   (function initEntry() {
-    const vsel = document.getElementById('commonVendedor');
-    if (vsel) {
-      vsel.innerHTML = '<option value="">— Elegí vendedor —</option>' +
-        VENDEDORES.map(v => '<option value="' + v.replace(/"/g, '&quot;') + '">' + v + '</option>').join('');
-    }
     if (returnTarget === 'vwfs') {
       const banner = document.getElementById('returnFromVwfsBanner');
       if (banner) banner.style.display = '';

@@ -355,22 +355,6 @@
     </div>
   </section>
 
-  <!-- ═══════ STEP VENDEDOR (se muestra como paso 2, después del DNI) ═══════ -->
-  <div class="step" id="vwfs-step-vendedor">
-    <div class="section-card">
-      <div class="section-title"><span class="icon">💼</span>Vendedor</div>
-      <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: var(--vw-cobalt);">
-        <strong>¿Quién es el vendedor?</strong> Elegí el vendedor asignado a esta operación.
-      </div>
-      <div class="field">
-        <label>Vendedor asignado</label>
-        <select id="vwfsVendedor">
-          <option value="">— Elegí vendedor —</option>
-        </select>
-      </div>
-    </div>
-  </div>
-
   <!-- ═══════ STEP 1: Foto del DNI + análisis IA ═══════ -->
   <div class="step" id="vwfs-step1">
 
@@ -1095,15 +1079,10 @@
   }
 
   // ═══════ STATE ═══════
-  // Paso 1 = DNI, paso 2 = Vendedor (después del DNI para no romper el salto de "reanudar desde F01"), luego el resto.
-  const TOTAL_STEPS = 7;
-  const STEP_LABELS = ['Foto del DNI', 'Vendedor', 'Identificación', 'Estado civil', 'Laboral e ingresos', 'Vivienda y cotitular', 'Resumen'];
-
-  // Lista fija de vendedores (igual que panel.html / F01).
-  const VENDEDORES = [
-    'Antonio Loisi','Daniel López','Gisela Buena','Inés Alonso','Jorge Fazzini',
-    'José Castro','Julián Naddeo','Marta Castro','Tomas Bandiera','TG — Ventas de Gerencia'
-  ];
+  // Paso 1 = DNI, luego el resto. El vendedor lo asigna ventas/administración desde
+  // el panel — el cliente NO lo elige.
+  const TOTAL_STEPS = 6;
+  const STEP_LABELS = ['Foto del DNI', 'Identificación', 'Estado civil', 'Laboral e ingresos', 'Vivienda y cotitular', 'Resumen'];
   let currentStep = 0;
   const toggleValues = {};
   let generatedPDFBlob = null;
@@ -1903,11 +1882,6 @@
   // ═══════ NAVEGACIÓN ═══════
   function startForm() {
     currentStep = 1;
-    const vsel = document.getElementById('vwfsVendedor');
-    if (vsel && vsel.options.length <= 1) {
-      vsel.innerHTML = '<option value="">— Elegí vendedor —</option>' +
-        VENDEDORES.map(v => '<option value="' + v.replace(/"/g, '&quot;') + '">' + v + '</option>').join('');
-    }
     document.getElementById('entryScreen').style.display = 'none';
     document.getElementById('progressBar').classList.add('visible');
     document.getElementById('navBar').classList.add('visible');
@@ -1923,10 +1897,8 @@
 
   function showStep(n) {
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
-    // n=1 → DNI (vwfs-step1). n=2 → Vendedor. n≥3 → vwfs-step{n-1}.
-    const stepEl = n === 2
-      ? document.getElementById('vwfs-step-vendedor')
-      : document.getElementById('vwfs-step' + (n <= 1 ? n : n - 1));
+    // n → vwfs-step{n} directo (vwfs-step1 = DNI, ... vwfs-step6 = Resumen).
+    const stepEl = document.getElementById('vwfs-step' + n);
     if (stepEl) stepEl.classList.add('active');
 
     const steps = document.querySelectorAll('.progress-step');
@@ -1958,16 +1930,9 @@
         return;
       }
     }
-    if (currentStep === 2) {
-      const vsel = document.getElementById('vwfsVendedor');
-      if (!vsel || !vsel.value) {
-        alert('Elegí el vendedor asignado antes de avanzar.');
-        return;
-      }
-    }
-    // De step 3 en adelante (pasos del tipo), chequeamos campos obligatorios visibles.
-    if (currentStep >= 3) {
-      const stepEl = document.getElementById('vwfs-step' + (currentStep - 1));
+    // De step 2 en adelante chequeamos campos obligatorios visibles.
+    if (currentStep >= 2) {
+      const stepEl = document.getElementById('vwfs-step' + currentStep);
       if (stepEl) {
         const missing = findMissingFields(stepEl);
         if (missing.length) {
@@ -1976,7 +1941,7 @@
         }
       }
     }
-    if (currentStep === 3) {
+    if (currentStep === 2) {
       if (!validateBcoFrances()) {
         document.getElementById('bcoError').scrollIntoView({ behavior: 'smooth', block: 'center' });
         return;
@@ -2349,7 +2314,7 @@
         documento: g('tipoDoc') + ' ' + g('nroDoc'),
         email: g('email'),
         celular: g('celular'),
-        vendedor: (document.getElementById('vwfsVendedor') || {}).value || null,
+        vendedor: (editingRecord && editingRecord.vendedor) || null, // lo asigna el panel, no el cliente; en edición se conserva
         pdf_url: supabasePdfUrl,
         datos: datosObj,
         dni_frente_url: dniFrenteUrlUploaded || null,
@@ -2657,9 +2622,6 @@
     const ok = await loadEditRecord(editingId);
     if (ok) {
       startForm();
-      // Prefijar vendedor si el registro ya lo tenía (el select se pobló en startForm).
-      const vsel = document.getElementById('vwfsVendedor');
-      if (vsel && editingRecord && editingRecord.vendedor) vsel.value = editingRecord.vendedor;
     }
   })();
 </script>
