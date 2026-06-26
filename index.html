@@ -444,7 +444,7 @@
     <div class="section-card">
       <div class="section-title"><div class="icon">🎂</div> Info personal</div>
       <div class="row row-2">
-        <div class="field"><label>Fecha de nacimiento</label><input type="date" id="pf-fechaNac"></div>
+        <div class="field"><label>Fecha de nacimiento</label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pf-fechaNac"></div>
         <div class="field"><label>Lugar de nacimiento</label><input type="text" id="pf-lugarNac" placeholder="Bs. As."></div>
       </div>
       <div class="row row-2">
@@ -596,7 +596,7 @@
         <div class="field"><label>Celular</label><input type="tel" id="pf-t2celular"></div>
         <div class="field"><label>E-mail</label><input type="email" id="pf-t2email"></div>
         <div class="row row-2">
-          <div class="field"><label>Fecha nac.</label><input type="date" id="pf-t2fechaNac"></div>
+          <div class="field"><label>Fecha nac.</label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pf-t2fechaNac"></div>
           <div class="field"><label>Lugar nac.</label><input type="text" id="pf-t2lugarNac"></div>
         </div>
         <div class="row row-2">
@@ -694,7 +694,7 @@
       <div class="field"><label>Personería otorgada por</label><input type="text" id="pj-personeria" placeholder="Organismo que aprobó la inscripción"></div>
       <div class="row row-2">
         <div class="field"><label>Nº inscripción</label><input type="text" id="pj-nroInsc"></div>
-        <div class="field"><label>Fecha inscripción</label><input type="date" id="pj-fechaInsc"></div>
+        <div class="field"><label>Fecha inscripción</label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pj-fechaInsc"></div>
       </div>
     </div>
     <div class="section-card">
@@ -732,7 +732,7 @@
         <select id="pj-firmSexo"><option value="">Seleccionar</option><option>Masculino</option><option>Femenino</option><option>X</option></select>
       </div>
       <div class="row row-2">
-        <div class="field"><label>Fecha nac.</label><input type="date" id="pj-firmFechaNac"></div>
+        <div class="field"><label>Fecha nac.</label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pj-firmFechaNac"></div>
         <div class="field"><label>Lugar nac.</label><input type="text" id="pj-firmLugarNac"></div>
       </div>
       <div class="row row-2">
@@ -1419,6 +1419,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           alert('Completá estos campos antes de avanzar:\n\n• ' + missing.join('\n• '));
           return;
         }
+        const badDates = findInvalidDates(stepEl);
+        if (badDates.length) {
+          alert('Revisá estas fechas, tienen que ser DD/MM/AAAA completo:\n\n• ' + badDates.join('\n• '));
+          return;
+        }
       }
     }
     if (currentStep === totalSteps) { generatePDF(); return; }
@@ -1903,7 +1908,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         if (m) {
           const d = m[1].padStart(2, '0'), mo = m[2].padStart(2, '0');
           const y = m[3].length === 2 ? ('19' + m[3]) : m[3];
-          setIf('pf-fechaNac', y + '-' + mo + '-' + d);
+          setIf('pf-fechaNac', d + '/' + mo + '/' + y);
         }
       }
       if (ext.nacionalidad) setIf('pf-nacionalidad', ext.nacionalidad);
@@ -2200,13 +2205,61 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   // Helper
   function g(id) { const el = document.getElementById(id); return el ? (el.value || '') : ''; }
 
+  // ─── Fechas en formato argentino DD/MM/AAAA ───
+  // Internamente seguimos guardando ISO (AAAA-MM-DD) para no romper el matcheo
+  // F01↔VWFS, el panel ni el PDF. Estos helpers convierten entre ambos.
+  function ddmmToIso(s) {
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((s || '').trim());
+    if (!m) return '';
+    return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  }
+  function isoToDdmm(s) {
+    s = (s || '').toString().trim();
+    let m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+    if (m) return m[3].padStart(2, '0') + '/' + m[2].padStart(2, '0') + '/' + m[1];
+    m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+    if (m) return m[1].padStart(2, '0') + '/' + m[2].padStart(2, '0') + '/' + m[3];
+    return s;
+  }
+  // Lee un campo DD/MM/AAAA y lo devuelve en ISO para guardar.
+  function gDate(id) { return ddmmToIso(g(id)); }
+  // Auto-formato mientras tipean: solo dígitos, inserta las barras.
+  function maskDateInput(el) {
+    let v = el.value.replace(/\D/g, '').slice(0, 8);
+    if (v.length >= 5) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+    else if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+    el.value = v;
+  }
+  function initDateMasks() {
+    document.querySelectorAll('input.date-ar').forEach(function(el) {
+      el.addEventListener('input', function() { maskDateInput(el); });
+    });
+  }
+  // Devuelve labels de campos de fecha con valor incompleto/invalido dentro de un step.
+  function findInvalidDates(stepEl) {
+    const bad = [];
+    stepEl.querySelectorAll('input.date-ar').forEach(function(el) {
+      const cond = el.closest('.conditional');
+      if (cond && !cond.classList.contains('show')) return;
+      if (el.offsetParent === null) return;
+      const v = (el.value || '').trim();
+      if (v && !ddmmToIso(v)) {
+        const lbl = el.closest('.field') && el.closest('.field').querySelector('label');
+        bad.push(lbl ? lbl.textContent.trim() : 'Fecha');
+      }
+    });
+    return bad;
+  }
+
   // Build summary
   function buildSummary() {
     const items = formType === 'fisica' ? getPFData() : getPJData();
     const target = formType === 'fisica' ? 'pf-summaryContent' : 'pj-summaryContent';
     const html = items.filter(([,v]) => v && v.trim()).map(([l,v]) => {
-      if (l.startsWith('—')) return '<div class="summary-item" style="background:var(--vw-new-horizon-20);margin:4px -4px;padding:6px 8px;border-radius:6px;font-weight:700"><span>'+l.replace(/—/g,'').trim()+'</span><span class="summary-value">'+v+'</span></div>';
-      return '<div class="summary-item"><span class="summary-label">'+l+'</span><span class="summary-value">'+v+'</span></div>';
+      // Mostrar las fechas (guardadas en ISO) como DD/MM/AAAA en el resumen.
+      const disp = /Fecha/i.test(l) ? isoToDdmm(v) : v;
+      if (l.startsWith('—')) return '<div class="summary-item" style="background:var(--vw-new-horizon-20);margin:4px -4px;padding:6px 8px;border-radius:6px;font-weight:700"><span>'+l.replace(/—/g,'').trim()+'</span><span class="summary-value">'+disp+'</span></div>';
+      return '<div class="summary-item"><span class="summary-label">'+l+'</span><span class="summary-value">'+disp+'</span></div>';
     }).join('');
     document.getElementById(target).innerHTML = html || '<p style="color:#8899AA;font-size:13px">No se completaron datos.</p>';
   }
@@ -2217,7 +2270,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       ['CUIL', g('pf-cuil')], ['Sexo', g('pf-sexo')],
       ['Nacionalidad', g('pf-nacionalidad')], ['Celular', g('pf-celular')],
       ['E-mail', g('pf-email')], ['Tel. fijo', g('pf-telFijo')],
-      ['Fecha nac.', g('pf-fechaNac')], ['Lugar nac.', g('pf-lugarNac')],
+      ['Fecha nac.', gDate('pf-fechaNac')], ['Lugar nac.', g('pf-lugarNac')],
       ['Estado civil', g('pf-estadoCivil')], ['Ocupación', g('pf-ocupacion')],
       ['% Titularidad', g('pf-porcTit')],
       ['— DOM. DNI —',''], ['Dirección', [g('pf-dniCalle'),g('pf-dniNro')].filter(Boolean).join(' ')],
@@ -2244,7 +2297,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     return [
       ['Razón social', g('pj-razonSocial')], ['CUIT', g('pj-cuit')], ['Actividad', g('pj-actividad')],
       ['Celular', g('pj-celular')], ['E-mail', g('pj-email')],
-      ['Personería', g('pj-personeria')], ['Nº inscr.', g('pj-nroInsc')], ['Fecha inscr.', g('pj-fechaInsc')],
+      ['Personería', g('pj-personeria')], ['Nº inscr.', g('pj-nroInsc')], ['Fecha inscr.', gDate('pj-fechaInsc')],
       ['— DOMICILIO ESTATUTO —',''],
       ['Dirección', [g('pj-calle'),g('pj-nro')].filter(Boolean).join(' ')],
       ['Localidad', g('pj-localidad')], ['Provincia', g('pj-provincia')], ['CP', g('pj-cp')],
@@ -2310,10 +2363,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       }
       if (!label && !value) { y += 2; return; }
       if (label && value) {
+        // Las fechas se guardan en ISO; en el PDF las mostramos como DD/MM/AAAA.
+        const dispVal = /Fecha/i.test(label) ? isoToDdmm(value) : value;
         doc.setFontSize(8.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 110, 120);
         doc.text(label + ':', margin, y);
         doc.setFont('helvetica', 'bold'); doc.setTextColor(0, 30, 80);
-        doc.text(value.substring(0, 50), margin + 48, y);
+        doc.text(dispVal.substring(0, 50), margin + 48, y);
         y += 5.5;
       }
     });
@@ -2748,8 +2803,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     document.getElementById('adminList').innerHTML = html;
   }
 
-  // Init: banner de "volves a VWFS" si corresponde
+  // Init: máscara de fechas DD/MM/AAAA + banner de "volves a VWFS" si corresponde
   (function initEntry() {
+    initDateMasks();
     if (returnTarget === 'vwfs') {
       const banner = document.getElementById('returnFromVwfsBanner');
       if (banner) banner.style.display = '';

@@ -338,7 +338,7 @@
       </div>
       <div class="field">
         <label>Fecha de nacimiento</label>
-        <input type="date" id="entry-fechaNac">
+        <input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="entry-fechaNac">
       </div>
 
       <button class="btn btn-primary btn-block" onclick="tryPreload()">Buscar mis datos</button>
@@ -463,7 +463,7 @@
       <div class="row row-2">
         <div class="field">
           <label>Fecha de nacimiento</label>
-          <input type="date" id="fechaNac">
+          <input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="fechaNac">
         </div>
         <div class="field">
           <label>Nacionalidad</label>
@@ -766,7 +766,7 @@
 
       <div class="field">
         <label>Fecha de nacimiento</label>
-        <input type="date" id="cony-fechaNac">
+        <input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="cony-fechaNac">
       </div>
     </div>
 
@@ -993,7 +993,7 @@
 
         <div class="field">
           <label>Fecha de nacimiento</label>
-          <input type="date" id="cotit-fechaNac">
+          <input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="cotit-fechaNac">
         </div>
 
         <div class="row row-2">
@@ -1105,6 +1105,50 @@
 
   // ═══════ HELPERS ═══════
   function g(id) { const el = document.getElementById(id); return el ? (el.value || '') : ''; }
+
+  // ─── Fechas en formato argentino DD/MM/AAAA ───
+  // Internamente seguimos guardando ISO (AAAA-MM-DD) para no romper el matcheo
+  // F01↔VWFS, el panel ni el PDF. Estos helpers convierten entre ambos.
+  function ddmmToIso(s) {
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((s || '').trim());
+    if (!m) return '';
+    return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  }
+  function isoToDdmm(s) {
+    s = (s || '').toString().trim();
+    let m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+    if (m) return m[3].padStart(2, '0') + '/' + m[2].padStart(2, '0') + '/' + m[1];
+    m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+    if (m) return m[1].padStart(2, '0') + '/' + m[2].padStart(2, '0') + '/' + m[3];
+    return s;
+  }
+  // Lee un campo DD/MM/AAAA y lo devuelve en ISO para guardar/comparar.
+  function gDate(id) { return ddmmToIso(g(id)); }
+  function maskDateInput(el) {
+    let v = el.value.replace(/\D/g, '').slice(0, 8);
+    if (v.length >= 5) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+    else if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+    el.value = v;
+  }
+  function initDateMasks() {
+    document.querySelectorAll('input.date-ar').forEach(function(el) {
+      el.addEventListener('input', function() { maskDateInput(el); });
+    });
+  }
+  function findInvalidDates(stepEl) {
+    const bad = [];
+    stepEl.querySelectorAll('input.date-ar').forEach(function(el) {
+      const cond = el.closest('.conditional');
+      if (cond && !cond.classList.contains('show')) return;
+      if (el.offsetParent === null) return;
+      const v = (el.value || '').trim();
+      if (v && !ddmmToIso(v)) {
+        const lbl = el.closest('.field') && el.closest('.field').querySelector('label');
+        bad.push(lbl ? lbl.textContent.trim() : 'Fecha');
+      }
+    });
+    return bad;
+  }
 
   function fmtARS(v) {
     if (v == null || v === '') return '';
@@ -1568,7 +1612,7 @@
         const d = m[1].padStart(2, '0');
         const mo = m[2].padStart(2, '0');
         const y = m[3].length === 2 ? ('19' + m[3]) : m[3];
-        setField('fechaNac', y + '-' + mo + '-' + d);
+        setField('fechaNac', d + '/' + mo + '/' + y);
       }
     }
     setAlways('nacionalidad', ext.nacionalidad);
@@ -1673,11 +1717,18 @@
     const tipoDoc = g('entry-tipoDoc');
     const nroDoc = g('entry-nroDoc').trim();
     const fechaNac = g('entry-fechaNac');
+    const fechaNacIso = ddmmToIso(fechaNac);
     const statusEl = document.getElementById('entryStatus');
 
     if (!nroDoc || !fechaNac) {
       statusEl.className = 'info-callout err';
       statusEl.textContent = 'Completá número de documento y fecha de nacimiento.';
+      statusEl.style.display = '';
+      return;
+    }
+    if (!fechaNacIso) {
+      statusEl.className = 'info-callout err';
+      statusEl.textContent = 'La fecha de nacimiento tiene que ser DD/MM/AAAA completo.';
       statusEl.style.display = '';
       return;
     }
@@ -1694,7 +1745,9 @@
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const rows = await res.json();
 
-      const match = rows.find(r => r.datos && r.datos['Fecha nac.'] === fechaNac);
+      // Comparación tolerante: normalizamos ambos lados a DD/MM/AAAA (los F01 guardan ISO).
+      const match = rows.find(r => r.datos && r.datos['Fecha nac.'] &&
+        isoToDdmm(r.datos['Fecha nac.']) === isoToDdmm(fechaNac));
 
       if (!match) {
         // Nuevo modelo: sin F01 no se puede avanzar. Redirigimos a F01.
@@ -1788,7 +1841,7 @@
 
     setToggle('sexo', d['Sexo']);
     setField('nacionalidad', d['Nacionalidad'] || 'Argentina');
-    setField('fechaNac', d['Fecha nac.']);
+    setField('fechaNac', isoToDdmm(d['Fecha nac.']));
     setField('email', d['E-mail'] || row.email || '');
     setField('celular', d['Celular'] || row.celular || '');
     setField('telFijo', d['Tel. fijo']);
@@ -1857,7 +1910,7 @@
           if (m) {
             const dd = m[1].padStart(2, '0'), mo = m[2].padStart(2, '0');
             const y = m[3].length === 2 ? ('19' + m[3]) : m[3];
-            setField('cony-fechaNac', y + '-' + mo + '-' + dd);
+            setField('cony-fechaNac', dd + '/' + mo + '/' + y);
           }
         }
         if (ext.nacionalidad) setField('cony-nacionalidad', ext.nacionalidad);
@@ -1939,6 +1992,11 @@
           alert('Completá estos campos antes de avanzar:\n\n• ' + missing.join('\n• '));
           return;
         }
+        const badDates = findInvalidDates(stepEl);
+        if (badDates.length) {
+          alert('Revisá estas fechas, tienen que ser DD/MM/AAAA completo:\n\n• ' + badDates.join('\n• '));
+          return;
+        }
       }
     }
     if (currentStep === 2) {
@@ -2010,7 +2068,7 @@
 
       ['— DATOS PERSONALES —', ''],
       ['Sexo', toggleValues['sexo'] || ''],
-      ['Fecha nac.', g('fechaNac')],
+      ['Fecha nac.', gDate('fechaNac')],
       ['Nacionalidad', g('nacionalidad')],
       ['Estudios', g('estudios')],
       ['PEP', toggleValues['pep'] || 'No'],
@@ -2054,7 +2112,7 @@
         ['Apellido', g('cony-apellido')],
         ['Nombre', g('cony-nombre')],
         ['Sexo', toggleValues['cony-sexo'] || ''],
-        ['Fecha nac.', g('cony-fechaNac')],
+        ['Fecha nac.', gDate('cony-fechaNac')],
         ['Nacionalidad', g('cony-nacionalidad')],
       );
     }
@@ -2106,7 +2164,7 @@
         ['Apellido', g('cotit-apellido')],
         ['Nombre', g('cotit-nombre')],
         ['Sexo', toggleValues['cotit-sexo'] || ''],
-        ['Fecha nac.', g('cotit-fechaNac')],
+        ['Fecha nac.', gDate('cotit-fechaNac')],
         ['Ingresos fijos', fmtARS(g('cotit-ingFijos'))],
         ['Ingresos variables', fmtARS(g('cotit-ingVar'))],
       );
@@ -2133,7 +2191,9 @@
       if (label.startsWith('—')) {
         html += '<div class="summary-sep">' + label.replace(/—/g, '').trim() + '</div>';
       } else if (value) {
-        html += '<div class="summary-item"><span class="lbl">' + label + '</span><span class="val">' + value + '</span></div>';
+        // Las fechas se guardan en ISO; en el resumen las mostramos como DD/MM/AAAA.
+        const disp = /Fecha/i.test(label) ? isoToDdmm(value) : value;
+        html += '<div class="summary-item"><span class="lbl">' + label + '</span><span class="val">' + disp + '</span></div>';
       }
     }
     c.innerHTML = html || '<p style="color:#8899AA; font-size:13px;">Sin datos cargados aún.</p>';
@@ -2178,12 +2238,14 @@
         doc.setFontSize(10);
         doc.setTextColor(0, 30, 80);
       } else if (value) {
+        // Las fechas se guardan en ISO; en el PDF las mostramos como DD/MM/AAAA.
+        const dispVal = /Fecha/i.test(label) ? isoToDdmm(value) : value;
         doc.setFont('helvetica', 'bold');
         doc.setTextColor(90, 107, 127);
         doc.text(label + ':', margin, y);
         doc.setFont('helvetica', 'normal');
         doc.setTextColor(0, 30, 80);
-        const valueLines = doc.splitTextToSize(String(value), pageW - margin * 2 - 50);
+        const valueLines = doc.splitTextToSize(String(dispVal), pageW - margin * 2 - 50);
         doc.text(valueLines, margin + 48, y);
         y += 5 * Math.max(1, valueLines.length);
       }
@@ -2447,7 +2509,7 @@
     set('apellido', d['Apellido']);
     set('nombre',   d['Nombre']);
     setToggle('sexo', d['Sexo']);
-    set('fechaNac',    d['Fecha nac.']);
+    set('fechaNac',    isoToDdmm(d['Fecha nac.']));
     set('nacionalidad', d['Nacionalidad']);
     if (d['Estudios']) { const es = document.getElementById('estudios'); es.value = d['Estudios']; es.classList.add('prefilled'); }
     setToggle('pep', d['PEP'] || 'No');
@@ -2505,7 +2567,7 @@
     set('cony-apellido',      d['Apellido (2)']);
     set('cony-nombre',        d['Nombre (2)']);
     setToggle('cony-sexo',    d['Sexo (2)']);
-    set('cony-fechaNac',      d['Fecha nac. (2)']);
+    set('cony-fechaNac',      isoToDdmm(d['Fecha nac. (2)']));
     set('cony-nacionalidad',  d['Nacionalidad (2)']);
 
     // Laboral
@@ -2548,7 +2610,7 @@
       set('cotit-apellido', d['Apellido (3)']);
       set('cotit-nombre',   d['Nombre (3)']);
       setToggle('cotit-sexo', d['Sexo (3)']);
-      set('cotit-fechaNac', d['Fecha nac. (3)']);
+      set('cotit-fechaNac', isoToDdmm(d['Fecha nac. (3)']));
     }
 
   }
@@ -2603,6 +2665,9 @@
       return false;
     }
   }
+
+  // Máscara DD/MM/AAAA en todos los campos de fecha (incluye el de la pantalla inicial).
+  initDateMasks();
 
   // Init edit mode
   (async function initEditMode() {
