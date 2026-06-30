@@ -2343,7 +2343,10 @@
       const blob = doc.output('blob');
       const nombre = clientName || 'Sin nombre';
       const timestamp = Date.now();
-      const safe = nombre.replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9 ]/g, '').trim().replace(/\s+/g, '_');
+      // Supabase Storage rechaza (HTTP 400) nombres con caracteres no-ASCII; los
+      // nombres con tilde/ñ rompían la subida. Sacamos acentos para la clave del
+      // archivo (el nombre real con acentos se guarda igual en el registro).
+      const safe = nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
       const fileName = 'VWFS_' + safe + '_' + timestamp + '.pdf';
 
       const uploadRes = await supaFetch('/storage/v1/object/formularios-vwfs/' + fileName, {
@@ -2439,7 +2442,7 @@
 
   function downloadPDFLocal() {
     if (!generatedPDFBlob) return;
-    const name = (g('apellido') + '_' + g('nombre')).replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9 _]/g, '').trim() || 'Cliente';
+    const name = (g('apellido') + '_' + g('nombre')).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 _]/g, '').trim() || 'Cliente';
     const fileName = 'VWFS_' + name + '.pdf';
     const url = URL.createObjectURL(generatedPDFBlob);
     const a = document.createElement('a');

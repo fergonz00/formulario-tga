@@ -2567,7 +2567,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const nombre = clientName || 'Sin nombre';
       const tipo = formType === 'fisica' ? 'PF' : 'PJ';
       const timestamp = Date.now();
-      const safe = nombre.replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9 ]/g, '').trim().replace(/\s+/g, '_');
+      // OJO: Supabase Storage rechaza (HTTP 400) cualquier nombre de archivo con
+      // caracteres no-ASCII. Los nombres con tilde/ñ (MARÍA, NÚÑEZ…) rompían la
+      // subida. Sacamos los acentos SOLO para la clave del archivo (el nombre real
+      // con acentos se guarda igual en el registro y en datos).
+      const safe = nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
       const fileName = 'F01_' + tipo + '_' + safe + '_' + timestamp + '.pdf';
 
       // 1. Upload PDF to Storage
@@ -2665,7 +2669,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   function downloadPDFLocal() {
     if (!generatedPDFBlob) return;
     const name = formType === 'fisica' ? g('pf-nombre') : g('pj-razonSocial');
-    const safe = (name || 'Cliente').replace(/[^a-zA-ZáéíóúñÁÉÍÓÚÑ0-9 ]/g, '').trim().replace(/\s+/g, '_');
+    const safe = (name || 'Cliente').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
     const tipo = formType === 'fisica' ? 'PF' : 'PJ';
     const fileName = 'F01_' + tipo + '_' + safe + '.pdf';
     const url = URL.createObjectURL(generatedPDFBlob);
