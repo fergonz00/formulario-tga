@@ -160,7 +160,7 @@
     background: white; border-radius: var(--radius);
     box-shadow: var(--shadow-sm);
   }
-  .action-bar button { border: none; cursor: pointer; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; }
+  .action-bar button, .action-bar a.btn-action { border: none; cursor: pointer; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; }
   .action-bar .btn-action { background: #F0F2F5; color: #1F2937; }
   .action-bar .btn-action:hover { background: #E0E5EB; }
 
@@ -356,6 +356,7 @@
     <div class="action-bar">
       <button class="btn-action" type="button" onclick="copyFormLink()">📋 Copiar link p/ cliente</button>
       <button class="btn-action" type="button" onclick="openPublicForm()">🔗 Ir al formulario</button>
+      <a class="btn-action" href="documentacion-entrega-usado.pdf" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;line-height:1;">📄 Doc. entrega usado</a>
       <button class="btn btn-danger" type="button" id="btnBulkDelete" onclick="bulkDelete()" style="display:none;">🗑 Borrar seleccionados (0)</button>
     </div>
 
