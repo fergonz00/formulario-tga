@@ -83,6 +83,9 @@
   }
   tbody td:first-child { text-align: left; font-weight: 800; color: var(--vw-cobalt); }
   tbody tr:last-child td { border-bottom: 0; }
+  tbody tr.hl td { background: rgba(255,140,0,0.09); }
+  tbody tr.hl td:first-child { color: #C25E00; }
+  .sub { font-size: 10px; font-weight: 600; color: #5A6B7F; text-transform: none; letter-spacing: 0; margin-top: 2px; }
   .interes { font-weight: 800; font-size: 15px; color: var(--vw-dark-blue); }
   .cuota { font-weight: 700; color: var(--vw-dark-blue); }
   .total { color: #5A6B7F; font-size: 13px; }
@@ -134,7 +137,7 @@
         <input id="monto" type="text" inputmode="numeric" placeholder="0" autocomplete="off" aria-label="Monto del gasto en pesos">
       </div>
       <p class="note">Ingresá el monto del gasto (sellos, patentamiento, formularios, impuestos, etc.).
-        La tabla muestra <b>cuánto cobrarle al cliente</b> en cada plan de cuotas.</p>
+        La tabla muestra <b>cuánto cobrarle al cliente</b> en cada plan.</p>
     </div>
 
     <div class="card">
@@ -144,8 +147,11 @@
         </thead>
         <tbody id="tabla"></tbody>
       </table>
-      <p class="note">El <b>Interés</b> es lo que el cliente paga por sobre el monto (ya incluye el <b>2,5% que cobramos</b>).
-        Ingresá el monto para ver la cuota y el total. Tasas MP actualizadas al 22/06.</p>
+      <p class="note">El <b>Interés</b> es lo que el cliente paga por sobre el monto. Ya incluye el
+        <b>arancel de la tarjeta (2,2% + IVA)</b> y el costo financiero de las cuotas, todo sobre el total.
+        Tasas MP actualizadas al 22/06.</p>
+      <p class="note"><b>Tarjeta MP:</b> si el cliente paga con la Tarjeta de Crédito Mercado Pago por QR,
+        hace <b>3 cuotas sin interés</b> y te cuesta lo mismo que 1 pago (solo el arancel).</p>
     </div>
 
     <p class="sec">Tarjetas que se aceptan</p>
@@ -177,7 +183,8 @@
         <div class="acbody">
           <ul>
             <li>Esta herramienta es <b>solo para gastos</b>, no para la unidad.</li>
-            <li>El <b>2,5% adicional</b> (sobre el monto sin interés) ya está incluido en los totales.</li>
+            <li>El interés ya incluye el <b>arancel (2,2% + IVA)</b> y el costo financiero de las cuotas.</li>
+            <li>La opción más barata en cuotas es la <b>Tarjeta MP (3 sin interés)</b>: te cuesta igual que 1 pago.</li>
             <li>Vigencia del acuerdo <b>indeterminada</b>: los costos quedan fijos hasta nueva baja de MP.</li>
           </ul>
         </div>
@@ -188,17 +195,21 @@
   </div>
 
 <script>
-  // Coef. c/IVA (Excel MP, baja de costos 22/06, liberación 4 días) + adicional 2,5% SOBRE EL MONTO base.
-  // El adicional se SUMA al coeficiente (no se multiplica). Para actualizar tasas: editar solo "coefIva".
-  var ADICIONAL = 0.025;
+  // Método exacto: coef = 1 / (1 - (costo_financiero + ARANCEL) * IVA)
+  // El arancel y el costo financiero se descuentan JUNTOS sobre el total → van adentro del coeficiente.
+  // ARANCEL con colchón (real MP 1,8%, acá 2,2%). Para actualizar tasas: editar "cf" (costo financiero 4 días).
+  var ARANCEL = 0.022;  // arancel sin IVA
+  var IVA = 1.21;
   var PLANES = [
-    { c:2,  coefIva:1.046 },
-    { c:3,  coefIva:1.066 },
-    { c:6,  coefIva:1.121 },
-    { c:9,  coefIva:1.186 },
-    { c:12, coefIva:1.244 },
-    { c:18, coefIva:1.367 },
-    { c:24, coefIva:1.496 }
+    { label:'1 pago',     n:1,  cf:0,      hl:false, mp:false },
+    { label:'Tarjeta MP', n:3,  cf:0,      hl:true,  mp:true  },
+    { label:'2 cuotas',   n:2,  cf:0.0365, hl:false, mp:false },
+    { label:'3 cuotas',   n:3,  cf:0.0515, hl:false, mp:false },
+    { label:'6 cuotas',   n:6,  cf:0.0890, hl:false, mp:false },
+    { label:'9 cuotas',   n:9,  cf:0.1295, hl:false, mp:false },
+    { label:'12 cuotas',  n:12, cf:0.1620, hl:false, mp:false },
+    { label:'18 cuotas',  n:18, cf:0.2220, hl:false, mp:false },
+    { label:'24 cuotas',  n:24, cf:0.2740, hl:false, mp:false }
   ];
 
   var input = document.getElementById('monto');
@@ -211,15 +222,16 @@
     var base = parseMonto();
     var html = '';
     PLANES.forEach(function(p){
-      var coef = p.coefIva + ADICIONAL;
+      var coef = 1 / (1 - (p.cf + ARANCEL) * IVA);
       var interes = pct((coef - 1) * 100);
       var cuotaTxt = '—', totalTxt = '—';
       if(base){
         var total = base * coef;
-        cuotaTxt = '$'+fmt(total / p.c);
+        cuotaTxt = '$'+fmt(total / p.n);
         totalTxt = '$'+fmt(total);
       }
-      html += '<tr><td>'+p.c+' cuotas</td>'
+      var labelHtml = p.label + (p.mp ? '<div class="sub">3 cuotas sin interés</div>' : '');
+      html += '<tr'+(p.hl ? ' class="hl"' : '')+'><td>'+labelHtml+'</td>'
         + '<td class="interes">'+interes+'</td>'
         + '<td class="cuota">'+cuotaTxt+'</td>'
         + '<td class="total">'+totalTxt+'</td></tr>';
