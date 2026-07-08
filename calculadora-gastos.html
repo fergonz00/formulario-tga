@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calculadora de Gastos — Tito González Automotores</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+  :root {
+    --vw-dark-blue: #001E50;
+    --vw-cobalt: #0040C1;
+    --vw-new-horizon: #DAE4ED;
+    --vw-new-horizon-20: #F2F5F8;
+    --vw-amber: #FF8C00;
+    --vw-green: #00873C;
+    --shadow-sm: 0 1px 3px rgba(0,30,80,0.08);
+    --shadow-md: 0 4px 12px rgba(0,30,80,0.1);
+    --radius: 14px;
+    --radius-sm: 10px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Plus Jakarta Sans', sans-serif;
+    background: var(--vw-new-horizon-20);
+    color: var(--vw-dark-blue);
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .header {
+    background: var(--vw-dark-blue); color: white;
+    padding: 16px 20px; display: flex; justify-content: space-between; align-items: center;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .header h1 { font-size: 16px; font-weight: 700; }
+  .header a.back {
+    background: transparent; border: 1px solid rgba(255,255,255,0.3); color: white;
+    padding: 6px 12px; border-radius: 18px; font-size: 12px; text-decoration: none;
+    display: inline-flex; align-items: center; gap: 6px;
+  }
+
+  .container { padding: 16px; max-width: 560px; margin: 0 auto; }
+
+  .card {
+    background: white; border-radius: var(--radius);
+    padding: 18px; margin-bottom: 12px; box-shadow: var(--shadow-sm);
+  }
+
+  .badge {
+    display: inline-block; background: var(--vw-amber); color: white;
+    font-weight: 800; font-size: 11px; padding: 5px 11px; border-radius: 999px;
+    letter-spacing: 0.5px; margin-bottom: 14px;
+  }
+  h2.title { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+  .subtitle { font-size: 13px; color: #5A6B7F; }
+
+  label { display: block; font-size: 12px; font-weight: 700; color: #5A6B7F;
+    margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.4px; }
+  .inputbox {
+    display: flex; align-items: center; border: 2px solid var(--vw-new-horizon);
+    border-radius: var(--radius-sm); padding: 0 14px; background: white; transition: border-color .15s;
+  }
+  .inputbox:focus-within { border-color: var(--vw-cobalt); box-shadow: 0 0 0 3px rgba(0,64,193,0.1); }
+  .inputbox span { font-size: 26px; font-weight: 800; color: #9AA7B8; }
+  input {
+    border: 0; outline: 0; background: transparent; font-size: 30px; font-weight: 800;
+    padding: 13px 8px; width: 100%; color: var(--vw-dark-blue); min-width: 0;
+    font-family: inherit;
+  }
+  .note { font-size: 12px; color: #5A6B7F; margin-top: 14px; line-height: 1.55; }
+  .note b { color: var(--vw-dark-blue); }
+
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: #5A6B7F;
+    text-align: right; padding: 9px 6px; border-bottom: 2px solid var(--vw-new-horizon);
+  }
+  thead th:first-child { text-align: left; }
+  tbody td {
+    padding: 12px 6px; text-align: right; border-bottom: 1px solid var(--vw-new-horizon-20);
+    font-variant-numeric: tabular-nums;
+  }
+  tbody td:first-child { text-align: left; font-weight: 800; color: var(--vw-cobalt); }
+  tbody tr:last-child td { border-bottom: 0; }
+  .interes { font-weight: 800; font-size: 15px; color: var(--vw-dark-blue); }
+  .cuota { font-weight: 700; color: var(--vw-dark-blue); }
+  .total { color: #5A6B7F; font-size: 13px; }
+
+  .sec { font-size: 11px; text-transform: uppercase; letter-spacing: 0.6px; color: #5A6B7F;
+    margin: 6px 4px 8px; font-weight: 700; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip {
+    font-size: 12px; font-weight: 800; padding: 8px 12px; border-radius: 10px;
+    border: 1px solid var(--vw-new-horizon); background: var(--vw-new-horizon-20);
+    letter-spacing: 0.3px; color: var(--vw-dark-blue);
+  }
+
+  details { border: 1px solid var(--vw-new-horizon); border-radius: 12px; overflow: hidden; background: white; }
+  details + details { margin-top: 10px; }
+  summary {
+    list-style: none; cursor: pointer; padding: 14px 16px; font-weight: 800; font-size: 14px;
+    color: var(--vw-cobalt); display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  }
+  summary:focus-visible { outline: 2px solid var(--vw-cobalt); outline-offset: -2px; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; font-size: 20px; color: #9AA7B8; font-weight: 400; line-height: 1; }
+  details[open] summary::after { content: "\2212"; }
+  .acbody { padding: 0 16px 16px; font-size: 13px; color: var(--vw-dark-blue); line-height: 1.65; }
+  .acbody ul { margin: 0; padding-left: 18px; }
+  .acbody li { margin-bottom: 8px; }
+  .acbody li b { color: var(--vw-cobalt); }
+
+  .foot { text-align: center; font-size: 11px; color: #9AA7B8; margin-top: 6px; padding-bottom: 30px; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <h1>Calculadora de Gastos</h1>
+    <a class="back" href="panel.html">← Volver al panel</a>
+  </div>
+
+  <div class="container">
+    <div class="card">
+      <span class="badge">SOLO GASTOS · USO INTERNO</span>
+      <h2 class="title">Cobro con tarjeta</h2>
+      <p class="subtitle">Mercado Pago Point / QR</p>
+    </div>
+
+    <div class="card">
+      <label for="monto">Monto del gasto</label>
+      <div class="inputbox">
+        <span>$</span>
+        <input id="monto" type="text" inputmode="numeric" placeholder="0" autocomplete="off" aria-label="Monto del gasto en pesos">
+      </div>
+      <p class="note">Ingresá el monto del gasto (sellos, patentamiento, formularios, impuestos, etc.).
+        La tabla muestra <b>cuánto cobrarle al cliente</b> en cada plan de cuotas.</p>
+    </div>
+
+    <div class="card">
+      <table>
+        <thead>
+          <tr><th scope="col">Plan</th><th scope="col">Interés</th><th scope="col">Cuota</th><th scope="col">Total</th></tr>
+        </thead>
+        <tbody id="tabla"></tbody>
+      </table>
+      <p class="note">El <b>Interés</b> es lo que el cliente paga por sobre el monto (ya incluye el <b>2,5% que cobramos</b>).
+        Ingresá el monto para ver la cuota y el total. Tasas MP actualizadas al 22/06.</p>
+    </div>
+
+    <p class="sec">Tarjetas que se aceptan</p>
+    <div class="card">
+      <div class="chips">
+        <span class="chip">VISA</span>
+        <span class="chip">Mastercard</span>
+        <span class="chip">American Express</span>
+        <span class="chip">Naranja</span>
+        <span class="chip">Cabal</span>
+      </div>
+      <p class="note"><b>Mismo interés y mismo plazo para todas.</b> Crédito y débito.</p>
+    </div>
+
+    <p class="sec">Info útil</p>
+    <div>
+      <details open>
+        <summary>Cómo cobrar</summary>
+        <div class="acbody">
+          <ul>
+            <li>Con la <b>Point Smart</b>: tarjetas físicas de débito y crédito (banda, chip, NFC).</li>
+            <li>Con <b>QR</b>: dinero en cuenta, débito y crédito desde la app de Mercado Pago.</li>
+            <li>Podés cobrar <b>servicios, repuestos, financiar 0km, señas, impuestos y sellos</b>. Sin límite de facturación.</li>
+          </ul>
+        </div>
+      </details>
+      <details>
+        <summary>Reglas de uso</summary>
+        <div class="acbody">
+          <ul>
+            <li>Esta herramienta es <b>solo para gastos</b>, no para la unidad.</li>
+            <li>El <b>2,5% adicional</b> (sobre el monto sin interés) ya está incluido en los totales.</li>
+            <li>Vigencia del acuerdo <b>indeterminada</b>: los costos quedan fijos hasta nueva baja de MP.</li>
+          </ul>
+        </div>
+      </details>
+    </div>
+
+    <p class="foot">Uso interno · Tito González Automotores · Tasas MP 22/06/2026</p>
+  </div>
+
+<script>
+  // Coef. c/IVA (Excel MP, baja de costos 22/06, liberación 4 días) + adicional 2,5% SOBRE EL MONTO base.
+  // El adicional se SUMA al coeficiente (no se multiplica). Para actualizar tasas: editar solo "coefIva".
+  var ADICIONAL = 0.025;
+  var PLANES = [
+    { c:2,  coefIva:1.046 },
+    { c:3,  coefIva:1.066 },
+    { c:6,  coefIva:1.121 },
+    { c:9,  coefIva:1.186 },
+    { c:12, coefIva:1.244 },
+    { c:18, coefIva:1.367 },
+    { c:24, coefIva:1.496 }
+  ];
+
+  var input = document.getElementById('monto');
+  var tabla = document.getElementById('tabla');
+  var fmt = function(n){ return n.toLocaleString('es-AR', {maximumFractionDigits:0}); };
+  var pct = function(n){ return n.toLocaleString('es-AR',{minimumFractionDigits:1,maximumFractionDigits:1})+'%'; };
+  var parseMonto = function(){ var r = input.value.replace(/[^\d]/g,''); return r ? parseInt(r,10) : 0; };
+
+  function render(){
+    var base = parseMonto();
+    var html = '';
+    PLANES.forEach(function(p){
+      var coef = p.coefIva + ADICIONAL;
+      var interes = pct((coef - 1) * 100);
+      var cuotaTxt = '—', totalTxt = '—';
+      if(base){
+        var total = base * coef;
+        cuotaTxt = '$'+fmt(total / p.c);
+        totalTxt = '$'+fmt(total);
+      }
+      html += '<tr><td>'+p.c+' cuotas</td>'
+        + '<td class="interes">'+interes+'</td>'
+        + '<td class="cuota">'+cuotaTxt+'</td>'
+        + '<td class="total">'+totalTxt+'</td></tr>';
+    });
+    tabla.innerHTML = html;
+  }
+
+  input.addEventListener('input', function(){
+    var v = parseMonto();
+    input.value = v ? fmt(v) : '';
+    render();
+  });
+  render();
+</script>
+</body>
+</html>
