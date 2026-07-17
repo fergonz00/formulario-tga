@@ -310,6 +310,30 @@
     margin-top: 0;
   }
   .tile-expand.open .tile-content { display: block; padding-top: 12px; }
+
+  /* Zona de carga moderna (Revisor de Prendas) */
+  .prenda-drop {
+    position: relative;
+    border: 2px dashed var(--vw-new-horizon);
+    border-radius: 14px;
+    background: var(--vw-new-horizon-20);
+    padding: 30px 18px;
+    text-align: center;
+    cursor: pointer;
+    transition: var(--transition);
+  }
+  .prenda-drop:hover { border-color: var(--vw-cobalt); background: rgba(0,64,193,0.05); }
+  .prenda-drop.dragover { border-color: var(--vw-cobalt); background: rgba(0,64,193,0.10); transform: scale(1.01); }
+  .prenda-drop.has-files { border-style: solid; border-color: var(--vw-green); background: rgba(0,135,60,0.06); }
+  .prenda-drop .pd-icon {
+    width: 52px; height: 52px; margin: 0 auto 10px;
+    display: flex; align-items: center; justify-content: center;
+    background: white; border-radius: 50%; font-size: 26px;
+    box-shadow: var(--shadow-sm);
+  }
+  .prenda-drop .pd-text { font-size: 14px; font-weight: 600; color: var(--vw-dark-blue); }
+  .prenda-drop .pd-text u { color: var(--vw-cobalt); text-decoration: underline; }
+  .prenda-drop .pd-hint { font-size: 12px; color: #8899AA; margin-top: 4px; }
 </style>
 </head>
 <body>
@@ -351,8 +375,10 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="vwfs" onclick="setTab('vwfs')">VWFS <span class="tab-count" id="tab-cnt-vwfs">0</span></button>
       <button class="tab-btn" data-tab="f01" onclick="setTab('f01')">F01 <span class="tab-count" id="tab-cnt-f01">0</span></button>
+      <button class="tab-btn" data-tab="prendas" id="tabPrendas" onclick="setTab('prendas')" style="display:none;">🔎 Revisor de Prendas</button>
     </div>
 
+    <div id="listView">
     <div class="action-bar">
       <button class="btn-action" type="button" onclick="copyFormLink()">📋 Copiar link p/ cliente</button>
       <button class="btn-action" type="button" onclick="openPublicForm()">🔗 Ir al formulario</button>
@@ -397,6 +423,65 @@
     <div id="rowList">
       <div class="loading">Cargando…</div>
     </div>
+    </div><!-- /listView -->
+
+    <!-- ═══════ SOLAPA REVISOR DE PRENDAS (solo whitelist) ═══════ -->
+    <div id="prendasView" style="display:none;">
+      <!-- Analizador -->
+      <div class="card">
+        <div class="detail-header" style="margin-bottom:14px;">
+          <h2 style="font-size:18px;font-weight:800;color:var(--vw-dark-blue);">🔎 Revisor de Prendas</h2>
+          <p style="font-size:13px;color:#5A6B7F;margin-top:4px;">
+            Subí la prenda (PDF escaneado y/o fotos, una o varias hojas). La IA la revisa contra las condiciones. Si querés, guardás el informe.
+          </p>
+        </div>
+        <div class="field" style="margin-bottom:12px;">
+          <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--vw-dark-blue);text-transform:uppercase;letter-spacing:0.3px;">Documento(s) de la prenda</label>
+          <div class="prenda-drop" id="prendaDrop"
+            onclick="document.getElementById('prendaFiles').click()"
+            ondragover="event.preventDefault(); this.classList.add('dragover');"
+            ondragleave="this.classList.remove('dragover');"
+            ondrop="handlePrendaDrop(event);">
+            <input type="file" id="prendaFiles" accept="application/pdf,image/*" multiple onchange="onPrendasFiles()" style="display:none;">
+            <div class="pd-icon">📄</div>
+            <div class="pd-text">Arrastrá la prenda acá o <u>hacé click para elegir</u></div>
+            <div class="pd-hint">PDF escaneado o fotos · una o varias hojas</div>
+          </div>
+          <div id="prendaFilesList" style="font-size:12px;color:#5A6B7F;margin-top:10px;"></div>
+          <div id="prendaProgress" style="display:none;margin-top:10px;">
+            <div style="height:8px;background:var(--vw-new-horizon);border-radius:20px;overflow:hidden;">
+              <div id="prendaProgressBar" style="height:100%;width:0%;background:var(--vw-cobalt);border-radius:20px;transition:width 0.2s ease;"></div>
+            </div>
+            <div id="prendaProgressText" style="font-size:12px;color:#5A6B7F;margin-top:6px;text-align:center;"></div>
+          </div>
+          <div id="prendaReady" style="display:none;margin-top:10px;font-size:13px;font-weight:700;color:var(--vw-green);display:none;">✓ Documento cargado — listo para analizar</div>
+        </div>
+        <button class="btn btn-primary" id="btnAnalizarPrenda" type="button" onclick="analizarPrenda()" disabled style="width:100%;">Analizar prenda</button>
+        <div id="prendaResult" style="margin-top:16px;"></div>
+        <div id="prendaActions" style="display:none;margin-top:14px;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-primary" type="button" onclick="guardarInforme()" style="flex:1;min-width:150px;">💾 Guardar informe</button>
+          <button class="btn-action" type="button" onclick="cerrarAnalisis()" style="flex:1;min-width:120px;justify-content:center;">✖ Cerrar</button>
+        </div>
+      </div>
+
+      <!-- Historial de informes guardados -->
+      <div class="card">
+        <div class="detail-header" style="margin-bottom:12px;">
+          <h2 style="font-size:16px;font-weight:800;color:var(--vw-dark-blue);">Informes guardados</h2>
+        </div>
+        <div style="margin-bottom:10px;">
+          <input type="text" id="prendaSearch" placeholder="🔍 Buscar por nombre o fecha (ej: 17/07)..." oninput="setPrendaSearch(this.value)"
+            style="width:100%;padding:10px 14px;border:1.5px solid var(--vw-new-horizon);border-radius:var(--radius-sm);font-family:inherit;font-size:14px;">
+        </div>
+        <div class="row-filters" style="margin-bottom:12px;">
+          <div class="rf-item">
+            <label>Período</label>
+            <select id="prendaMonth" onchange="setPrendaMonth(this.value)"></select>
+          </div>
+        </div>
+        <div id="prendasList"><div class="loading">Cargando…</div></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -421,6 +506,329 @@
         ...options.headers
       }
     });
+  }
+
+  // ═══════ REVISOR DE PRENDAS ═══════
+  let prendaVeredicto = null;      // último análisis (para guardar)
+  let prendaArchivos = null;       // URLs ya subidas, listas para analizar
+  let prendaUploading = false;     // true mientras suben los archivos
+  let prendaInformes = [];         // informes guardados cargados de la base
+  let filterPrendaSearch = '';
+  let filterPrendaMonth = '';      // 'YYYY-MM' | '__year__' | '__all__'
+
+  function resetPrendas() {
+    document.getElementById('prendaFiles').value = '';
+    document.getElementById('prendaFilesList').innerHTML = '';
+    document.getElementById('prendaResult').innerHTML = '';
+    document.getElementById('prendaActions').style.display = 'none';
+    document.getElementById('btnAnalizarPrenda').disabled = true;
+    document.getElementById('prendaProgress').style.display = 'none';
+    document.getElementById('prendaProgressBar').style.width = '0%';
+    document.getElementById('prendaReady').style.display = 'none';
+    const drop = document.getElementById('prendaDrop');
+    if (drop) drop.classList.remove('has-files', 'dragover');
+    prendaVeredicto = null;
+    prendaArchivos = null;
+    prendaUploading = false;
+  }
+  function cerrarAnalisis() { resetPrendas(); }
+
+  function onPrendasFiles() {
+    const input = document.getElementById('prendaFiles');
+    const files = input.files ? Array.from(input.files) : [];
+    const list = document.getElementById('prendaFilesList');
+    const drop = document.getElementById('prendaDrop');
+    // Reset del estado de subida/listo cada vez que cambian los archivos.
+    prendaArchivos = null;
+    document.getElementById('btnAnalizarPrenda').disabled = true;
+    document.getElementById('prendaReady').style.display = 'none';
+    document.getElementById('prendaProgress').style.display = 'none';
+    document.getElementById('prendaProgressBar').style.width = '0%';
+    if (drop) drop.classList.toggle('has-files', files.length > 0);
+    list.innerHTML = files.length
+      ? files.map(f => '📎 ' + escapeHtml(f.name) + ' <span style="color:#8899AA;">(' + Math.round(f.size / 1024) + ' KB)</span>').join('<br>')
+      : '';
+    if (files.length) uploadPrendaFiles(files);
+  }
+
+  function handlePrendaDrop(e) {
+    e.preventDefault();
+    const drop = document.getElementById('prendaDrop');
+    if (drop) drop.classList.remove('dragover');
+    const dt = e.dataTransfer;
+    if (!dt || !dt.files || !dt.files.length) return;
+    try { document.getElementById('prendaFiles').files = dt.files; } catch (_) {}
+    onPrendasFiles();
+  }
+
+  // Sube un archivo con XHR para tener progreso real de bytes.
+  function uploadOnePrenda(file, path, onProgress) {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', SUPABASE_URL + '/storage/v1/object/vwfs-dnis/' + path);
+      xhr.setRequestHeader('apikey', SUPABASE_KEY);
+      xhr.setRequestHeader('Authorization', 'Bearer ' + SUPABASE_KEY);
+      xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+      xhr.setRequestHeader('x-upsert', 'true');
+      xhr.upload.onprogress = (e) => { if (e.lengthComputable && onProgress) onProgress(e.loaded); };
+      xhr.onload = () => { (xhr.status >= 200 && xhr.status < 300) ? resolve() : reject(new Error('HTTP ' + xhr.status + ': ' + xhr.responseText)); };
+      xhr.onerror = () => reject(new Error('Error de red al subir el archivo.'));
+      xhr.send(file);
+    });
+  }
+
+  // Sube todos los archivos mostrando una barra de progreso; al terminar marca "listo".
+  async function uploadPrendaFiles(files) {
+    prendaUploading = true;
+    prendaArchivos = null;
+    const btn = document.getElementById('btnAnalizarPrenda');
+    const prog = document.getElementById('prendaProgress');
+    const bar = document.getElementById('prendaProgressBar');
+    const txt = document.getElementById('prendaProgressText');
+    const ready = document.getElementById('prendaReady');
+    btn.disabled = true;
+    ready.style.display = 'none';
+    prog.style.display = '';
+    bar.style.width = '0%';
+    const totalBytes = files.reduce((s, f) => s + (f.size || 0), 0) || 1;
+    let doneBytes = 0;
+    try {
+      const ts = Date.now();
+      const archivos = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        const safe = f.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+        const path = 'prendas_tmp/' + ts + '/' + i + '_' + safe;
+        txt.textContent = 'Subiendo ' + (i + 1) + ' de ' + files.length + '…';
+        await uploadOnePrenda(f, path, (loaded) => {
+          bar.style.width = Math.min(100, Math.round(((doneBytes + loaded) / totalBytes) * 100)) + '%';
+        });
+        doneBytes += (f.size || 0);
+        bar.style.width = Math.min(100, Math.round((doneBytes / totalBytes) * 100)) + '%';
+        const url = SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
+        const tipo = (f.type === 'application/pdf' || /\.pdf$/i.test(f.name)) ? 'pdf' : 'imagen';
+        archivos.push({ url, tipo });
+      }
+      bar.style.width = '100%';
+      prendaArchivos = archivos;
+      setTimeout(() => { prog.style.display = 'none'; }, 300);
+      ready.style.display = '';
+      btn.disabled = false;
+    } catch (e) {
+      prog.style.display = 'none';
+      prendaArchivos = null;
+      btn.disabled = true;
+      document.getElementById('prendaFilesList').innerHTML +=
+        '<div style="color:var(--vw-red);margin-top:6px;">❌ No se pudo subir: ' + escapeHtml(e && e.message ? e.message : 'error') + '</div>';
+    } finally {
+      prendaUploading = false;
+    }
+  }
+
+  async function analizarPrenda() {
+    if (!PRENDAS_USERS.includes(currentUser)) { alert('No tenés acceso a esta sección.'); return; }
+    if (prendaUploading) { alert('Esperá a que termine de subir el documento.'); return; }
+    if (!prendaArchivos || !prendaArchivos.length) { alert('Subí primero el documento de la prenda.'); return; }
+    const btn = document.getElementById('btnAnalizarPrenda');
+    const result = document.getElementById('prendaResult');
+    const origLabel = btn.textContent;
+    document.getElementById('prendaActions').style.display = 'none';
+    prendaVeredicto = null;
+    btn.disabled = true; btn.textContent = 'Analizando…';
+    result.innerHTML = '<div style="text-align:center;padding:16px;color:#5A6B7F;font-size:13px;">⏳ Analizando con IA… (puede tardar hasta un minuto)</div>';
+    try {
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-prenda', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archivos: prendaArchivos })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'La IA no pudo analizar la prenda. Probá de nuevo.');
+      prendaVeredicto = data.veredicto;
+      renderPrendaResult(data.veredicto);
+      document.getElementById('prendaActions').style.display = 'flex';
+    } catch (e) {
+      result.innerHTML = '<div style="background:rgba(228,0,43,0.08);border-left:4px solid var(--vw-red);border-radius:8px;padding:12px;font-size:13px;">❌ ' + escapeHtml(e && e.message ? e.message : 'Error inesperado') + '</div>';
+    } finally {
+      btn.disabled = false; btn.textContent = origLabel;
+    }
+  }
+
+  // Guardar el informe actual en la base.
+  async function guardarInforme() {
+    if (!prendaVeredicto) return;
+    const v = prendaVeredicto;
+    const acts = document.getElementById('prendaActions');
+    const saveBtn = acts.querySelector('.btn-primary');
+    const orig = saveBtn.textContent; saveBtn.disabled = true; saveBtn.textContent = 'Guardando…';
+    try {
+      const payload = {
+        guardado_por: currentUser,
+        deudor_nombre: v.deudor_nombre || '',
+        deudor_dni: v.deudor_dni || '',
+        estado: v.aprobado === true ? 'aprobado' : 'rechazado',
+        aprobado: v.aprobado === true,
+        veredicto: v
+      };
+      const res = await supaFetch('/rest/v1/prendas_informes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify(payload)
+      });
+      if (!res.ok) { const t = await res.text(); throw new Error(t); }
+      resetPrendas();
+      await loadPrendaInformes();
+    } catch (e) {
+      alert('No se pudo guardar el informe: ' + (e && e.message ? e.message : 'error'));
+      saveBtn.disabled = false; saveBtn.textContent = orig;
+    }
+  }
+
+  // Devuelve el HTML del detalle de un veredicto (reutilizado en el análisis y en el historial).
+  function veredictoHtml(v) {
+    if (!v || typeof v !== 'object') return '<div style="font-size:13px;color:#5A6B7F;">Sin detalle.</div>';
+    const aprobado = v.aprobado === true;
+    const color = aprobado ? 'var(--vw-green)' : 'var(--vw-red)';
+    const bg = aprobado ? 'rgba(0,135,60,0.10)' : 'rgba(228,0,43,0.08)';
+    let html = '<div style="background:' + bg + ';border-left:4px solid ' + color + ';border-radius:8px;padding:14px;margin-bottom:12px;">' +
+      '<div style="font-size:18px;font-weight:800;color:' + color + ';">' + (aprobado ? '✓ APROBADA' : '✗ RECHAZADA') + '</div>' +
+      (v.deudor_nombre ? '<div style="font-size:13px;font-weight:600;color:var(--vw-dark-blue);margin-top:4px;">' + escapeHtml(v.deudor_nombre) + (v.deudor_dni ? ' · DNI ' + escapeHtml(v.deudor_dni) : '') + '</div>' : '') +
+      (v.resumen ? '<div style="font-size:13px;color:#334;margin-top:6px;">' + escapeHtml(v.resumen) + '</div>' : '') +
+      '</div>';
+    const ec = v.estado_civil_detectado ? ('Estado civil: <strong>' + escapeHtml(v.estado_civil_detectado) + '</strong>') : '';
+    const fi = v.firmas ? (' · Firmas encontradas: <strong>' + (v.firmas.encontradas != null ? v.firmas.encontradas : '?') + '</strong> de <strong>' + (v.firmas.esperadas != null ? v.firmas.esperadas : '?') + '</strong> esperadas') : '';
+    if (ec || fi) html += '<div style="font-size:12px;color:#5A6B7F;margin-bottom:10px;">' + ec + fi + '</div>';
+    const checks = Array.isArray(v.checks) ? v.checks : [];
+    html += checks.map(c => {
+      const ok = c && c.ok === true;
+      return '<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--vw-new-horizon-20);">' +
+        '<span style="color:' + (ok ? '#00873C' : '#E4002B') + ';font-weight:800;flex-shrink:0;">' + (ok ? '✓' : '✗') + '</span>' +
+        '<div><div style="font-weight:600;font-size:13px;">' + escapeHtml((c && c.regla) || '') + '</div>' +
+        (c && c.detalle ? '<div style="font-size:12px;color:#5A6B7F;margin-top:2px;">' + escapeHtml(c.detalle) + '</div>' : '') +
+        '</div></div>';
+    }).join('');
+    const motivos = Array.isArray(v.motivos_rechazo) ? v.motivos_rechazo : [];
+    if (!aprobado && motivos.length) {
+      html += '<div style="margin-top:12px;background:rgba(228,0,43,0.06);border-radius:8px;padding:10px;">' +
+        '<div style="font-weight:700;font-size:13px;color:var(--vw-red);margin-bottom:4px;">Motivos de rechazo:</div>' +
+        '<ul style="margin:0;padding-left:18px;font-size:12px;color:#334;">' +
+        motivos.map(m => '<li>' + escapeHtml(m) + '</li>').join('') + '</ul></div>';
+    }
+    return html;
+  }
+  function renderPrendaResult(v) { document.getElementById('prendaResult').innerHTML = veredictoHtml(v); }
+
+  // ─── Historial de informes guardados ───
+  function fmtPrendaFecha(iso) {
+    const d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d)) return '';
+    const p = n => String(n).padStart(2, '0');
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  async function loadPrendaInformes() {
+    const el = document.getElementById('prendasList');
+    try {
+      const res = await supaFetch('/rest/v1/prendas_informes?select=*&order=created_at.desc&limit=500', { headers: { 'Accept': 'application/json' } });
+      const rows = await res.json();
+      prendaInformes = Array.isArray(rows) ? rows : [];
+      buildPrendaMonthFilter();
+      renderPrendasList();
+    } catch (e) {
+      if (el) el.innerHTML = '<div style="color:var(--vw-red);font-size:13px;">Error cargando los informes.</div>';
+    }
+  }
+
+  function buildPrendaMonthFilter() {
+    const sel = document.getElementById('prendaMonth');
+    if (!sel) return;
+    const now = new Date();
+    const curKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const curYear = now.getFullYear();
+    const keys = Array.from(new Set(prendaInformes.map(rowMesKey).filter(Boolean)));
+    if (!keys.includes(curKey)) keys.push(curKey);
+    keys.sort().reverse();
+    if (!filterPrendaMonth) filterPrendaMonth = curKey;
+    if (filterPrendaMonth !== '__all__' && filterPrendaMonth !== '__year__' && !keys.includes(filterPrendaMonth)) filterPrendaMonth = curKey;
+    let opts = '';
+    keys.forEach(k => {
+      const lbl = (k === curKey ? 'Mes actual — ' : '') + rowMesLabel(k);
+      opts += `<option value="${k}"${k === filterPrendaMonth ? ' selected' : ''}>${lbl}</option>`;
+    });
+    opts += `<option value="__year__"${filterPrendaMonth === '__year__' ? ' selected' : ''}>Todo ${curYear}</option>`;
+    opts += `<option value="__all__"${filterPrendaMonth === '__all__' ? ' selected' : ''}>Todos</option>`;
+    sel.innerHTML = opts;
+  }
+
+  function setPrendaSearch(v) { filterPrendaSearch = v; renderPrendasList(); }
+  function setPrendaMonth(v) { filterPrendaMonth = v; renderPrendasList(); }
+
+  function renderPrendasList() {
+    const el = document.getElementById('prendasList');
+    if (!el) return;
+    const curYear = (new Date()).getFullYear();
+    let rows = prendaInformes.slice();
+    if (filterPrendaMonth === '__year__') rows = rows.filter(r => (new Date(r.created_at)).getFullYear() === curYear);
+    else if (filterPrendaMonth && filterPrendaMonth !== '__all__') rows = rows.filter(r => rowMesKey(r) === filterPrendaMonth);
+    const q = (filterPrendaSearch || '').toLowerCase().trim();
+    if (q) rows = rows.filter(r =>
+      (r.deudor_nombre || '').toLowerCase().includes(q) ||
+      (r.deudor_dni || '').toLowerCase().includes(q) ||
+      fmtPrendaFecha(r.created_at).toLowerCase().includes(q)
+    );
+    if (!rows.length) { el.innerHTML = '<div class="empty-state"><div class="emoji">📭</div>Sin informes en esta vista</div>'; return; }
+    const canDelete = PRENDAS_DELETE_USERS.includes(currentUser);
+    el.innerHTML = rows.map(r => {
+      const ap = r.aprobado === true;
+      const chipColor = ap ? '#00873C' : '#E4002B';
+      const chipBg = ap ? 'rgba(0,135,60,0.12)' : 'rgba(228,0,43,0.10)';
+      const nombre = escapeHtml(r.deudor_nombre || 'Sin nombre');
+      const delBtn = canDelete
+        ? '<button type="button" title="Borrar informe" onclick="borrarInforme(' + r.id + ', event)" style="flex-shrink:0;border:none;background:transparent;color:var(--vw-red);font-size:16px;cursor:pointer;padding:2px 6px;border-radius:6px;">🗑</button>'
+        : '';
+      return '<div style="border:1px solid var(--vw-new-horizon);border-radius:10px;margin-bottom:8px;overflow:hidden;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 12px;cursor:pointer;" onclick="togglePrendaRow(' + r.id + ')">' +
+          '<div style="min-width:0;">' +
+            '<div style="font-weight:700;font-size:14px;">' + nombre + '</div>' +
+            '<div style="font-size:11px;color:#8899AA;">' + fmtPrendaFecha(r.created_at) + (r.guardado_por ? ' · ' + escapeHtml(r.guardado_por) : '') + '</div>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">' +
+            '<span style="font-size:11px;font-weight:800;color:' + chipColor + ';background:' + chipBg + ';padding:3px 10px;border-radius:20px;">' + (ap ? 'APROBADA' : 'RECHAZADA') + '</span>' +
+            delBtn +
+          '</div>' +
+        '</div>' +
+        '<div id="prendaDetail-' + r.id + '" style="display:none;padding:4px 12px 12px 12px;border-top:1px solid var(--vw-new-horizon-20);"></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  async function borrarInforme(id, e) {
+    if (e) e.stopPropagation();
+    if (!PRENDAS_DELETE_USERS.includes(currentUser)) { alert('No tenés permiso para borrar.'); return; }
+    if (!confirm('¿Borrar este informe? Esta acción no se puede deshacer.')) return;
+    try {
+      const res = await supaFetch('/rest/v1/prendas_informes?id=eq.' + id, {
+        method: 'DELETE',
+        headers: { 'Prefer': 'return=minimal' }
+      });
+      if (!res.ok) { const t = await res.text(); throw new Error(t); }
+      prendaInformes = prendaInformes.filter(x => x.id !== id);
+      renderPrendasList();
+    } catch (err) {
+      alert('No se pudo borrar: ' + (err && err.message ? err.message : 'error'));
+    }
+  }
+
+  function togglePrendaRow(id) {
+    const d = document.getElementById('prendaDetail-' + id);
+    if (!d) return;
+    if (!d.style.display || d.style.display === 'none') {
+      const r = prendaInformes.find(x => x.id === id);
+      d.innerHTML = r ? veredictoHtml(r.veredicto) : '<div style="font-size:12px;color:#5A6B7F;">Sin detalle.</div>';
+      d.style.display = '';
+    } else {
+      d.style.display = 'none';
+    }
   }
 
   // ═══════ STATE ═══════
@@ -460,6 +868,11 @@
   const ESTADO_KEYS = Object.keys(ESTADOS);
 
   const TIPOS_COMPROBANTE = ['Seña', 'Refuerzo', 'Cancelación', 'Otro'];
+
+  // Usuarios con acceso al Revisor de Prendas (whitelist). Solo estos ven la sección.
+  const PRENDAS_USERS = ['alaso', 'cgonzalez', 'fgonzalez', 'fngonzalez', 'megerez', 'mgerez', 'vfernandez', 'mlubrano'];
+  // Usuarios que además pueden BORRAR informes guardados.
+  const PRENDAS_DELETE_USERS = ['mlubrano', 'fngonzalez'];
 
   let filterVendedor = '';
   let filterAdministrativa = '';
@@ -577,6 +990,8 @@
     populateAsignacionSelects();
     document.getElementById('adminFilterBlock').style.display = isAdminOrOwner() ? '' : 'none';
     document.getElementById('rowFilters').classList.toggle('two', isAdminOrOwner());
+    // Revisor de Prendas: solapa visible solo para los usuarios del whitelist.
+    document.getElementById('tabPrendas').style.display = PRENDAS_USERS.includes(user) ? '' : 'none';
     Promise.all([loadTab('vwfs'), loadTab('f01')]).then(() => setTab('vwfs'));
   }
 
@@ -731,6 +1146,16 @@
   }
 
   async function setTab(tab) {
+    if (tab === 'prendas') {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === 'prendas'));
+      document.getElementById('listView').style.display = 'none';
+      document.getElementById('prendasView').style.display = '';
+      resetPrendas();
+      loadPrendaInformes();
+      return;
+    }
+    document.getElementById('prendasView').style.display = 'none';
+    document.getElementById('listView').style.display = '';
     currentTab = tab;
     selectedIds.clear();
     updateBulkDeleteButton();
