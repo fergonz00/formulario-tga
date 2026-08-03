@@ -1276,9 +1276,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   let dniAnalisisOk = false;    // true si calidad.ok_global, permite avanzar
   let dniFrenteUrlUploaded = '';
   let dniDorsoUrlUploaded = '';
-  const DNI_MIN_WIDTH = 800;
-  const DNI_MIN_HEIGHT = 500;
-  const DNI_MIN_BYTES = 40 * 1024;
+  // Sin mínimo de resolución: aunque sea baja, si el DNI es legible la IA decide.
+  const DNI_MIN_BYTES = 30 * 1024;
 
   // ?return=vwfs → al terminar F01 mandamos al cliente de vuelta a VWFS.
   const returnTarget = new URLSearchParams(window.location.search).get('return') || '';
@@ -1623,7 +1622,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     const swap = effOrientation >= 5 && effOrientation <= 8;
     const visualW = swap ? rawH : rawW;
     const visualH = swap ? rawW : rawH;
-    const MAX_W = 1800;
+    const MAX_W = 2576;
     const scale = visualW > MAX_W ? MAX_W / visualW : 1;
     const outW = Math.round(visualW * scale);
     const outH = Math.round(visualH * scale);
@@ -1675,10 +1674,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     }
     try {
       const norm = await normalizeImageFromFile(file);
-      if (norm.w < DNI_MIN_WIDTH || norm.h < DNI_MIN_HEIGHT) {
-        err.textContent = 'La foto tiene muy poca resolucion (' + norm.w + 'x' + norm.h + '). Minimo ' + DNI_MIN_WIDTH + 'x' + DNI_MIN_HEIGHT + '.';
-        err.style.display = ''; input.value = ''; return;
-      }
       // Usamos el Blob directo: NO construimos `new File(...)` porque ese
       // constructor no existe en navegadores viejos (Edge Legacy) y tiraba
       // excepcion -> "no se pudo procesar". El Blob ya tiene .type y .size y
@@ -1999,10 +1994,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     }
     try {
       const norm = await normalizeImageFromFile(file);
-      if (norm.w < DNI_MIN_WIDTH || norm.h < DNI_MIN_HEIGHT) {
-        err.textContent = 'Muy poca resolucion (' + norm.w + 'x' + norm.h + ').';
-        err.style.display = ''; input.value = ''; return;
-      }
       // Blob directo (sin `new File`, incompatible con navegadores viejos).
       const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
       conyDniImages[which] = { dataUrl: norm.dataUrl, file: blob, mime: norm.mime, w: norm.w, h: norm.h };

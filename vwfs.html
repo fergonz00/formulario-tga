@@ -1093,9 +1093,8 @@
   let conyDniFrenteUrlFromF01 = '';
   let conyDniDorsoUrlFromF01 = '';
   const dniImages = {};
-  const DNI_MIN_WIDTH = 800;
-  const DNI_MIN_HEIGHT = 500;
-  const DNI_MIN_BYTES = 80 * 1024;
+  // Sin mínimo de resolución: aunque sea baja, si el DNI es legible la IA decide.
+  const DNI_MIN_BYTES = 30 * 1024;
 
   // Resultado del analisis IA del DNI (lo guardamos acumulado para el insert final)
   let dniAnalisis = null;          // { calidad, extraido, modelo, analizado_at }
@@ -1315,7 +1314,7 @@
     const swap = orientation >= 5 && orientation <= 8;
     const visualW = swap ? rawH : rawW;
     const visualH = swap ? rawW : rawH;
-    const MAX_W = 1800;
+    const MAX_W = 2576;
     const scale = visualW > MAX_W ? MAX_W / visualW : 1;
     const outW = Math.round(visualW * scale);
     const outH = Math.round(visualH * scale);
@@ -1368,12 +1367,6 @@
 
     try {
       const norm = await normalizeImageFromFile(file);
-      if (norm.w < DNI_MIN_WIDTH || norm.h < DNI_MIN_HEIGHT) {
-        err.textContent = 'La foto tiene muy poca resolución (' + norm.w + '×' + norm.h + '). Necesitamos al menos ' + DNI_MIN_WIDTH + '×' + DNI_MIN_HEIGHT + '. Sacá la foto con mejor luz o más cerca.';
-        err.style.display = '';
-        input.value = '';
-        return;
-      }
 
       // Reconstruimos un File a partir del canvas normalizado (asi al subirlo
       // al bucket tambien queda ya rotado/redimensionado).
