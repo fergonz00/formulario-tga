@@ -368,10 +368,10 @@
   <!-- ═══════════════════════════════════════ -->
   <div class="step" id="common-step-dni">
     <div class="section-card">
-      <div class="section-title"><div class="icon">📷</div> DNI del Apoderado</div>
+      <div class="section-title"><div class="icon">📷</div> <span id="dniStepTitleText">DNI del titular</span></div>
 
       <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: #0040C1;">
-        <strong>Primero el DNI del apoderado.</strong> Subí las dos caras (frente y dorso). Vamos a analizarlas con IA para confirmar que se ven bien y <strong>precargar el resto del formulario</strong>.
+        <strong id="dniStepLead">Primero el DNI del titular.</strong> Subí las dos caras (frente y dorso). Vamos a analizarlas con IA para confirmar que se ven bien y <strong>precargar el resto del formulario</strong>.
       </div>
 
       <div class="upload-zone" id="uploadFrenteZone">
@@ -718,7 +718,7 @@
   // Paso 1 (común) = Foto del DNI, luego los pasos por tipo. El vendedor lo asigna
   // ventas/administración desde el panel — el cliente NO lo elige.
   const stepConfig = {
-    fisica: { prefix: 'pf', steps: 6, labels: ['DNI del apoderado','Datos del titular','Domicilio','Datos laborales','Modelo y plan','Resumen'] },
+    fisica: { prefix: 'pf', steps: 6, labels: ['DNI del titular','Datos del titular','Domicilio','Datos laborales','Modelo y plan','Resumen'] },
     juridica: { prefix: 'pj', steps: 5, labels: ['DNI del apoderado','Datos de la empresa','Datos del apoderado','Modelo y plan','Resumen'] }
   };
 
@@ -786,6 +786,10 @@
     const cfg = stepConfig[type];
     totalSteps = cfg.steps;
     currentStep = 1;
+    // PF: DNI del titular. PJ: DNI del apoderado.
+    const quien = type === 'juridica' ? 'apoderado' : 'titular';
+    const tt = document.getElementById('dniStepTitleText'); if (tt) tt.textContent = 'DNI del ' + quien;
+    const lead = document.getElementById('dniStepLead'); if (lead) lead.textContent = 'Primero el DNI del ' + quien + '.';
     document.getElementById('selectorScreen').style.display = 'none';
     document.getElementById('progressBar').classList.add('visible');
     document.getElementById('navBar').classList.add('visible');
