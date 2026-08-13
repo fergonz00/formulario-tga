@@ -1,0 +1,2108 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Plan de Ahorro — Tito González Automotores</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
+
+  :root {
+    --vw-dark-blue: #001E50;
+    --vw-cobalt: #0040C1;
+    --vw-new-horizon: #DAE4ED;
+    --vw-new-horizon-20: #F2F5F8;
+    --vw-amber: #FF8C00;
+    --vw-white: #FFFFFF;
+    --vw-red: #E4002B;
+    --vw-green: #00873C;
+    --shadow-sm: 0 1px 3px rgba(0,30,80,0.08);
+    --shadow-md: 0 4px 12px rgba(0,30,80,0.1);
+    --radius: 14px;
+    --radius-sm: 10px;
+    --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--vw-new-horizon-20);
+    color: var(--vw-dark-blue);
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: var(--vw-dark-blue);
+    padding: 20px 20px 24px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .header img.logo {
+    height: 48px;
+    width: auto;
+    margin-bottom: 6px;
+    filter: drop-shadow(0 2px 8px rgba(0,0,0,0.3));
+  }
+  .header p {
+    color: var(--vw-new-horizon);
+    font-size: 12px;
+    font-weight: 400;
+    opacity: 0.8;
+    letter-spacing: 0.3px;
+  }
+  .btn-home {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255,255,255,0.3);
+    background: rgba(255,255,255,0.1);
+    color: white;
+    font-size: 18px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition);
+    z-index: 10;
+  }
+  .btn-home:active { transform: scale(0.9); background: rgba(255,255,255,0.2); }
+  .btn-home.visible { display: flex; }
+
+  /* ── Progress ── */
+  .progress-bar {
+    background: var(--vw-white);
+    padding: 16px 20px;
+    box-shadow: var(--shadow-sm);
+    position: sticky;
+    top: 92px;
+    z-index: 99;
+    display: none;
+  }
+  .progress-bar.visible { display: block; }
+  .progress-steps { display: flex; gap: 4px; margin-bottom: 10px; }
+  .progress-step {
+    flex: 1; height: 4px; background: var(--vw-new-horizon);
+    border-radius: 2px; transition: background var(--transition);
+  }
+  .progress-step.active { background: var(--vw-cobalt); }
+  .progress-step.done { background: var(--vw-green); }
+  .progress-label { font-size: 12px; font-weight: 600; color: var(--vw-cobalt); }
+
+  /* ── Form Container ── */
+  .form-container {
+    padding: 16px; max-width: 480px; margin: 0 auto; padding-bottom: 100px;
+  }
+
+  /* ── Selector Screen ── */
+  .selector-screen { animation: fadeIn 0.3s ease; }
+  .selector-card {
+    background: var(--vw-white); border-radius: var(--radius);
+    padding: 28px 20px; margin-bottom: 12px; box-shadow: var(--shadow-sm);
+    text-align: center;
+  }
+  .selector-card h2 {
+    font-size: 18px; font-weight: 700; margin-bottom: 6px;
+  }
+  .selector-card p {
+    font-size: 13px; color: #5A6B7F; margin-bottom: 24px; line-height: 1.5;
+  }
+  .selector-btn {
+    display: flex; align-items: center; gap: 14px;
+    width: 100%; padding: 18px 20px; margin-bottom: 12px;
+    border: 2px solid var(--vw-new-horizon); border-radius: var(--radius);
+    background: var(--vw-white); cursor: pointer; text-align: left;
+    font-family: inherit; transition: all var(--transition);
+  }
+  .selector-btn:active { transform: scale(0.98); }
+  .selector-btn:hover { border-color: var(--vw-cobalt); background: rgba(0,64,193,0.03); }
+  .selector-btn .sel-icon {
+    width: 48px; height: 48px; border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 24px; flex-shrink: 0;
+  }
+  .selector-btn .sel-icon.fisica { background: #E8F0FE; }
+  .selector-btn .sel-icon.juridica { background: #FFF3E0; }
+  .selector-btn .sel-text h3 { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+  .selector-btn .sel-text p { font-size: 12px; color: #5A6B7F; margin: 0; }
+
+  /* ── Steps ── */
+  .step { display: none; animation: fadeIn 0.3s ease; }
+  .step.active { display: block; }
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .section-card {
+    background: var(--vw-white); border-radius: var(--radius);
+    padding: 20px; margin-bottom: 12px; box-shadow: var(--shadow-sm);
+  }
+  .section-title {
+    font-size: 14px; font-weight: 700; color: var(--vw-dark-blue);
+    margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
+  }
+  .section-title .icon {
+    width: 28px; height: 28px; background: var(--vw-new-horizon-20);
+    border-radius: 8px; display: flex; align-items: center;
+    justify-content: center; font-size: 14px; flex-shrink: 0;
+  }
+
+  /* ── Fields ── */
+  .field { margin-bottom: 14px; }
+  .field label {
+    display: block; font-size: 12px; font-weight: 600;
+    color: var(--vw-dark-blue); margin-bottom: 5px;
+    text-transform: uppercase; letter-spacing: 0.3px;
+  }
+  .field label .optional { font-weight: 400; text-transform: none; color: #8899AA; font-size: 11px; }
+  .field input, .field select, .field textarea {
+    width: 100%; padding: 13px 14px; border: 1.5px solid var(--vw-new-horizon);
+    border-radius: var(--radius-sm); font-family: inherit; font-size: 16px;
+    color: var(--vw-dark-blue); background: var(--vw-white);
+    transition: border-color var(--transition), box-shadow var(--transition);
+    -webkit-appearance: none; appearance: none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus {
+    outline: none; border-color: var(--vw-cobalt);
+    box-shadow: 0 0 0 3px rgba(0,64,193,0.1);
+  }
+  .field select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23001E50' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px;
+  }
+  .row { display: grid; gap: 10px; }
+  .row-2 { grid-template-columns: 1fr 1fr; }
+  .row-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+  /* ── Toggle buttons ── */
+  .toggle-group { display: flex; gap: 8px; flex-wrap: wrap; }
+  .toggle-btn {
+    flex: 1 1 auto; min-width: 90px; padding: 10px 12px;
+    border: 1.5px solid var(--vw-new-horizon); border-radius: var(--radius-sm);
+    background: var(--vw-white); font-family: inherit; font-size: 13px;
+    font-weight: 500; color: var(--vw-dark-blue); cursor: pointer;
+    text-align: center; transition: all var(--transition);
+    white-space: normal; word-break: break-word; line-height: 1.25;
+  }
+  .toggle-btn.selected {
+    border-color: var(--vw-cobalt); background: rgba(0,64,193,0.06);
+    color: var(--vw-cobalt); font-weight: 600;
+  }
+  .toggle-btn:active { transform: scale(0.97); }
+
+  /* ── Upload ── */
+  .upload-zone {
+    border: 2px dashed var(--vw-new-horizon); border-radius: var(--radius);
+    padding: 24px 16px; text-align: center; cursor: pointer;
+    transition: all var(--transition); position: relative;
+  }
+  .upload-zone:active, .upload-zone.has-file {
+    border-color: var(--vw-cobalt); background: rgba(0,64,193,0.03);
+  }
+  .upload-zone .upload-icon { font-size: 28px; margin-bottom: 8px; }
+  .upload-zone .upload-text { font-size: 13px; font-weight: 500; }
+  .upload-zone .upload-hint { font-size: 11px; color: #8899AA; margin-top: 4px; }
+  .upload-zone input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+  /* Cuando ya hay archivo, colapsar el cuadrado a solo el titulo */
+  .upload-zone.has-file { padding: 10px 14px; border-style: solid; }
+  .upload-zone.has-file .upload-icon,
+  .upload-zone.has-file .upload-hint { display: none; }
+  .upload-zone.has-file .upload-text { font-size: 12px; color: #00873C; }
+  .upload-zone.has-file .upload-text::before { content: '✓ '; }
+  .upload-preview {
+    display: none; margin-top: 10px; padding: 10px;
+    background: var(--vw-new-horizon-20); border-radius: 8px;
+    font-size: 12px; color: var(--vw-green); font-weight: 500;
+  }
+
+  /* ── Conditional ── */
+  .conditional { display: none; animation: fadeIn 0.25s ease; }
+  .conditional.show { display: block; }
+
+  /* ── Info callout ── */
+  .info-callout {
+    background: rgba(0,64,193,0.05); border-left: 3px solid var(--vw-cobalt);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    padding: 12px 14px; margin-bottom: 14px;
+    font-size: 12px; line-height: 1.5;
+  }
+
+  /* ── Switch ── */
+  .switch-field {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid var(--vw-new-horizon-20);
+  }
+  .switch-field:last-child { border-bottom: none; }
+  .switch-label { font-size: 14px; font-weight: 500; }
+  .switch { position: relative; width: 48px; height: 28px; flex-shrink: 0; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .switch .slider {
+    position: absolute; inset: 0; background: var(--vw-new-horizon);
+    border-radius: 14px; cursor: pointer; transition: var(--transition);
+  }
+  .switch .slider::before {
+    content: ''; position: absolute; width: 22px; height: 22px;
+    background: white; border-radius: 50%; top: 3px; left: 3px;
+    transition: var(--transition); box-shadow: var(--shadow-sm);
+  }
+  .switch input:checked + .slider { background: var(--vw-cobalt); }
+  .switch input:checked + .slider::before { left: 23px; }
+
+  /* ── Nav ── */
+  .nav-bar {
+    position: fixed; bottom: 0; left: 0; right: 0;
+    background: var(--vw-white); border-top: 1px solid var(--vw-new-horizon);
+    padding: 12px 16px; padding-bottom: max(12px, env(safe-area-inset-bottom));
+    display: none; gap: 10px; z-index: 100; max-width: 480px; margin: 0 auto;
+  }
+  .nav-bar.visible { display: flex; }
+  .btn {
+    flex: 1; padding: 15px 20px; border: none; border-radius: var(--radius-sm);
+    font-family: inherit; font-size: 15px; font-weight: 700;
+    cursor: pointer; transition: all var(--transition); text-align: center;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-primary { background: var(--vw-cobalt); color: var(--vw-white); }
+  .btn-primary:hover { background: #0035A0; }
+  .btn-secondary {
+    background: var(--vw-new-horizon-20); color: var(--vw-dark-blue);
+    flex: 0 0 auto; padding: 15px 24px;
+  }
+  .btn-send { background: var(--vw-green); color: var(--vw-white); }
+  .btn-send:hover { background: #006D30; }
+
+  /* ── Summary ── */
+  .summary-item {
+    display: flex; justify-content: space-between; padding: 8px 0;
+    border-bottom: 1px solid var(--vw-new-horizon-20); font-size: 13px;
+  }
+  .summary-item:last-child { border-bottom: none; }
+  .summary-label { color: #5A6B7F; }
+  .summary-value { font-weight: 600; text-align: right; max-width: 60%; word-break: break-word; }
+
+  /* ── Persona autorizada ── */
+  .persona-autorizada {
+    background: var(--vw-new-horizon-20); border-radius: var(--radius-sm);
+    padding: 12px; margin-bottom: 10px;
+  }
+
+  /* ── Success ── */
+  .success-screen { display: none; text-align: center; padding: 60px 24px; animation: fadeIn 0.4s ease; }
+  .success-screen.active { display: block; }
+  .success-icon {
+    width: 72px; height: 48px; background: var(--vw-green);
+    border-radius: 50%; display: flex; align-items: center;
+    justify-content: center; margin: 0 auto 20px; font-size: 36px; color: white;
+  }
+  .success-screen h2 { font-size: 22px; font-weight: 700; margin-bottom: 8px; }
+  .success-screen p { font-size: 14px; color: #5A6B7F; line-height: 1.6; }
+
+  .divider { height: 1px; background: var(--vw-new-horizon); margin: 12px 0; }
+
+  @media (max-width: 360px) { .row-3 { grid-template-columns: 1fr 1fr; } }
+
+  /* Tarjeta de info del plan seleccionado */
+  .plan-info { margin-top: 14px; background: var(--vw-new-horizon-20); border: 1.5px solid var(--vw-new-horizon); border-radius: var(--radius-sm); padding: 12px 14px; }
+  .plan-info .plan-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 5px 0; font-size: 13px; border-bottom: 1px solid rgba(0,30,80,0.06); }
+  .plan-info .plan-row:last-child { border-bottom: none; }
+  .plan-info .plan-row span { color: #5A6B7F; }
+  .plan-info .plan-row strong { color: var(--vw-dark-blue); text-align: right; }
+</style>
+</head>
+<body>
+
+<div class="header" style="position:sticky;top:0;z-index:100;">
+  <button class="btn-home" id="btnHome" onclick="goHome()">🏠</button>
+  <img src="data:image/png;base64,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" alt="Tito González Automotores — 100 Aniversario" class="logo">
+  <p>Plan de Ahorro — Solicitud de Adhesión</p>
+</div>
+
+<div class="progress-bar" id="progressBar">
+  <div class="progress-steps" id="progressSteps"></div>
+  <div class="progress-label" id="progressLabel"></div>
+</div>
+
+<div class="form-container" id="formContainer">
+
+  <!-- ═══════ SELECTOR ═══════ -->
+  <div class="selector-screen" id="selectorScreen">
+    <div class="selector-card" id="returnFromVwfsBanner" style="display:none; background: rgba(0,64,193,0.06); border-left: 4px solid #0040C1;">
+      <p style="margin:0; font-size:14px;">📋 Primero necesitamos validar tu identidad con el F01. Cuando termines, te mandamos de vuelta al formulario VWFS automáticamente.</p>
+    </div>
+    <div class="selector-card">
+      <h2>¿Quién va a titular el vehículo?</h2>
+      <p>Seleccioná el tipo de persona para completar el formulario correspondiente.</p>
+
+      <button class="selector-btn" onclick="startForm('fisica')">
+        <div class="sel-icon fisica">👤</div>
+        <div class="sel-text">
+          <h3>Persona Física</h3>
+          <p>Para personas individuales</p>
+        </div>
+      </button>
+
+      <button class="selector-btn" onclick="startForm('juridica')">
+        <div class="sel-icon juridica">🏢</div>
+        <div class="sel-text">
+          <h3>Persona Jurídica</h3>
+          <p>Empresas, sociedades, asociaciones</p>
+        </div>
+      </button>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- Campos ocultos del plan (los completa el dropdown de Modelo) -->
+  <div style="display:none">
+    <input type="text" id="ah-modelo"><input type="text" id="ah-valorMovil"><input type="text" id="ah-codigoPlan"><input type="text" id="ah-codigoSusc">
+  </div>
+
+  <!-- ═══════ PASO 1 COMÚN: DNI + ANÁLISIS IA ═ -->
+  <!-- ═══════════════════════════════════════ -->
+  <div class="step" id="common-step-dni">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">📷</div> DNI del Apoderado</div>
+
+      <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: #0040C1;">
+        <strong>Primero el DNI del apoderado.</strong> Subí las dos caras (frente y dorso). Vamos a analizarlas con IA para confirmar que se ven bien y <strong>precargar el resto del formulario</strong>.
+      </div>
+
+      <div class="upload-zone" id="uploadFrenteZone">
+        <div class="upload-icon">📇</div>
+        <div class="upload-text">Foto del DNI — <strong>Frente</strong></div>
+        <div class="upload-hint">Apoyalo sobre fondo blanco — los 4 bordes visibles</div>
+        <input type="file" accept="image/*" id="dniFrenteFile" onchange="handleDniUpload('frente', this)">
+      </div>
+      <div class="upload-preview" id="uploadFrentePreview"></div>
+
+      <div class="upload-zone" id="uploadDorsoZone" style="margin-top: 12px;">
+        <div class="upload-icon">📇</div>
+        <div class="upload-text">Foto del DNI — <strong>Dorso</strong></div>
+        <div class="upload-hint">Apoyalo sobre fondo blanco — los 4 bordes visibles</div>
+        <input type="file" accept="image/*" id="dniDorsoFile" onchange="handleDniUpload('dorso', this)">
+      </div>
+      <div class="upload-preview" id="uploadDorsoPreview"></div>
+
+      <div id="dniError" class="info-callout err" style="display:none; margin-top: 10px;"></div>
+
+      <div id="btnAnalyzeDniHint" style="display:none; margin-top: 14px; font-size: 13px; text-align: center; color: #0040C1; font-weight: 600;">
+        👇 Por favor apretá acá para validar el DNI y poder avanzar
+      </div>
+      <button type="button" class="btn btn-primary btn-block" id="btnAnalyzeDni" style="margin-top: 8px; display:none;" onclick="analyzeDni()">
+        Analizar DNI
+      </button>
+
+      <div id="dniAnalyzingState" class="info-callout" style="display:none; margin-top: 10px; background: rgba(0,64,193,0.06); border-left-color: #0040C1;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="spinner" style="width:20px; height:20px; border:3px solid rgba(0,64,193,0.2); border-top-color: #0040C1; border-radius:50%; animation: spin 0.8s linear infinite;"></div>
+          <span>Analizando DNI con IA… (puede tardar 10–20 seg)</span>
+        </div>
+      </div>
+
+      <div id="dniAnalysisResult" style="display:none; margin-top: 10px;"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- ═══════ PERSONA FÍSICA (5 pasos internos + 1 común) ═══════ -->
+  <!-- ═══════════════════════════════════════ -->
+
+  <!-- PF Step 1 (mostrado como paso 2): Datos titular -->
+  <div class="step" id="pf-step1">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">👤</div> Datos del titular</div>
+      <div class="field">
+        <label>Nombre y apellido completo</label>
+        <input type="text" id="pf-nombre" placeholder="Ej: Juan Carlos Pérez" autocomplete="name">
+      </div>
+      <div class="row row-2">
+        <div class="field">
+          <label>Tipo documento</label>
+          <select id="pf-tipoDoc"><option value="DNI">DNI</option><option value="LE">LE</option><option value="LC">LC</option><option value="Pasaporte">Pasaporte</option></select>
+        </div>
+        <div class="field">
+          <label>Nº de documento</label>
+          <input type="text" id="pf-nroDoc" placeholder="12345678" inputmode="numeric">
+        </div>
+      </div>
+      <div class="row row-2">
+        <div class="field">
+          <label>CUIL</label>
+          <input type="text" id="pf-cuil" placeholder="20-12345678-9" inputmode="numeric">
+        </div>
+        <div class="field">
+          <label>Sexo</label>
+          <select id="pf-sexo"><option value="">Seleccionar</option><option value="Masculino">Masculino</option><option value="Femenino">Femenino</option><option value="X">X</option></select>
+        </div>
+      </div>
+      <div class="field"><label>Nacionalidad</label><input type="text" id="pf-nacionalidad" value="Argentina"></div>
+    </div>
+    <div class="section-card">
+      <div class="section-title"><div class="icon">📞</div> Contacto</div>
+      <div class="field"><label>Celular</label><input type="tel" id="pf-celular" placeholder="11 1234-5678" autocomplete="tel"></div>
+      <div class="field"><label>E-mail</label><input type="email" id="pf-email" placeholder="juan@email.com" autocomplete="email"></div>
+      <div class="row row-2">
+        <div class="field"><label>Tel. particular <span class="optional">(opcional)</span></label><input type="tel" id="pf-telFijo" autocomplete="tel"></div>
+        <div class="field"><label>Tel. alternativo <span class="optional">(opcional)</span></label><input type="tel" id="pf-telAlt" autocomplete="tel"></div>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-title"><div class="icon">🎂</div> Info personal</div>
+      <div class="row row-2">
+        <div class="field"><label>Fecha de nacimiento</label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pf-fechaNac"></div>
+        <div class="field"><label>Lugar de nacimiento</label><input type="text" id="pf-lugarNac" placeholder="Bs. As."></div>
+      </div>
+      <div class="field">
+        <label>Estado civil</label>
+        <select id="pf-estadoCivil" onchange="document.getElementById('pf-conyugeBlock').classList.toggle('show', this.value==='Casado/a')"><option value="">Seleccionar</option><option>Soltero/a</option><option>Casado/a</option><option>Divorciado/a</option><option>Viudo/a</option><option>Unión convivencial</option></select>
+      </div>
+      <!-- Cónyuge inline (solo si Casado/a) -->
+      <div class="conditional" id="pf-conyugeBlock">
+        <div class="divider"></div>
+        <div class="section-title"><div class="icon">💍</div> Datos del cónyuge</div>
+
+        <!-- PRIMERO el DNI. De ahí autocompletamos nombre + CUIL. -->
+        <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: #0040C1; font-size:13px;">
+          <strong>Primero el DNI del cónyuge.</strong> Subí frente y dorso y analizalo. De ahí sacamos nombre y CUIL automáticamente.
+        </div>
+        <div class="upload-zone" id="conyUploadFrenteZone">
+          <div class="upload-icon">📇</div>
+          <div class="upload-text">Cónyuge — <strong>Frente</strong></div>
+          <div class="upload-hint">Apoyalo sobre fondo blanco — los 4 bordes visibles</div>
+          <input type="file" accept="image/*" id="conyDniFrenteFile" onchange="handleConyDniUpload('frente', this)">
+        </div>
+        <div class="upload-preview" id="conyUploadFrentePreview"></div>
+        <div class="upload-zone" id="conyUploadDorsoZone" style="margin-top: 10px;">
+          <div class="upload-icon">📇</div>
+          <div class="upload-text">Cónyuge — <strong>Dorso</strong></div>
+          <div class="upload-hint">Apoyalo sobre fondo blanco — los 4 bordes visibles</div>
+          <input type="file" accept="image/*" id="conyDniDorsoFile" onchange="handleConyDniUpload('dorso', this)">
+        </div>
+        <div class="upload-preview" id="conyUploadDorsoPreview"></div>
+        <div id="conyDniError" class="info-callout err" style="display:none; margin-top: 10px;"></div>
+        <div id="conyBtnAnalyzeHint" style="display:none; margin-top: 10px; font-size: 13px; text-align: center; color: #0040C1; font-weight: 600;">
+          👇 Apretá acá para validar el DNI del cónyuge
+        </div>
+        <button type="button" class="btn btn-primary btn-block" id="conyBtnAnalyzeDni" style="margin-top: 6px; display:none;" onclick="analyzeConyDni()">
+          Analizar DNI del cónyuge
+        </button>
+        <div id="conyDniAnalyzingState" style="display:none; padding:10px; background:#F2F5F8; border-radius:8px; margin-top:10px; font-size:13px;">
+          <span class="spinner"></span> Analizando DNI del cónyuge…
+        </div>
+        <div id="conyDniAnalysisResult" style="display:none; margin-top: 10px;"></div>
+
+        <!-- Los datos del conyuge quedan ocultos hasta que la IA valide el DNI. -->
+        <div class="conditional" id="pf-conyugeDataBlock">
+          <div style="height:12px"></div>
+          <div class="info-callout" style="background: rgba(0,135,60,0.06); border-left-color: #00873C; font-size: 12px;">
+            Los datos se precargaron desde el DNI. Editá si la IA leyó algo mal.
+          </div>
+          <div class="field"><label>Nombre y apellido</label><input type="text" id="pf-conyugeNombre"></div>
+          <div class="field"><label>CUIL del cónyuge</label><input type="text" id="pf-conyugeCuil" placeholder="20-12345678-9" inputmode="numeric"></div>
+          <div class="field">
+            <label>Cantidad de nupcias</label>
+            <div class="toggle-group">
+              <button type="button" class="toggle-btn" data-field="nupcias" data-value="1">1ª</button>
+              <button type="button" class="toggle-btn" data-field="nupcias" data-value="2">2ª</button>
+              <button type="button" class="toggle-btn" data-field="nupcias" data-value="3+">3ª+</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="pf-conyugeLockMsg" class="info-callout" style="margin-top: 10px; background: rgba(255,140,0,0.08); border-left-color: #FF8C00; font-size: 12px;">
+          ⚠ Primero subí y analizá el DNI del cónyuge. Los datos se completan automáticamente después.
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PF Step 2: Domicilios -->
+  <div class="step" id="pf-step2">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">🏠</div> Domicilio del DNI</div>
+      <div class="field"><label>Calle</label><input type="text" id="pf-dniCalle" autocomplete="street-address"></div>
+      <div class="row row-3">
+        <div class="field"><label>Nro</label><input type="text" id="pf-dniNro" inputmode="numeric"></div>
+        <div class="field"><label>Piso <span class="optional">(opt)</span></label><input type="text" id="pf-dniPiso"></div>
+        <div class="field"><label>Dpto <span class="optional">(opt)</span></label><input type="text" id="pf-dniDpto"></div>
+      </div>
+      <div class="row row-2">
+        <div class="field"><label>Localidad</label><input type="text" id="pf-dniLocalidad"></div>
+        <div class="field"><label>Barrio <span class="optional">(opt)</span></label><input type="text" id="pf-dniBarrio"></div>
+      </div>
+      <div class="row row-2">
+        <div class="field"><label>Provincia</label><select id="pf-dniProvincia"><option value="">Seleccionar</option><option>CABA</option><option>Buenos Aires</option><option>Catamarca</option><option>Chaco</option><option>Chubut</option><option>Córdoba</option><option>Corrientes</option><option>Entre Ríos</option><option>Formosa</option><option>Jujuy</option><option>La Pampa</option><option>La Rioja</option><option>Mendoza</option><option>Misiones</option><option>Neuquén</option><option>Río Negro</option><option>Salta</option><option>San Juan</option><option>San Luis</option><option>Santa Cruz</option><option>Santa Fe</option><option>Sgo. del Estero</option><option>Tierra del Fuego</option><option>Tucumán</option></select></div>
+        <div class="field"><label>Código postal</label><input type="text" id="pf-dniCP" inputmode="numeric"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PF Step 3: Datos laborales -->
+  <div class="step" id="pf-step3">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">💼</div> Datos laborales</div>
+      <div class="field"><label>Actividad principal / Cargo</label><input type="text" id="pf-actividad" placeholder="Ej: Empleado, Comerciante, Profesional..."></div>
+      <div class="row row-2">
+        <div class="field"><label>Ingresos mensuales</label><input type="text" id="pf-ingresos" inputmode="numeric" placeholder="$"></div>
+        <div class="field"><label>Fecha de ingreso <span class="optional">(opcional)</span></label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pf-fechaIngreso"></div>
+      </div>
+      <div class="field"><label>Empleador / Razón social <span class="optional">(opcional)</span></label><input type="text" id="pf-empleador"></div>
+      <div class="field"><label>Domicilio del empleador <span class="optional">(opcional)</span></label><input type="text" id="pf-empleadorDom"></div>
+    </div>
+  </div>
+
+  <!-- PF Step 4: Modelo / Plan -->
+  <div class="step" id="pf-step4">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">🚗</div> Modelo y plan</div>
+      <div class="info-callout">Elegí el modelo. El valor móvil y los códigos se completan solos.</div>
+      <div class="field"><label>Modelo / Plan</label><select id="ah-modelo-pf" onchange="onModeloChange('pf')"></select></div>
+      <div id="ah-planInfo-pf" class="plan-info" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- PF Step 5: Resumen -->
+  <div class="step" id="pf-step5">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">✅</div> Revisá tus datos</div>
+      <div class="info-callout">Verificá que todo esté correcto antes de enviar.</div>
+      <div id="pf-summaryContent"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════ -->
+  <!-- ═══════ PERSONA JURÍDICA (4 pasos) ═══ -->
+  <!-- ═══════════════════════════════════════ -->
+
+  <!-- PJ Step 1: Datos empresa -->
+  <div class="step" id="pj-step1">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">🏢</div> Datos de la empresa</div>
+      <div class="field"><label>Razón social</label><input type="text" id="pj-razonSocial" placeholder="Ej: Empresa S.A."></div>
+      <div class="field"><label>CUIT</label><input type="text" id="pj-cuit" placeholder="30-12345678-9" inputmode="numeric"></div>
+      <div class="field"><label>Actividad de la empresa</label><input type="text" id="pj-actividad" placeholder="Ej: Comercio"></div>
+      <div class="field"><label>Ingresos / Facturación mensual</label><input type="text" id="pj-ingresos" inputmode="numeric" placeholder="$"></div>
+    </div>
+    <div class="section-card">
+      <div class="section-title"><div class="icon">📞</div> Contacto de la empresa</div>
+      <div class="field"><label>Celular</label><input type="tel" id="pj-celular" autocomplete="tel"></div>
+      <div class="field"><label>E-mail</label><input type="email" id="pj-email" autocomplete="email"></div>
+      <div class="field"><label>Teléfono fijo <span class="optional">(opcional)</span></label><input type="tel" id="pj-telFijo"></div>
+    </div>
+    <div class="section-card">
+      <div class="section-title"><div class="icon">🏠</div> Domicilio del estatuto / contrato social</div>
+      <div class="field"><label>Calle</label><input type="text" id="pj-calle"></div>
+      <div class="row row-3">
+        <div class="field"><label>Nro</label><input type="text" id="pj-nro" inputmode="numeric"></div>
+        <div class="field"><label>Piso</label><input type="text" id="pj-piso"></div>
+        <div class="field"><label>Dpto</label><input type="text" id="pj-dpto"></div>
+      </div>
+      <div class="row row-2">
+        <div class="field"><label>Localidad</label><input type="text" id="pj-localidad"></div>
+        <div class="field"><label>Barrio</label><input type="text" id="pj-barrio"></div>
+      </div>
+      <div class="row row-2">
+        <div class="field"><label>Provincia</label><select id="pj-provincia"><option value="">Seleccionar</option><option>CABA</option><option>Buenos Aires</option><option>Catamarca</option><option>Chaco</option><option>Chubut</option><option>Córdoba</option><option>Corrientes</option><option>Entre Ríos</option><option>Formosa</option><option>Jujuy</option><option>La Pampa</option><option>La Rioja</option><option>Mendoza</option><option>Misiones</option><option>Neuquén</option><option>Río Negro</option><option>Salta</option><option>San Juan</option><option>San Luis</option><option>Santa Cruz</option><option>Santa Fe</option><option>Sgo. del Estero</option><option>Tierra del Fuego</option><option>Tucumán</option></select></div>
+        <div class="field"><label>Código postal</label><input type="text" id="pj-cp" inputmode="numeric"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PJ Step 2: Datos del apoderado -->
+  <div class="step" id="pj-step2">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">✍️</div> Datos del apoderado</div>
+      <div class="info-callout">Presidente, o quien surja del estatuto, o apoderado con poder amplio. Es de quien se sube el DNI.</div>
+      <div class="field"><label>Cargo</label><input type="text" id="pj-cargo" placeholder="Ej: Presidente / Apoderado"></div>
+      <div class="field"><label>Nombre y apellido</label><input type="text" id="pj-firmNombre"></div>
+      <div class="row row-2">
+        <div class="field"><label>Tipo doc.</label><select id="pj-firmTipoDoc"><option>DNI</option><option>LE</option><option>LC</option><option>Pasaporte</option></select></div>
+        <div class="field"><label>Nº documento</label><input type="text" id="pj-firmNroDoc" inputmode="numeric"></div>
+      </div>
+      <div class="row row-2">
+        <div class="field"><label>CUIL</label><input type="text" id="pj-firmCuil" inputmode="numeric"></div>
+        <div class="field"><label>Sexo</label><select id="pj-firmSexo"><option value="">Seleccionar</option><option>Masculino</option><option>Femenino</option><option>X</option></select></div>
+      </div>
+      <div class="row row-2">
+        <div class="field"><label>Fecha nac.</label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pj-firmFechaNac"></div>
+        <div class="field"><label>Nacionalidad</label><input type="text" id="pj-firmNacionalidad" value="Argentina"></div>
+      </div>
+      <div class="row row-2">
+        <div class="field"><label>Celular <span class="optional">(opcional)</span></label><input type="tel" id="pj-firmCelular"></div>
+        <div class="field"><label>E-mail <span class="optional">(opcional)</span></label><input type="email" id="pj-firmEmail"></div>
+      </div>
+    </div>
+    <div class="section-card">
+      <div class="section-title"><div class="icon">🏠</div> Domicilio del apoderado</div>
+      <div class="field"><label>Calle</label><input type="text" id="pj-firmCalle"></div>
+      <div class="row row-3">
+        <div class="field"><label>Nro</label><input type="text" id="pj-firmNro" inputmode="numeric"></div>
+        <div class="field"><label>Piso <span class="optional">(opt)</span></label><input type="text" id="pj-firmPiso"></div>
+        <div class="field"><label>Dpto <span class="optional">(opt)</span></label><input type="text" id="pj-firmDpto"></div>
+      </div>
+      <div class="row row-2">
+        <div class="field"><label>Localidad</label><input type="text" id="pj-firmLocalidad"></div>
+        <div class="field"><label>Provincia</label><select id="pj-firmProvincia"><option value="">Seleccionar</option><option>CABA</option><option>Buenos Aires</option><option>Catamarca</option><option>Chaco</option><option>Chubut</option><option>Córdoba</option><option>Corrientes</option><option>Entre Ríos</option><option>Formosa</option><option>Jujuy</option><option>La Pampa</option><option>La Rioja</option><option>Mendoza</option><option>Misiones</option><option>Neuquén</option><option>Río Negro</option><option>Salta</option><option>San Juan</option><option>San Luis</option><option>Santa Cruz</option><option>Santa Fe</option><option>Sgo. del Estero</option><option>Tierra del Fuego</option><option>Tucumán</option></select></div>
+      </div>
+      <div class="field"><label>Código postal</label><input type="text" id="pj-firmCP" inputmode="numeric"></div>
+    </div>
+  </div>
+
+  <!-- PJ Step 3: Modelo / Plan -->
+  <div class="step" id="pj-step3">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">🚗</div> Modelo y plan</div>
+      <div class="info-callout">Elegí el modelo. El valor móvil y los códigos se completan solos.</div>
+      <div class="field"><label>Modelo / Plan</label><select id="ah-modelo-pj" onchange="onModeloChange('pj')"></select></div>
+      <div id="ah-planInfo-pj" class="plan-info" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- PJ Step 4: Resumen -->
+  <div class="step" id="pj-step4">
+    <div class="section-card">
+      <div class="section-title"><div class="icon">✅</div> Revisá los datos</div>
+      <div class="info-callout">Verificá que todo esté correcto antes de enviar.</div>
+      <div id="pj-summaryContent"></div>
+    </div>
+  </div>
+
+  <!-- ═══════ SUCCESS ═══════ -->
+  <div class="success-screen" id="successScreen">
+    <div class="success-icon">✅</div>
+    <h2>¡Datos enviados!</h2>
+    <div id="uploadingState">
+      <p style="color:#5A6B7F;">Guardando datos...</p>
+      <div style="margin:16px auto; width:40px; height:40px; border:3px solid var(--vw-new-horizon); border-top-color:var(--vw-cobalt); border-radius:50%; animation:spin 0.8s linear infinite;"></div>
+      <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
+    </div>
+    <div id="uploadReady" style="display:none;">
+      <div style="margin-top:8px; font-size:15px; color:var(--vw-green); font-weight:700;">✓ Datos guardados correctamente</div>
+      <p style="margin-top:12px; font-size:14px; color:#5A6B7F;">La solicitud quedó cargada. El equipo de Tito González la va a procesar en el sistema de Plan de Ahorro.</p>
+    </div>
+    <div id="uploadErrorState" style="display:none;">
+      <div id="uploadError" style="margin-top:12px; font-size:13px; color:var(--vw-red);"></div>
+      <p style="margin-top:16px; font-size:12px; color:#8899AA;">Reintentá o avisá al concesionario.</p>
+    </div>
+  </div>
+
+
+</div>
+
+<!-- Navigation -->
+<div class="nav-bar" id="navBar">
+  <button class="btn btn-secondary" id="btnBack" onclick="prevStep()" style="display:none">← Atrás</button>
+  <button class="btn btn-primary" id="btnNext" onclick="nextStep()">Siguiente →</button>
+</div>
+
+<!-- Admin link -->
+<div id="adminLink" style="text-align:center;padding:20px;font-size:12px;">
+  <a href="panel.html" style="color:#8899AA;text-decoration:none;">🔐 Ingresar al panel</a>
+</div>
+
+<script>
+  let formType = null; // 'fisica' or 'juridica'
+  let currentStep = 0;
+  let totalSteps = 0;
+  const toggleValues = {};
+  let generatedPDFBlob = null;
+  const uploadedImages = {};
+
+  // Paso 1 (común) = Foto del DNI, luego los pasos por tipo. El vendedor lo asigna
+  // ventas/administración desde el panel — el cliente NO lo elige.
+  const stepConfig = {
+    fisica: { prefix: 'pf', steps: 6, labels: ['DNI del apoderado','Datos del titular','Domicilio','Datos laborales','Modelo y plan','Resumen'] },
+    juridica: { prefix: 'pj', steps: 5, labels: ['DNI del apoderado','Datos de la empresa','Datos del apoderado','Modelo y plan','Resumen'] }
+  };
+
+  // ═══════ PLANES DE AHORRO (grilla vigente — actualizar cada mes) ═══════
+  const PLANES_AHORRO = [
+    { modelo:'TERA TREND MSI MT MY26 (DF11T4)',              valorMovil:'37.865.250', codigoPlan:'TERV7A', codigoSusc:'DF11T4TERV7A001', tipo:'70/30' },
+    { modelo:'NIVUS SENSE 170 TSI MT (CH21R4)',              valorMovil:'34.286.650', codigoPlan:'NISEV8', codigoSusc:'CH21R4NISEV8001', tipo:'80/20' },
+    { modelo:'T-CROSS SENSE 170 TSI MT (BF3PD4)',            valorMovil:'39.060.350', codigoPlan:'TCSEV8', codigoSusc:'BF3PD4TCSEV8001', tipo:'80/20' },
+    { modelo:'POLO ROBUST MSI MT MY26 (BZ3RT4)',             valorMovil:'29.775.900', codigoPlan:'POLRO7', codigoSusc:'BZ3RT4POLRO7001', tipo:'70/30' },
+    { modelo:'VIRTUS SENSE MSI MT (BZ4ET4)',                 valorMovil:'34.675.600', codigoPlan:'VISEV1', codigoSusc:'BZ4ET4VISEV1001', tipo:'Cuota Entera' },
+    { modelo:'AMAROK Trendline TDI MT 4x2 G2 MY25 (AGDA43)', valorMovil:'51.929.800', codigoPlan:'AMAV72', codigoSusc:'AGDA43AMAV72001', tipo:'70/30' }
+  ];
+  function initModeloDropdowns() {
+    const opts = '<option value="">Elegí un modelo…</option>' +
+      PLANES_AHORRO.map(function(p,i){ return '<option value="'+i+'">'+p.modelo+'</option>'; }).join('');
+    ['pf','pj'].forEach(function(pref){ const s = document.getElementById('ah-modelo-'+pref); if (s) s.innerHTML = opts; });
+  }
+  function setHiddenPlan(p) {
+    document.getElementById('ah-modelo').value      = p ? p.modelo : '';
+    document.getElementById('ah-valorMovil').value  = p ? p.valorMovil : '';
+    document.getElementById('ah-codigoPlan').value  = p ? p.codigoPlan : '';
+    document.getElementById('ah-codigoSusc').value  = p ? p.codigoSusc : '';
+  }
+  function onModeloChange(prefix) {
+    const sel = document.getElementById('ah-modelo-' + prefix);
+    const info = document.getElementById('ah-planInfo-' + prefix);
+    const v = sel ? sel.value : '';
+    if (v === '') { setHiddenPlan(null); if (info) info.style.display = 'none'; return; }
+    const p = PLANES_AHORRO[parseInt(v, 10)];
+    setHiddenPlan(p);
+    if (info) {
+      info.style.display = '';
+      info.innerHTML =
+        '<div class="plan-row"><span>Valor móvil</span><strong>$' + p.valorMovil + '</strong></div>' +
+        '<div class="plan-row"><span>Plan</span><strong>H · 84 cuotas</strong></div>' +
+        '<div class="plan-row"><span>Cód. plan</span><strong>' + p.codigoPlan + '</strong></div>' +
+        '<div class="plan-row"><span>Cód. suscripción</span><strong>' + p.codigoSusc + '</strong></div>' +
+        '<div class="plan-row"><span>Adjudicación</span><strong>' + p.tipo + '</strong></div>';
+    }
+  }
+
+  // ═══════ STATE para analisis IA del DNI ═══════
+  const dniImages = {};         // { frente: {dataUrl, file, w, h}, dorso: {...} }
+  let dniAnalisis = null;       // resultado de la Edge Function
+  let dniAnalisisOk = false;    // true si calidad.ok_global, permite avanzar
+  let dniFrenteUrlUploaded = '';
+  let dniDorsoUrlUploaded = '';
+  // Sin mínimo de resolución: aunque sea baja, si el DNI es legible la IA decide.
+  const DNI_MIN_BYTES = 30 * 1024;
+
+  // ?return=vwfs → al terminar F01 mandamos al cliente de vuelta a VWFS.
+  const returnTarget = new URLSearchParams(window.location.search).get('return') || '';
+
+  // Toggle buttons
+  document.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      toggleValues[btn.dataset.field] = btn.dataset.value;
+      btn.parentElement.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+  });
+
+  function startForm(type) {
+    formType = type;
+    const cfg = stepConfig[type];
+    totalSteps = cfg.steps;
+    currentStep = 1;
+    document.getElementById('selectorScreen').style.display = 'none';
+    document.getElementById('progressBar').classList.add('visible');
+    document.getElementById('navBar').classList.add('visible');
+    document.getElementById('btnHome').classList.add('visible');
+
+    // Build progress steps
+    const container = document.getElementById('progressSteps');
+    container.innerHTML = '';
+    for (let i = 0; i < totalSteps; i++) {
+      container.innerHTML += '<div class="progress-step"></div>';
+    }
+
+    showStep(currentStep);
+  }
+
+  function goHome() {
+    if (!confirm('¿Estás seguro de volver a empezar? Se perderán los datos cargados.')) return;
+
+    // Reset everything
+    formType = null;
+    currentStep = 0;
+    totalSteps = 0;
+    Object.keys(toggleValues).forEach(k => delete toggleValues[k]);
+    Object.keys(uploadedImages).forEach(k => delete uploadedImages[k]);
+    generatedPDFBlob = null;
+    supabasePdfUrl = '';
+
+    // Clear all inputs
+    document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="date"], input[type="number"]').forEach(el => {
+      if (el.id === 'pf-nacionalidad' || el.id === 'pf-t2nacionalidad' || el.id === 'pj-firmNacionalidad') {
+        el.value = 'Argentina';
+      } else if (el.id === 'pf-porcTit') {
+        el.value = '100%';
+      } else {
+        el.value = '';
+      }
+    });
+    document.querySelectorAll('select').forEach(el => el.selectedIndex = 0);
+    document.querySelectorAll('.toggle-btn').forEach(el => el.classList.remove('selected'));
+    document.querySelectorAll('.upload-zone').forEach(el => el.classList.remove('has-file'));
+    document.querySelectorAll('.upload-preview').forEach(el => el.style.display = 'none');
+    document.querySelectorAll('input[type="checkbox"]').forEach(el => { el.checked = false; });
+    document.querySelectorAll('.conditional').forEach(el => el.classList.remove('show'));
+
+    // Hide everything, show selector
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    document.getElementById('successScreen').classList.remove('active');
+    document.getElementById('adminLogin').style.display = 'none';
+    document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('adminLink').style.display = '';
+    document.getElementById('uploadStatus').style.display = '';
+    document.getElementById('uploadErrorState').style.display = 'none';
+    document.getElementById('uploadingState').style.display = '';
+    document.getElementById('uploadReady').style.display = 'none';
+    document.getElementById('selectorScreen').style.display = '';
+    document.getElementById('progressBar').classList.remove('visible');
+    document.getElementById('navBar').classList.remove('visible');
+    document.getElementById('btnHome').classList.remove('visible');
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function showStep(n) {
+    const cfg = stepConfig[formType];
+    document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+    // n=1 = paso comun DNI + IA. n>1 se mapea a pf-step{n-1} o pj-step{n-1}.
+    const stepEl = n === 1
+      ? document.getElementById('common-step-dni')
+      : document.getElementById(cfg.prefix + '-step' + (n - 1));
+    if (stepEl) stepEl.classList.add('active');
+
+    const steps = document.querySelectorAll('.progress-step');
+    steps.forEach((s, i) => {
+      s.classList.remove('active', 'done');
+      if (i + 1 === n) s.classList.add('active');
+      else if (i + 1 < n) s.classList.add('done');
+    });
+    document.getElementById('progressLabel').textContent = 'Paso ' + n + ' de ' + totalSteps + ' — ' + cfg.labels[n-1];
+
+    document.getElementById('btnBack').style.display = n === 1 ? 'none' : '';
+    const btnNext = document.getElementById('btnNext');
+    if (n === totalSteps) {
+      btnNext.textContent = 'Finalizar y enviar ✓';
+      btnNext.className = 'btn btn-send';
+    } else {
+      btnNext.textContent = 'Siguiente →';
+      btnNext.className = 'btn btn-primary';
+    }
+
+    if (n === totalSteps) buildSummary();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  function nextStep() {
+    if (currentStep === 1) {
+      if (!validateDniStep()) {
+        document.getElementById('dniError').scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return;
+      }
+    }
+    // Step 2+: chequeo de obligatorios visibles en el step actual del tipo activo.
+    if (currentStep >= 2 && formType) {
+      const cfg = stepConfig[formType];
+      const stepEl = document.getElementById(cfg.prefix + '-step' + (currentStep - 1));
+      if (stepEl) {
+        // Si esta casado/a, el DNI del conyuge tiene que estar analizado OK antes de avanzar.
+        if (formType === 'fisica') {
+          const ec = document.getElementById('pf-estadoCivil');
+          const isCasado = ec && ec.value === 'Casado/a';
+          const conyBlockVisible = document.getElementById('pf-conyugeBlock')?.classList.contains('show');
+          if (isCasado && conyBlockVisible && !conyDniAnalisisOk) {
+            alert('Primero subí y analizá el DNI del cónyuge antes de avanzar.\n\n(Está marcado como Casado/a pero el DNI del cónyuge aún no fue validado.)');
+            const resultEl = document.getElementById('conyDniAnalysisResult') || document.getElementById('pf-conyugeLockMsg');
+            if (resultEl) resultEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+          }
+        }
+        const missing = findMissingFields(stepEl);
+        if (missing.length) {
+          alert('Completá estos campos antes de avanzar:\n\n• ' + missing.join('\n• '));
+          return;
+        }
+        const badDates = findInvalidDates(stepEl);
+        if (badDates.length) {
+          alert('Revisá estas fechas, tienen que ser DD/MM/AAAA completo:\n\n• ' + badDates.join('\n• '));
+          return;
+        }
+      }
+    }
+    if (currentStep === totalSteps) { generatePDF(); return; }
+    currentStep++;
+    showStep(currentStep);
+  }
+
+  // Valida todos los .field visibles no marcados como optional.
+  function findMissingFields(stepEl) {
+    const missing = [];
+    stepEl.querySelectorAll('.field').forEach(field => {
+      const cond = field.closest('.conditional');
+      if (cond && !cond.classList.contains('show')) return;
+      if (field.offsetParent === null) return;
+      if (field.querySelector('.optional')) return;
+      const lbl = field.querySelector('label');
+      const lblText = lbl ? lbl.textContent.replace(/\s*\(opc.*?\)\s*/i, '').replace(/\s*\(opcional\)\s*/i, '').replace(/\s*\(opt\)\s*/i, '').trim() : '(sin nombre)';
+      const tgBtn = field.querySelector('.toggle-btn[data-field]');
+      if (tgBtn) {
+        const fname = tgBtn.dataset.field;
+        if (!toggleValues[fname]) missing.push(lblText);
+        return;
+      }
+      const inp = field.querySelector('input:not([type=file]):not([disabled]), select:not([disabled]), textarea:not([disabled])');
+      if (!inp) return;
+      const v = (inp.value || '').toString().trim();
+      if (!v) missing.push(lblText);
+    });
+    return missing;
+  }
+
+  function validateDniStep() {
+    const err = document.getElementById('dniError');
+    err.style.display = 'none';
+    err.textContent = '';
+    if (!dniImages.frente || !dniImages.dorso) {
+      err.textContent = 'Subí frente y dorso del DNI antes de avanzar.';
+      err.style.display = '';
+      return false;
+    }
+    if (!dniAnalisisOk) {
+      err.textContent = 'Tocá "Analizar DNI con IA" y esperá a que valide las fotos antes de avanzar.';
+      err.style.display = '';
+      return false;
+    }
+    return true;
+  }
+
+  function prevStep() {
+    if (currentStep === 1) {
+      // Go back to selector
+      formType = null;
+      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+      document.getElementById('selectorScreen').style.display = '';
+      document.getElementById('progressBar').classList.remove('visible');
+      document.getElementById('navBar').classList.remove('visible');
+      document.getElementById('btnHome').classList.remove('visible');
+      return;
+    }
+    currentStep--;
+    showStep(currentStep);
+  }
+
+  // File upload with base64 storage
+  function handleUpload(input, previewId) {
+    const preview = document.getElementById(previewId);
+    if (input.files.length > 0) {
+      const file = input.files[0];
+      preview.style.display = 'block';
+      preview.textContent = '✓ ' + file.name;
+      input.closest('.upload-zone').classList.add('has-file');
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onload = e => {
+          uploadedImages[previewId] = { data: e.target.result, name: file.name, type: file.type };
+          preview.textContent = '✓ ' + file.name + ' (listo para PDF)';
+        };
+        reader.readAsDataURL(file);
+      }
+    }
+  }
+
+  // ═══════ DNI UPLOAD + ANALISIS IA (paso 1 comun) ═══════
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(new Error('No se pudo leer el archivo'));
+      r.readAsDataURL(file);
+    });
+  }
+
+  function getImgDims(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.onerror = () => reject(new Error('Imagen invalida'));
+      img.src = dataUrl;
+    });
+  }
+
+  // Convierte un dataURL (base64) a Uint8Array. Subimos el binario como bytes
+  // con Content-Type explicito en vez de mandar un Blob/File: los navegadores
+  // viejos (Edge Legacy) mandaban el body Blob de forma que el proxy de
+  // Supabase rechazaba con "400 Bad Request". Bytes + Content-Type es universal.
+  function dataUrlToBytes(dataUrl) {
+    const comma = dataUrl.indexOf(',');
+    const b64 = dataUrl.slice(comma + 1);
+    const bin = atob(b64);
+    const len = bin.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+
+  function resetDniAnalysisState() {
+    dniAnalisis = null;
+    dniAnalisisOk = false;
+    const res = document.getElementById('dniAnalysisResult');
+    if (res) { res.innerHTML = ''; res.style.display = 'none'; }
+  }
+
+  // Lee EXIF orientation de un JPEG. 1 = sin rotacion.
+  async function getJpegOrientation(file) {
+    if (!file || file.type !== 'image/jpeg') return 1;
+    try {
+      const buf = await file.slice(0, 256 * 1024).arrayBuffer();
+      const view = new DataView(buf);
+      if (view.byteLength < 2 || view.getUint16(0, false) !== 0xFFD8) return 1;
+      let offset = 2;
+      while (offset < view.byteLength) {
+        if (offset + 4 > view.byteLength) break;
+        const marker = view.getUint16(offset, false);
+        offset += 2;
+        if (marker === 0xFFE1) {
+          if (offset + 12 > view.byteLength) break;
+          if (view.getUint32(offset + 2, false) !== 0x45786966) return 1;
+          const tiff = offset + 8;
+          const little = view.getUint16(tiff, false) === 0x4949;
+          const firstIFD = view.getUint32(tiff + 4, little);
+          const entries = view.getUint16(tiff + firstIFD, little);
+          for (let i = 0; i < entries; i++) {
+            const entry = tiff + firstIFD + 2 + i * 12;
+            if (entry + 8 > view.byteLength) break;
+            if (view.getUint16(entry, little) === 0x0112) {
+              return view.getUint16(entry + 8, little) || 1;
+            }
+          }
+          return 1;
+        } else if ((marker & 0xFF00) !== 0xFF00) {
+          break;
+        } else {
+          if (offset + 2 > view.byteLength) break;
+          offset += view.getUint16(offset, false);
+        }
+      }
+    } catch (_e) { /* */ }
+    return 1;
+  }
+
+  // Redibuja aplicando EXIF manualmente. Forzamos imageOrientation:'none' en
+  // createImageBitmap para evitar la auto-rotacion del browser y poder
+  // controlar el resultado nosotros.
+  async function normalizeImageFromFile(file) {
+    const orientation = await getJpegOrientation(file);
+    let bmp;
+    // autoOriented = true cuando el decoder ya aplico la orientacion EXIF por su
+    // cuenta (fallbacks). En ese caso NO debemos rotar de nuevo manualmente.
+    let autoOriented = false;
+    try {
+      // Camino preferido: pixeles crudos, rotamos nosotros con el EXIF leido.
+      bmp = await createImageBitmap(file, { imageOrientation: 'none' });
+    } catch (_e1) {
+      try {
+        // Algunos navegadores de escritorio soportan createImageBitmap pero no
+        // el argumento de opciones: reintentamos sin opciones (auto-orienta).
+        bmp = await createImageBitmap(file);
+        autoOriented = true;
+      } catch (_e2) {
+        // Ultimo recurso: <img>. Si el navegador no puede decodificar el
+        // formato (p.ej. HEIC de iPhone en una PC) onerror dispara y avisamos.
+        const dataUrlRaw = await fileToDataUrl(file);
+        const imgEl = new Image();
+        await new Promise((res, rej) => {
+          imgEl.onload = res;
+          imgEl.onerror = () => rej(Object.assign(new Error('No se pudo decodificar la imagen'), { code: 'DECODE' }));
+          imgEl.src = dataUrlRaw;
+        });
+        bmp = imgEl;
+        autoOriented = true;
+      }
+    }
+    const effOrientation = autoOriented ? 1 : orientation;
+    const rawW = bmp.width || bmp.naturalWidth;
+    const rawH = bmp.height || bmp.naturalHeight;
+    if (!rawW || !rawH) throw Object.assign(new Error('Imagen sin dimensiones'), { code: 'DECODE' });
+    const swap = effOrientation >= 5 && effOrientation <= 8;
+    const visualW = swap ? rawH : rawW;
+    const visualH = swap ? rawW : rawH;
+    const MAX_W = 2576;
+    const scale = visualW > MAX_W ? MAX_W / visualW : 1;
+    const outW = Math.round(visualW * scale);
+    const outH = Math.round(visualH * scale);
+    const canvas = document.createElement('canvas');
+    canvas.width = outW;
+    canvas.height = outH;
+    const ctx = canvas.getContext('2d');
+    const sw = Math.round(rawW * scale);
+    const sh = Math.round(rawH * scale);
+    switch (effOrientation) {
+      case 2: ctx.translate(outW, 0);  ctx.scale(-1, 1); break;
+      case 3: ctx.translate(outW, outH); ctx.rotate(Math.PI); break;
+      case 4: ctx.translate(0, outH);  ctx.scale(1, -1); break;
+      case 5: ctx.rotate(0.5 * Math.PI); ctx.scale(1, -1); break;
+      case 6: ctx.rotate(0.5 * Math.PI); ctx.translate(0, -sh); break;
+      case 7: ctx.rotate(0.5 * Math.PI); ctx.translate(sw, -sh); ctx.scale(-1, 1); break;
+      case 8: ctx.rotate(-0.5 * Math.PI); ctx.translate(-sw, 0); break;
+    }
+    ctx.drawImage(bmp, 0, 0, sw, sh);
+    const isPng = file.type === 'image/png';
+    const mime = isPng ? 'image/png' : 'image/jpeg';
+    const quality = isPng ? undefined : 0.92;
+    const dataUrl = canvas.toDataURL(mime, quality);
+    // Generamos el Blob directo del canvas (mas robusto y liviano que volver a
+    // hacer fetch() del dataURL, que ademas puede fallar bajo CSP estricto).
+    const blob = await new Promise((resolve) => {
+      if (canvas.toBlob) canvas.toBlob((b) => resolve(b), mime, quality);
+      else resolve(null);
+    });
+    return { dataUrl, blob, w: outW, h: outH, mime };
+  }
+
+  async function handleDniUpload(which, input) {
+    const err = document.getElementById('dniError');
+    err.style.display = 'none';
+    err.textContent = '';
+    const file = input.files && input.files[0];
+    if (!file) return;
+
+    resetDniAnalysisState();
+
+    if (!file.type.startsWith('image/')) {
+      err.textContent = 'El archivo debe ser una imagen (JPG o PNG).';
+      err.style.display = ''; input.value = ''; return;
+    }
+    if (file.size < DNI_MIN_BYTES) {
+      err.textContent = 'La foto pesa solo ' + Math.round(file.size/1024) + ' KB. Necesitamos al menos ' + Math.round(DNI_MIN_BYTES/1024) + ' KB.';
+      err.style.display = ''; input.value = ''; return;
+    }
+    try {
+      const norm = await normalizeImageFromFile(file);
+      // Usamos el Blob directo: NO construimos `new File(...)` porque ese
+      // constructor no existe en navegadores viejos (Edge Legacy) y tiraba
+      // excepcion -> "no se pudo procesar". El Blob ya tiene .type y .size y
+      // sirve como body del upload a Supabase.
+      const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
+      dniImages[which] = { dataUrl: norm.dataUrl, file: blob, mime: norm.mime, w: norm.w, h: norm.h };
+      showDniPreview(which);
+      updateAnalyzeBtnVisibility();
+    } catch (e) {
+      console.error('Error al procesar DNI:', e);
+      err.textContent = dniProcessErrorMsg(file);
+      err.style.display = ''; input.value = '';
+    }
+  }
+
+  // Mensaje de error util cuando el navegador no puede decodificar la imagen.
+  // Caso tipico en PC: foto HEIC/HEIF de iPhone que Chrome/Edge/Firefox no abren.
+  function dniProcessErrorMsg(file) {
+    const isHeic = /hei[cf]/i.test(file && file.type || '') || /\.(heic|heif)$/i.test(file && file.name || '');
+    if (isHeic) {
+      return 'Esta foto esta en formato HEIC (iPhone) y la computadora no puede abrirla. ' +
+             'Convertila a JPG, o subila directo desde el celular.';
+    }
+    return 'No se pudo procesar la imagen. Probá con otra foto en formato JPG o PNG (no PDF ni HEIC).';
+  }
+
+  function previewPrefix(which) { return which === 'frente' ? 'Frente' : 'Dorso'; }
+
+  function showDniPreview(which) {
+    const prefix = previewPrefix(which);
+    const zone = document.getElementById('upload' + prefix + 'Zone');
+    const prev = document.getElementById('upload' + prefix + 'Preview');
+    const img = dniImages[which];
+    if (!zone || !prev || !img) return;
+    zone.classList.add('has-file');
+    prev.style.display = 'block';
+    prev.innerHTML =
+      '<img src="' + img.dataUrl + '" alt="Vista previa" style="max-width:100%; border-radius:8px;">' +
+      '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:12px; color:#556;">' +
+        '<span>✓ ' + img.w + '×' + img.h + ' px · ' + Math.round(img.file.size/1024) + ' KB</span>' +
+        '<button type="button" onclick="removeDniImage(\'' + which + '\')" style="border:none; background:transparent; color:#E4002B; font-weight:600; cursor:pointer;">Quitar</button>' +
+      '</div>';
+  }
+
+  function removeDniImage(which) {
+    delete dniImages[which];
+    const prefix = previewPrefix(which);
+    const zone = document.getElementById('upload' + prefix + 'Zone');
+    const prev = document.getElementById('upload' + prefix + 'Preview');
+    const input = document.getElementById('dni' + prefix + 'File');
+    if (zone) zone.classList.remove('has-file');
+    if (prev) { prev.innerHTML = ''; prev.style.display = 'none'; }
+    if (input) input.value = '';
+    resetDniAnalysisState();
+    updateAnalyzeBtnVisibility();
+  }
+
+  function updateAnalyzeBtnVisibility() {
+    const btn = document.getElementById('btnAnalyzeDni');
+    const hint = document.getElementById('btnAnalyzeDniHint');
+    if (!btn) return;
+    const ready = !!dniImages.frente && !!dniImages.dorso && !dniAnalisisOk;
+    btn.style.display = ready ? '' : 'none';
+    if (ready) btn.disabled = false;
+    if (hint) hint.style.display = ready ? '' : 'none';
+  }
+
+  async function analyzeDni() {
+    const btn = document.getElementById('btnAnalyzeDni');
+    const loader = document.getElementById('dniAnalyzingState');
+    const resultEl = document.getElementById('dniAnalysisResult');
+    const errEl = document.getElementById('dniError');
+    errEl.style.display = 'none'; errEl.textContent = '';
+    resultEl.innerHTML = ''; resultEl.style.display = 'none';
+
+    if (!dniImages.frente || !dniImages.dorso) {
+      errEl.textContent = 'Subi el frente y el dorso del DNI antes de analizar.';
+      errEl.style.display = ''; return;
+    }
+    btn.disabled = true; btn.style.display = 'none';
+    const hint = document.getElementById('btnAnalyzeDniHint');
+    if (hint) hint.style.display = 'none';
+    loader.style.display = '';
+
+    try {
+      const timestamp = Date.now();
+      const safe = 'tmp_' + timestamp;
+      const uploadOne = async (which) => {
+        const img = dniImages[which];
+        const mime = img.mime || (img.file && img.file.type) || 'image/jpeg';
+        const ext = mime === 'image/png' ? 'png' : 'jpg';
+        const path = safe + '/' + which + '.' + ext;
+        const res = await supaFetch('/storage/v1/object/vwfs-dnis/' + path, {
+          method: 'POST',
+          headers: { 'Content-Type': mime, 'x-upsert': 'true' },
+          body: dataUrlToBytes(img.dataUrl)
+        });
+        if (!res.ok) { const t = await res.text(); throw new Error('Fallo subida ' + which + ': ' + t); }
+        return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
+      };
+      const [urlFrente, urlDorso] = await Promise.all([uploadOne('frente'), uploadOne('dorso')]);
+      dniFrenteUrlUploaded = urlFrente;
+      dniDorsoUrlUploaded = urlDorso;
+
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-dni', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dni_frente_url: urlFrente, dni_dorso_url: urlDorso, datero: {} })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'La IA no pudo analizar el DNI. Intenta de nuevo.');
+
+      dniAnalisis = data;
+      loader.style.display = 'none';
+
+      const cal = data.calidad || {};
+      const cardFor = (label, c) => {
+        if (!c) return '';
+        const row = (ok, txtOk, txtBad) =>
+          '<div style="display:flex; gap:6px; align-items:center; font-size:13px; padding:2px 0;">' +
+            '<span style="color:' + (ok ? '#00873C' : '#E4002B') + '; font-weight:700;">' + (ok ? '✓' : '✗') + '</span>' +
+            '<span>' + (ok ? txtOk : txtBad) + '</span>' +
+          '</div>';
+        return (
+          '<div style="background:#fff; border:1px solid #DAE4ED; border-radius:10px; padding:10px 12px; margin-top:8px;">' +
+            '<div style="font-weight:700; margin-bottom:4px;">' + label + '</div>' +
+            row(!!c.legible, 'Legible', 'No se lee bien') +
+            row(!c.blur, 'Foto nitida (sin blur)', 'Foto con blur / desenfocada') +
+            row(!c.bordes_cortados, 'Los 4 bordes visibles', 'Bordes cortados / DNI fuera de encuadre') +
+            row(!!c.fondo_blanco, 'Sobre fondo blanco (bordes nitidos)', 'No esta sobre fondo blanco — apoyalo en una hoja o mesa blanca') +
+            (c.vencido !== undefined ? row(!c.vencido, 'DNI vigente', 'DNI VENCIDO — no se puede usar') : '') +
+            (c.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + c.motivo + '</div>' : '') +
+          '</div>'
+        );
+      };
+      const detalle = cardFor('Frente', cal.frente) + cardFor('Dorso', cal.dorso);
+
+      // F01 es mas laxo que VWFS: acepta que el DNI no este sobre fondo blanco,
+      // pero avisa que para el tramite VWFS se va a requerir re-cargarlo.
+      const faceOkNoFondo = c => c && c.legible && !c.blur && !c.bordes_cortados && !c.vencido;
+      const essentiallyOk = faceOkNoFondo(cal.frente) && faceOkNoFondo(cal.dorso);
+      const soloFaltaFondo = essentiallyOk && !cal.ok_global &&
+        (!cal.frente.fondo_blanco || !cal.dorso.fondo_blanco);
+
+      if (cal.ok_global === true) {
+        dniAnalisisOk = true;
+        resultEl.innerHTML =
+          '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: #00873C;">' +
+            '<strong>✓ DNI OK.</strong> La IA pudo leer los datos correctamente. Precargamos el formulario con lo que leyo.' +
+          '</div>' + detalle;
+        resultEl.style.display = '';
+        prefillFromDniExtraido(data.extraido || {});
+        populateUploadedImagesFromDni();
+      } else if (soloFaltaFondo) {
+        // Pasa F01 pero avisa que VWFS va a pedir re-cargar con fondo blanco
+        dniAnalisisOk = true;
+        resultEl.innerHTML =
+          '<div class="info-callout" style="background: rgba(255,140,0,0.08); border-left-color: #FF8C00;">' +
+            '<strong>⚠ DNI aceptado para F01.</strong> Se ve bien pero <strong>no esta sobre fondo blanco</strong>. ' +
+            '<br><br>Si despues de F01 vas a hacer un credito con Volkswagen Financial Services (VWFS), ahi te vamos a pedir que lo cargues de nuevo sobre fondo blanco para que los bordes se vean perfectos.' +
+          '</div>' + detalle;
+        resultEl.style.display = '';
+        prefillFromDniExtraido(data.extraido || {});
+        populateUploadedImagesFromDni();
+      } else {
+        dniAnalisisOk = false;
+        resultEl.innerHTML =
+          '<div class="info-callout err">' +
+            '<strong>✗ El DNI no cumple.</strong> Mira el detalle abajo y saca las fotos de nuevo.' +
+          '</div>' + detalle +
+          '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetDniForRetry()">Sacar fotos de nuevo</button>';
+        resultEl.style.display = '';
+      }
+    } catch (e) {
+      console.error('analyzeDni error', e);
+      loader.style.display = 'none';
+      errEl.textContent = 'No pudimos analizar el DNI: ' + (e && e.message ? e.message : 'error inesperado');
+      errEl.style.display = '';
+      btn.disabled = false;
+      updateAnalyzeBtnVisibility();
+    }
+  }
+
+  function resetDniForRetry() {
+    removeDniImage('frente');
+    removeDniImage('dorso');
+    dniFrenteUrlUploaded = '';
+    dniDorsoUrlUploaded = '';
+  }
+
+  // Precarga los campos del F01 a partir de lo leido del DNI.
+  // Solo campos vacios (para no pisar si el usuario ya tipeo).
+  function prefillFromDniExtraido(ext) {
+    if (!ext || !formType) return;
+    const setIf = (id, v) => {
+      const el = document.getElementById(id);
+      if (!el || v == null || String(v).trim() === '') return;
+      if (el.tagName === 'SELECT') {
+        // Para selects, buscamos una opcion cuyo texto coincida (insensitivo a mayusculas/tildes).
+        if (el.value) return;
+        const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+        const wanted = norm(v);
+        for (const opt of el.options) {
+          if (norm(opt.value) === wanted || norm(opt.text) === wanted) { el.value = opt.value; return; }
+        }
+        // Si no hay match exacto, probar prefijo (ej "Sgo. del Estero" vs "Santiago del Estero")
+        for (const opt of el.options) {
+          if (opt.value && (norm(opt.value).startsWith(wanted) || wanted.startsWith(norm(opt.value)))) { el.value = opt.value; return; }
+        }
+      } else {
+        if (!el.value || el.value === '') el.value = v;
+      }
+    };
+
+    if (formType === 'fisica') {
+      const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
+      if (full) setIf('pf-nombre', full);
+      if (ext.dni) setIf('pf-nroDoc', ext.dni.replace(/\D/g, ''));
+      if (ext.cuil) setIf('pf-cuil', ext.cuil);
+      if (ext.sexo) {
+        const s = ext.sexo.toUpperCase();
+        const val = s === 'F' ? 'Femenino' : (s === 'M' ? 'Masculino' : (s === 'X' ? 'X' : ''));
+        if (val) setIf('pf-sexo', val);
+      }
+      if (ext.fecha_nacimiento) {
+        const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(ext.fecha_nacimiento.trim());
+        if (m) {
+          const d = m[1].padStart(2, '0'), mo = m[2].padStart(2, '0');
+          const y = m[3].length === 2 ? ('19' + m[3]) : m[3];
+          setIf('pf-fechaNac', d + '/' + mo + '/' + y);
+        }
+      }
+      if (ext.nacionalidad) setIf('pf-nacionalidad', ext.nacionalidad);
+
+      // Domicilio: preferir calle+altura separados si los tiene, sino parsear desde "domicilio"
+      if (ext.calle || ext.altura) {
+        if (ext.calle) setIf('pf-dniCalle', ext.calle);
+        if (ext.altura) setIf('pf-dniNro', ext.altura);
+      } else if (ext.domicilio) {
+        const dom = ext.domicilio.trim();
+        const mm = /^(.+?)\s+(\d{1,6})(?:\s+.*)?$/.exec(dom);
+        if (mm) { setIf('pf-dniCalle', mm[1].trim()); setIf('pf-dniNro', mm[2]); }
+        else setIf('pf-dniCalle', dom);
+      }
+      if (ext.barrio) setIf('pf-dniBarrio', ext.barrio);
+      if (ext.localidad) setIf('pf-dniLocalidad', ext.localidad);
+      if (ext.provincia) setIf('pf-dniProvincia', ext.provincia);
+      if (ext.codigo_postal) setIf('pf-dniCP', String(ext.codigo_postal).replace(/^[A-Z]/i, ''));
+    } else if (formType === 'juridica') {
+      const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
+      if (full) setIf('pj-firmanteNombre', full);
+      if (ext.dni) setIf('pj-firmanteDni', ext.dni.replace(/\D/g, ''));
+      if (ext.cuil) setIf('pj-firmanteCuil', ext.cuil);
+    }
+  }
+
+  // Copia las imagenes del DNI (analizadas con IA en paso 1) a las secciones
+  // "DNI titular" (PF) o "DNI firmante" (PJ). Asi el cliente no tiene que
+  // volver a subir las mismas fotos en un paso posterior.
+  function populateUploadedImagesFromDni() {
+    const prefix = formType === 'fisica' ? 'pf' : 'pj';
+    const setSlot = (slotId, which) => {
+      const img = dniImages[which];
+      if (!img) return;
+      uploadedImages[slotId] = { data: img.dataUrl, name: which + '.jpg', type: img.file.type };
+      const prev = document.getElementById(slotId);
+      if (prev) {
+        prev.style.display = 'block';
+        prev.textContent = '✓ ' + (which === 'frente' ? 'Frente' : 'Dorso') + ' cargado desde paso 1';
+        const zone = prev.previousElementSibling;
+        if (zone && zone.classList.contains('upload-zone')) zone.classList.add('has-file');
+      }
+    };
+    setSlot('prev-' + prefix + '-dni1', 'frente');
+    setSlot('prev-' + prefix + '-dni2', 'dorso');
+  }
+
+  // ═══════ DNI del CÓNYUGE: IA + regla relajada (solo F01) ═══════
+  const conyDniImages = {};
+  let conyDniAnalisis = null;
+  let conyDniAnalisisOk = false;
+  let conyDniFrenteUrlUploaded = '';
+  let conyDniDorsoUrlUploaded = '';
+
+  function resetConyDniAnalysisState() {
+    conyDniAnalisis = null;
+    conyDniAnalisisOk = false;
+    const res = document.getElementById('conyDniAnalysisResult');
+    if (res) { res.innerHTML = ''; res.style.display = 'none'; }
+    updateConyDataBlockVisibility();
+  }
+
+  // Muestra/oculta los campos de texto del conyuge segun si ya se valido el DNI.
+  function updateConyDataBlockVisibility() {
+    const dataBlock = document.getElementById('pf-conyugeDataBlock');
+    const lockMsg = document.getElementById('pf-conyugeLockMsg');
+    if (!dataBlock || !lockMsg) return;
+    if (conyDniAnalisisOk) {
+      dataBlock.classList.add('show');
+      lockMsg.style.display = 'none';
+    } else {
+      dataBlock.classList.remove('show');
+      lockMsg.style.display = '';
+    }
+  }
+
+  async function handleConyDniUpload(which, input) {
+    const err = document.getElementById('conyDniError');
+    err.style.display = 'none'; err.textContent = '';
+    const file = input.files && input.files[0];
+    if (!file) return;
+    resetConyDniAnalysisState();
+    if (!file.type.startsWith('image/')) {
+      err.textContent = 'El archivo debe ser una imagen.'; err.style.display = ''; input.value = ''; return;
+    }
+    if (file.size < DNI_MIN_BYTES) {
+      err.textContent = 'La foto pesa muy poco. Sacala con mas resolucion.'; err.style.display = ''; input.value = ''; return;
+    }
+    try {
+      const norm = await normalizeImageFromFile(file);
+      // Blob directo (sin `new File`, incompatible con navegadores viejos).
+      const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
+      conyDniImages[which] = { dataUrl: norm.dataUrl, file: blob, mime: norm.mime, w: norm.w, h: norm.h };
+      showConyDniPreview(which);
+      updateConyAnalyzeBtnVisibility();
+    } catch (e) {
+      console.error('Error al procesar DNI conyuge:', e);
+      err.textContent = dniProcessErrorMsg(file); err.style.display = ''; input.value = '';
+    }
+  }
+
+  function showConyDniPreview(which) {
+    const prefix = which === 'frente' ? 'Frente' : 'Dorso';
+    const zone = document.getElementById('conyUpload' + prefix + 'Zone');
+    const prev = document.getElementById('conyUpload' + prefix + 'Preview');
+    const img = conyDniImages[which];
+    if (!zone || !prev || !img) return;
+    zone.classList.add('has-file');
+    prev.style.display = 'block';
+    prev.innerHTML =
+      '<img src="' + img.dataUrl + '" alt="Vista previa" style="max-width:100%; border-radius:8px; max-height:180px; object-fit:contain;">' +
+      '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:12px; color:#556;">' +
+        '<span>✓ ' + img.w + 'x' + img.h + ' px</span>' +
+        '<button type="button" onclick="removeConyDniImage(\'' + which + '\')" style="border:none; background:transparent; color:#E4002B; font-weight:600; cursor:pointer;">Quitar</button>' +
+      '</div>';
+  }
+
+  function removeConyDniImage(which) {
+    delete conyDniImages[which];
+    const prefix = which === 'frente' ? 'Frente' : 'Dorso';
+    const zone = document.getElementById('conyUpload' + prefix + 'Zone');
+    const prev = document.getElementById('conyUpload' + prefix + 'Preview');
+    const input = document.getElementById('conyDni' + prefix + 'File');
+    if (zone) zone.classList.remove('has-file');
+    if (prev) { prev.innerHTML = ''; prev.style.display = 'none'; }
+    if (input) input.value = '';
+    resetConyDniAnalysisState();
+    updateConyAnalyzeBtnVisibility();
+  }
+
+  function updateConyAnalyzeBtnVisibility() {
+    const btn = document.getElementById('conyBtnAnalyzeDni');
+    const hint = document.getElementById('conyBtnAnalyzeHint');
+    if (!btn) return;
+    const ready = !!conyDniImages.frente && !!conyDniImages.dorso && !conyDniAnalisisOk;
+    btn.style.display = ready ? '' : 'none';
+    if (ready) btn.disabled = false;
+    if (hint) hint.style.display = ready ? '' : 'none';
+  }
+
+  function resetConyDniForRetry() {
+    removeConyDniImage('frente');
+    removeConyDniImage('dorso');
+    conyDniFrenteUrlUploaded = '';
+    conyDniDorsoUrlUploaded = '';
+  }
+
+  async function analyzeConyDni() {
+    const btn = document.getElementById('conyBtnAnalyzeDni');
+    const loader = document.getElementById('conyDniAnalyzingState');
+    const resultEl = document.getElementById('conyDniAnalysisResult');
+    const errEl = document.getElementById('conyDniError');
+    errEl.style.display = 'none'; errEl.textContent = '';
+    resultEl.innerHTML = ''; resultEl.style.display = 'none';
+
+    if (!conyDniImages.frente || !conyDniImages.dorso) {
+      errEl.textContent = 'Subi el frente y el dorso del DNI del conyuge.';
+      errEl.style.display = ''; return;
+    }
+    btn.disabled = true; btn.style.display = 'none';
+    const hint = document.getElementById('conyBtnAnalyzeHint');
+    if (hint) hint.style.display = 'none';
+    loader.style.display = '';
+
+    try {
+      const timestamp = Date.now();
+      const safe = 'cony_tmp_' + timestamp;
+      const uploadOne = async (which) => {
+        const img = conyDniImages[which];
+        const mime = img.mime || (img.file && img.file.type) || 'image/jpeg';
+        const extn = mime === 'image/png' ? 'png' : 'jpg';
+        const path = safe + '/' + which + '.' + extn;
+        const res = await supaFetch('/storage/v1/object/vwfs-dnis/' + path, {
+          method: 'POST',
+          headers: { 'Content-Type': mime, 'x-upsert': 'true' },
+          body: dataUrlToBytes(img.dataUrl)
+        });
+        if (!res.ok) { const t = await res.text(); throw new Error('Fallo subida ' + which + ': ' + t); }
+        return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
+      };
+      const [urlF, urlD] = await Promise.all([uploadOne('frente'), uploadOne('dorso')]);
+      conyDniFrenteUrlUploaded = urlF;
+      conyDniDorsoUrlUploaded = urlD;
+
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-dni', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dni_frente_url: urlF, dni_dorso_url: urlD, datero: {} })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'La IA no pudo analizar el DNI del conyuge.');
+
+      conyDniAnalisis = data;
+      loader.style.display = 'none';
+
+      const cal = data.calidad || {};
+      const cardFor = (label, c) => {
+        if (!c) return '';
+        const row = (ok, txtOk, txtBad) =>
+          '<div style="display:flex; gap:6px; align-items:center; font-size:13px; padding:2px 0;">' +
+            '<span style="color:' + (ok ? '#00873C' : '#E4002B') + '; font-weight:700;">' + (ok ? '✓' : '✗') + '</span>' +
+            '<span>' + (ok ? txtOk : txtBad) + '</span></div>';
+        return '<div style="background:#fff; border:1px solid #DAE4ED; border-radius:10px; padding:10px 12px; margin-top:8px;">' +
+          '<div style="font-weight:700; margin-bottom:4px;">' + label + '</div>' +
+          row(!!c.legible, 'Legible', 'No se lee bien') +
+          row(!c.blur, 'Foto nitida (sin blur)', 'Foto con blur') +
+          row(!c.bordes_cortados, 'Los 4 bordes visibles', 'Bordes cortados') +
+          row(!!c.fondo_blanco, 'Sobre fondo blanco', 'No esta sobre fondo blanco') +
+          (c.vencido !== undefined ? row(!c.vencido, 'DNI vigente', 'DNI VENCIDO - no sirve') : '') +
+          (c.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + c.motivo + '</div>' : '') +
+          '</div>';
+      };
+      const detalle = cardFor('Frente', cal.frente) + cardFor('Dorso', cal.dorso);
+
+      // Misma regla relajada que el titular en F01: pasa sin fondo blanco
+      // si todo lo demas esta bien, pero advierte.
+      const faceOkNoFondo = c => c && c.legible && !c.blur && !c.bordes_cortados && !c.vencido;
+      const essentiallyOk = faceOkNoFondo(cal.frente) && faceOkNoFondo(cal.dorso);
+      const soloFaltaFondo = essentiallyOk && !cal.ok_global &&
+        (!cal.frente.fondo_blanco || !cal.dorso.fondo_blanco);
+
+      if (cal.ok_global === true) {
+        conyDniAnalisisOk = true;
+        resultEl.innerHTML =
+          '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: #00873C;">' +
+            '<strong>✓ DNI del cónyuge OK.</strong> Se lee bien y esta completo.' +
+          '</div>' + detalle;
+        resultEl.style.display = '';
+        // Precarga nombre y CUIL del conyuge si campos vacios
+        if (data.extraido) {
+          const ext = data.extraido;
+          const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
+          if (full && !g('pf-conyugeNombre')) setField('pf-conyugeNombre', full);
+          if (ext.cuil && !g('pf-conyugeCuil')) setField('pf-conyugeCuil', ext.cuil);
+        }
+      } else if (soloFaltaFondo) {
+        conyDniAnalisisOk = true;
+        resultEl.innerHTML =
+          '<div class="info-callout" style="background: rgba(255,140,0,0.08); border-left-color: #FF8C00;">' +
+            '<strong>⚠ DNI del cónyuge aceptado para F01.</strong> Se ve bien pero no esta sobre fondo blanco. ' +
+            'Si despues vas a sacar credito VWFS, te vamos a pedir cargarlo sobre fondo blanco.' +
+          '</div>' + detalle;
+        resultEl.style.display = '';
+        if (data.extraido) {
+          const ext = data.extraido;
+          const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
+          if (full && !g('pf-conyugeNombre')) setField('pf-conyugeNombre', full);
+          if (ext.cuil && !g('pf-conyugeCuil')) setField('pf-conyugeCuil', ext.cuil);
+        }
+      } else {
+        conyDniAnalisisOk = false;
+        resultEl.innerHTML =
+          '<div class="info-callout err"><strong>✗ El DNI del cónyuge no cumple.</strong> Mira el detalle y subilo de nuevo.</div>' +
+          detalle +
+          '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetConyDniForRetry()">Volver a subir</button>';
+        resultEl.style.display = '';
+      }
+      updateConyDataBlockVisibility();
+    } catch (e) {
+      console.error('analyzeConyDni error', e);
+      loader.style.display = 'none';
+      errEl.textContent = 'No pudimos analizar el DNI del conyuge: ' + (e.message || 'error');
+      errEl.style.display = '';
+      btn.disabled = false;
+      updateConyAnalyzeBtnVisibility();
+    }
+  }
+
+  function setField(id, value) {
+    const el = document.getElementById(id);
+    if (el && !el.value) el.value = value;
+  }
+
+  // Cédulas
+  function toggleCedulaAzul(prefix) {
+    const has = document.getElementById(prefix + '-cedAzul').checked;
+    document.getElementById(prefix + '-cedAzulSection').classList.toggle('show', has);
+    if (has) updateAutorizados(prefix);
+  }
+
+  function updateAutorizados(prefix) {
+    const cant = parseInt(document.getElementById(prefix + '-cantAzules').value) || 1;
+    const list = document.getElementById(prefix + '-autorizadosList');
+    list.innerHTML = '';
+    for (let i = 0; i < cant; i++) {
+      list.innerHTML += '<div class="persona-autorizada"><div class="field" style="margin-bottom:8px"><label>Persona autorizada '+(i+1)+'</label><input type="text" id="'+prefix+'-aut'+i+'nombre" placeholder="Nombre completo"></div><div class="field" style="margin-bottom:0"><label>Nº de DNI</label><input type="text" id="'+prefix+'-aut'+i+'dni" placeholder="12345678" inputmode="numeric"></div></div>';
+    }
+  }
+
+  // Helper
+  function g(id) { const el = document.getElementById(id); return el ? (el.value || '') : ''; }
+
+  // ─── Fechas en formato argentino DD/MM/AAAA ───
+  // Internamente seguimos guardando ISO (AAAA-MM-DD) para no romper el matcheo
+  // F01↔VWFS, el panel ni el PDF. Estos helpers convierten entre ambos.
+  function ddmmToIso(s) {
+    const m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec((s || '').trim());
+    if (!m) return '';
+    return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  }
+  function isoToDdmm(s) {
+    s = (s || '').toString().trim();
+    let m = /^(\d{4})-(\d{1,2})-(\d{1,2})/.exec(s);
+    if (m) return m[3].padStart(2, '0') + '/' + m[2].padStart(2, '0') + '/' + m[1];
+    m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(s);
+    if (m) return m[1].padStart(2, '0') + '/' + m[2].padStart(2, '0') + '/' + m[3];
+    return s;
+  }
+  // Lee un campo DD/MM/AAAA y lo devuelve en ISO para guardar.
+  function gDate(id) { return ddmmToIso(g(id)); }
+  // Auto-formato mientras tipean: solo dígitos, inserta las barras.
+  function maskDateInput(el) {
+    let v = el.value.replace(/\D/g, '').slice(0, 8);
+    if (v.length >= 5) v = v.slice(0, 2) + '/' + v.slice(2, 4) + '/' + v.slice(4);
+    else if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+    el.value = v;
+  }
+  function initDateMasks() {
+    document.querySelectorAll('input.date-ar').forEach(function(el) {
+      el.addEventListener('input', function() { maskDateInput(el); });
+    });
+  }
+  // Devuelve labels de campos de fecha con valor incompleto/invalido dentro de un step.
+  function findInvalidDates(stepEl) {
+    const bad = [];
+    stepEl.querySelectorAll('input.date-ar').forEach(function(el) {
+      const cond = el.closest('.conditional');
+      if (cond && !cond.classList.contains('show')) return;
+      if (el.offsetParent === null) return;
+      const v = (el.value || '').trim();
+      if (v && !ddmmToIso(v)) {
+        const lbl = el.closest('.field') && el.closest('.field').querySelector('label');
+        bad.push(lbl ? lbl.textContent.trim() : 'Fecha');
+      }
+    });
+    return bad;
+  }
+
+  // Build summary
+  function buildSummary() {
+    const items = formType === 'fisica' ? getPFData() : getPJData();
+    const target = formType === 'fisica' ? 'pf-summaryContent' : 'pj-summaryContent';
+    const html = items.filter(([,v]) => v && v.trim()).map(([l,v]) => {
+      // Mostrar las fechas (guardadas en ISO) como DD/MM/AAAA en el resumen.
+      const disp = /Fecha/i.test(l) ? isoToDdmm(v) : v;
+      if (l.startsWith('—')) return '<div class="summary-item" style="background:var(--vw-new-horizon-20);margin:4px -4px;padding:6px 8px;border-radius:6px;font-weight:700"><span>'+l.replace(/—/g,'').trim()+'</span><span class="summary-value">'+disp+'</span></div>';
+      return '<div class="summary-item"><span class="summary-label">'+l+'</span><span class="summary-value">'+disp+'</span></div>';
+    }).join('');
+    document.getElementById(target).innerHTML = html || '<p style="color:#8899AA;font-size:13px">No se completaron datos.</p>';
+  }
+
+  function getPFData() {
+    const items = [
+      ['Nombre', g('pf-nombre')], ['Documento', g('pf-tipoDoc')+' '+g('pf-nroDoc')],
+      ['CUIL', g('pf-cuil')], ['Sexo', g('pf-sexo')],
+      ['Nacionalidad', g('pf-nacionalidad')], ['Celular', g('pf-celular')],
+      ['E-mail', g('pf-email')], ['Tel. particular', g('pf-telFijo')], ['Tel. alternativo', g('pf-telAlt')],
+      ['Fecha nac.', gDate('pf-fechaNac')], ['Lugar nac.', g('pf-lugarNac')],
+      ['Estado civil', g('pf-estadoCivil')],
+      ['— DOMICILIO —',''], ['Dirección', [g('pf-dniCalle'),g('pf-dniNro')].filter(Boolean).join(' ')],
+      ['Piso', g('pf-dniPiso')], ['Depto', g('pf-dniDpto')],
+      ['Localidad', g('pf-dniLocalidad')], ['Provincia', g('pf-dniProvincia')], ['CP', g('pf-dniCP')],
+    ];
+    if (g('pf-conyugeNombre') || g('pf-conyugeCuil')) {
+      items.push(['— CÓNYUGE —',''], ['Nombre cónyuge', g('pf-conyugeNombre')], ['CUIL cónyuge', g('pf-conyugeCuil')]);
+    }
+    items.push(
+      ['— LABORAL —',''],
+      ['Actividad / Cargo', g('pf-actividad')], ['Ingresos mensuales', g('pf-ingresos')],
+      ['Fecha de ingreso', gDate('pf-fechaIngreso')],
+      ['Empleador', g('pf-empleador')], ['Domicilio empleador', g('pf-empleadorDom')],
+      ['— PLAN —',''],
+      ['Modelo', g('ah-modelo')], ['Valor móvil', g('ah-valorMovil')],
+      ['Plan', 'H'], ['Cuotas', '84'], ['Cód. plan', g('ah-codigoPlan')], ['Cód. suscripción', g('ah-codigoSusc')],
+      ['Concesionario', 'Tito González Automotores S.A. (03079)']
+    );
+    return items;
+  }
+
+  function getPJData() {
+    return [
+      ['Razón social', g('pj-razonSocial')], ['CUIT', g('pj-cuit')], ['Actividad', g('pj-actividad')],
+      ['Ingresos / Facturación', g('pj-ingresos')],
+      ['Celular', g('pj-celular')], ['E-mail', g('pj-email')],
+      ['— DOMICILIO EMPRESA —',''],
+      ['Dirección', [g('pj-calle'),g('pj-nro')].filter(Boolean).join(' ')],
+      ['Localidad', g('pj-localidad')], ['Provincia', g('pj-provincia')], ['CP', g('pj-cp')],
+      ['— APODERADO —',''],
+      ['Cargo', g('pj-cargo')], ['Nombre', g('pj-firmNombre')],
+      ['Doc.', g('pj-firmTipoDoc')+' '+g('pj-firmNroDoc')], ['CUIL', g('pj-firmCuil')],
+      ['Sexo', g('pj-firmSexo')], ['Fecha nac.', gDate('pj-firmFechaNac')], ['Nacionalidad', g('pj-firmNacionalidad')],
+      ['— DOM. APODERADO —',''],
+      ['Dirección', [g('pj-firmCalle'),g('pj-firmNro')].filter(Boolean).join(' ')],
+      ['Localidad', g('pj-firmLocalidad')], ['Provincia', g('pj-firmProvincia')], ['CP', g('pj-firmCP')],
+      ['— PLAN —',''],
+      ['Modelo', g('ah-modelo')], ['Valor móvil', g('ah-valorMovil')],
+      ['Plan', 'H'], ['Cuotas', '84'], ['Cód. plan', g('ah-codigoPlan')], ['Cód. suscripción', g('ah-codigoSusc')],
+      ['Concesionario', 'Tito González Automotores S.A. (03079)']
+    ];
+  }
+
+  // Submit del wizard: ya no genera PDF, solo guarda en formularios_ahorro.
+  function generatePDF() {
+    document.getElementById('formContainer').querySelectorAll('.step').forEach(function(s){ s.classList.remove('active'); });
+    document.getElementById('successScreen').classList.add('active');
+    document.getElementById('navBar').classList.remove('visible');
+    document.getElementById('progressBar').classList.remove('visible');
+    document.getElementById('uploadingState').style.display = '';
+    document.getElementById('uploadReady').style.display = 'none';
+    document.getElementById('uploadErrorState').style.display = 'none';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    saveAhorro();
+  }
+
+  // ═══════ SUPABASE CONFIG ═══════
+  const SUPABASE_URL = 'https://wjfglsafgaltusmbnccl.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqZmdsc2FmZ2FsdHVzbWJuY2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MzM2OTksImV4cCI6MjA4OTAwOTY5OX0.OOwgyKDNQsbBaGDaL0OhJfc8eOsCClvvAPW0VFBKrOA';
+
+  async function supaFetch(path, options = {}) {
+    const res = await fetch(SUPABASE_URL + path, {
+      ...options,
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        ...options.headers
+      }
+    });
+    return res;
+  }
+
+  function getImageDimensions(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve({ width: img.width, height: img.height });
+      img.onerror = reject;
+      img.src = dataUrl;
+    });
+  }
+
+  // Re-renderiza un dataUrl a un canvas para "bakearle" la rotación EXIF
+  // (el browser auto-rota al cargar Image, así que el canvas captura los
+  // píxeles ya rotados). jsPDF no lee EXIF, por eso si la JPEG original
+  // tiene EXIF orientation 6/8/etc el PDF salía con la foto estirada/achatada.
+  function flattenImageDataUrl(dataUrl) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const w = img.naturalWidth, h = img.naturalHeight;
+        const canvas = document.createElement('canvas');
+        canvas.width = w; canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0);
+        resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.92), width: w, height: h });
+      };
+      img.onerror = () => reject(new Error('No se pudo cargar imagen para flatten'));
+      img.src = dataUrl;
+    });
+  }
+
+  let supabasePdfUrl = '';
+
+  async function uploadF01DniImages(safeName, timestamp) {
+    const urls = {};
+    const keys = formType === 'fisica'
+      ? [
+          ['prev-pf-dni1',        'DNI Titular Frente'],
+          ['prev-pf-dni2',        'DNI Titular Dorso'],
+          ['prev-pf-dniConFrente','DNI Cónyuge Frente'],
+          ['prev-pf-dniConDorso', 'DNI Cónyuge Dorso'],
+          ['prev-pf-dniT2',       'DNI 2° Titular']
+        ]
+      : [
+          ['prev-pj-dni1', 'DNI Firmante Frente'],
+          ['prev-pj-dni2', 'DNI Firmante Dorso']
+        ];
+    for (const [imgKey, label] of keys) {
+      const img = uploadedImages[imgKey];
+      if (!img || !img.data) continue;
+      const ext = (img.type || '').includes('png') ? 'png' : 'jpg';
+      const fileName = 'dni/F01_' + safeName + '_' + timestamp + '_' + imgKey + '.' + ext;
+      try {
+        const r = await fetch(img.data);
+        const blob = await r.blob();
+        const res = await supaFetch('/storage/v1/object/formularios-f01/' + fileName, {
+          method: 'POST',
+          headers: { 'Content-Type': img.type || 'image/jpeg' },
+          body: blob
+        });
+        if (res.ok) {
+          urls[label + ' URL'] = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
+        }
+      } catch (e) {
+        console.error('F01 DNI upload failed', imgKey, e);
+      }
+    }
+    return urls;
+  }
+
+  // Guarda el formulario de Plan de Ahorro (sube DNI + inserta en formularios_ahorro). Sin PDF.
+  async function saveAhorro() {
+    try {
+      const nombre = (formType === 'fisica' ? g('pf-nombre') : g('pj-razonSocial')) || 'Sin nombre';
+      const timestamp = Date.now();
+      const safe = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_') || 'cliente';
+
+      // 1. Subir imagenes de DNI al bucket (reutiliza el helper de F01)
+      const dniUrls = await uploadF01DniImages(safe, timestamp);
+
+      // 2. Armar datos
+      const documento = formType === 'fisica' ? (g('pf-tipoDoc') + ' ' + g('pf-nroDoc')) : g('pj-cuit');
+      const celular = formType === 'fisica' ? g('pf-celular') : g('pj-celular');
+      const email = formType === 'fisica' ? g('pf-email') : g('pj-email');
+      const allData = formType === 'fisica' ? getPFData() : getPJData();
+      const datosObj = Object.fromEntries(allData.filter(function(p){ return p[0] && p[1] && !p[0].startsWith('\u2014'); }));
+      Object.assign(datosObj, dniUrls);
+
+      // 3. Insertar registro
+      const res = await supaFetch('/rest/v1/formularios_ahorro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: JSON.stringify({
+          tipo: formType,
+          nombre: nombre,
+          documento: documento,
+          celular: celular,
+          email: email,
+          modelo: g('ah-modelo') || null,
+          valor_movil: g('ah-valorMovil') || null,
+          codigo_plan: g('ah-codigoPlan') || null,
+          vendedor: null,
+          datos: datosObj,
+          dni_frente_url: dniFrenteUrlUploaded || null,
+          dni_dorso_url: dniDorsoUrlUploaded || null,
+          dni_analisis: dniAnalisis || null
+        })
+      });
+      if (!res.ok) { const t = await res.text(); throw new Error(t); }
+
+      document.getElementById('uploadingState').style.display = 'none';
+      document.getElementById('uploadReady').style.display = '';
+    } catch (e) {
+      console.error('Save error:', e);
+      document.getElementById('uploadingState').style.display = 'none';
+      document.getElementById('uploadErrorState').style.display = '';
+      const errEl = document.getElementById('uploadError');
+      if (errEl) errEl.textContent = 'No se pudo guardar el formulario. Intentalo de nuevo o avisa al concesionario.';
+    }
+  }
+
+  function sharePDF() {
+    if (!supabasePdfUrl) return;
+    if (navigator.share) {
+      navigator.share({ title: 'Formulario F01', url: supabasePdfUrl }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(supabasePdfUrl).then(() => {
+        alert('Link copiado al portapapeles');
+      }).catch(() => {
+        prompt('Copiá este link:', supabasePdfUrl);
+      });
+    }
+  }
+
+  function downloadPDFLocal() {
+    if (!generatedPDFBlob) return;
+    const name = formType === 'fisica' ? g('pf-nombre') : g('pj-razonSocial');
+    const safe = (name || 'Cliente').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
+    const tipo = formType === 'fisica' ? 'PF' : 'PJ';
+    const fileName = 'F01_' + tipo + '_' + safe + '.pdf';
+    const url = URL.createObjectURL(generatedPDFBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ═══════ ADMIN PANEL ═══════
+  let adminFormularios = [];
+
+  function showAdminLogin() {
+    document.getElementById('selectorScreen').style.display = 'none';
+    document.getElementById('progressBar').classList.remove('visible');
+    document.getElementById('navBar').classList.remove('visible');
+    document.getElementById('btnHome').classList.add('visible');
+    document.getElementById('adminLogin').style.display = 'block';
+    document.getElementById('adminLink').style.display = 'none';
+  }
+
+  async function adminLogin() {
+    const user = document.getElementById('adminUser').value.trim().toLowerCase();
+    const pass = document.getElementById('adminPass').value;
+    document.getElementById('adminLoginError').style.display = 'none';
+
+    try {
+      const res = await supaFetch('/rest/v1/f01_admins?usuario=eq.' + encodeURIComponent(user) + '&clave=eq.' + encodeURIComponent(pass), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      const data = await res.json();
+      if (data.length > 0) {
+        document.getElementById('adminLogin').style.display = 'none';
+        document.getElementById('adminPanel').style.display = 'block';
+        loadFormularios();
+      } else {
+        document.getElementById('adminLoginError').style.display = 'block';
+      }
+    } catch (e) {
+      document.getElementById('adminLoginError').textContent = 'Error de conexión';
+      document.getElementById('adminLoginError').style.display = 'block';
+    }
+  }
+
+  function adminLogout() {
+    document.getElementById('adminPanel').style.display = 'none';
+    document.getElementById('adminLogin').style.display = 'none';
+    document.getElementById('selectorScreen').style.display = '';
+    document.getElementById('btnHome').classList.remove('visible');
+    document.getElementById('adminLink').style.display = '';
+    document.getElementById('adminUser').value = '';
+    document.getElementById('adminPass').value = '';
+  }
+
+  async function loadFormularios() {
+    try {
+      const res = await supaFetch('/rest/v1/formularios_f01?order=created_at.desc&limit=100', {
+        headers: { 'Content-Type': 'application/json' }
+      });
+      adminFormularios = await res.json();
+      buildMonthFilter();
+      filterFormularios();
+    } catch (e) {
+      document.getElementById('adminList').innerHTML = '<p style="color:var(--vw-red)">Error cargando formularios</p>';
+    }
+  }
+
+  // Clave YYYY-MM de un registro (a partir de created_at).
+  function mesKey(f) {
+    const d = f && f.created_at ? new Date(f.created_at) : null;
+    if (!d || isNaN(d)) return '';
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  function mesLabel(key) {
+    const [y, m] = key.split('-');
+    const meses = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+    return meses[parseInt(m, 10) - 1] + ' ' + y;
+  }
+
+  // Llena el <select> de meses: "Mes actual" por defecto, meses anteriores presentes y "Todos".
+  function buildMonthFilter() {
+    const sel = document.getElementById('adminMonthFilter');
+    if (!sel) return;
+    const now = new Date();
+    const curKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    const keys = Array.from(new Set(adminFormularios.map(mesKey).filter(Boolean)));
+    if (!keys.includes(curKey)) keys.push(curKey);
+    keys.sort().reverse();
+    let opts = '';
+    keys.forEach(k => {
+      const lbl = (k === curKey ? 'Mes actual — ' : '') + mesLabel(k);
+      opts += '<option value="' + k + '"' + (k === curKey ? ' selected' : '') + '>' + lbl + '</option>';
+    });
+    opts += '<option value="__all__">Todos los meses</option>';
+    sel.innerHTML = opts;
+  }
+
+  function filterFormularios() {
+    const q = (document.getElementById('adminSearch').value || '').toLowerCase().trim();
+    const qDigits = q.replace(/\D/g, '');
+    const mes = (document.getElementById('adminMonthFilter') || {}).value || '__all__';
+    const filtered = adminFormularios.filter(f => {
+      if (mes !== '__all__' && mesKey(f) !== mes) return false;
+      if (!q) return true;
+      const nombre = (f.nombre || '').toLowerCase();
+      const doc = (f.documento || '').toLowerCase();
+      const docDigits = doc.replace(/\D/g, '');
+      return nombre.includes(q) ||
+        doc.includes(q) ||
+        (f.tipo || '').toLowerCase().includes(q) ||
+        (qDigits && docDigits.includes(qDigits));
+    });
+    renderFormularios(filtered);
+  }
+
+  function renderFormularios(list) {
+    if (list.length === 0) {
+      document.getElementById('adminList').innerHTML = '<p style="color:#8899AA;text-align:center;padding:20px;">No hay formularios cargados</p>';
+      return;
+    }
+    let html = '';
+    list.forEach(f => {
+      const fecha = new Date(f.created_at).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      const tipoLabel = f.tipo === 'fisica' ? '👤 PF' : '🏢 PJ';
+      html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--vw-new-horizon-20);">';
+      html += '<div>';
+      html += '<div style="font-weight:600;font-size:14px;">' + tipoLabel + ' ' + (f.nombre || 'Sin nombre') + '</div>';
+      const vendTxt = f.vendedor ? ' — 💼 ' + f.vendedor : '';
+      html += '<div style="font-size:11px;color:#8899AA;">' + fecha + ' — ' + (f.documento || '') + vendTxt + '</div>';
+      html += '</div>';
+      if (f.pdf_url) {
+        html += '<a href="' + f.pdf_url + '" target="_blank" style="background:var(--vw-cobalt);color:white;padding:8px 14px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;flex-shrink:0;">Ver PDF</a>';
+      }
+      html += '</div>';
+    });
+    document.getElementById('adminList').innerHTML = html;
+  }
+
+  // Init: máscara de fechas DD/MM/AAAA + dropdown de modelos del plan.
+  (function initEntry() {
+    initDateMasks();
+    initModeloDropdowns();
+  })();
+
+</script>
+
+</body>
+</html>

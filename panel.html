@@ -375,6 +375,7 @@
     <div class="tabs">
       <button class="tab-btn active" data-tab="vwfs" onclick="setTab('vwfs')">VWFS <span class="tab-count" id="tab-cnt-vwfs">0</span></button>
       <button class="tab-btn" data-tab="f01" onclick="setTab('f01')">F01 <span class="tab-count" id="tab-cnt-f01">0</span></button>
+      <button class="tab-btn" data-tab="ahorro" onclick="setTab('ahorro')">Plan de Ahorro <span class="tab-count" id="tab-cnt-ahorro">0</span></button>
       <button class="tab-btn" data-tab="prendas" id="tabPrendas" onclick="setTab('prendas')" style="display:none;">🔎 Revisor de Prendas</button>
     </div>
 
@@ -836,15 +837,16 @@
   let currentRole = 'ventas';   // 'ventas' | 'administracion' | 'owner'
   let selectedIds = new Set();  // IDs marcados para borrado masivo (owner only)
   let currentTab = 'vwfs';
-  const rowsCache = { vwfs: null, f01: null };
+  const rowsCache = { vwfs: null, f01: null, ahorro: null };
   const comprobantesCache = {}; // { vwfsId: [row,...] }
   const archivosCache = {};      // { vwfsId: [row,...] }
   let filter = 'all';
   let currentDetailId = null;
 
   const TAB_CONFIG = {
-    vwfs: { table: 'formularios_vwfs', editUrl: 'vwfs.html?edit=',  label: 'VWFS' },
-    f01:  { table: 'formularios_f01',  editUrl: 'index.html?edit=', label: 'F01'  }
+    vwfs:   { table: 'formularios_vwfs',  editUrl: 'vwfs.html?edit=',  label: 'VWFS' },
+    f01:    { table: 'formularios_f01',   editUrl: 'index.html?edit=', label: 'F01'  },
+    ahorro: { table: 'formularios_ahorro', editUrl: '',               label: 'Plan de Ahorro' }
   };
 
   const VENDEDORES = [
@@ -992,7 +994,7 @@
     document.getElementById('rowFilters').classList.toggle('two', isAdminOrOwner());
     // Revisor de Prendas: solapa visible solo para los usuarios del whitelist.
     document.getElementById('tabPrendas').style.display = PRENDAS_USERS.includes(user) ? '' : 'none';
-    Promise.all([loadTab('vwfs'), loadTab('f01')]).then(() => setTab('vwfs'));
+    Promise.all([loadTab('vwfs'), loadTab('f01'), loadTab('ahorro')]).then(() => setTab('vwfs'));
   }
 
   function populateAsignacionSelects() {
@@ -1164,7 +1166,7 @@
     filter = 'all';
     document.querySelectorAll('.filter-chip').forEach(c =>
       c.classList.toggle('active', c.dataset.filter === 'all'));
-    document.getElementById('filters').style.display = tab === 'f01' ? 'none' : '';
+    document.getElementById('filters').style.display = (tab === 'f01' || tab === 'ahorro') ? 'none' : '';
     if (!rowsCache[tab]) await loadTab(tab);
     else { updateFilterCounts(); buildMonthFilter(); renderList(); }
   }
@@ -1174,6 +1176,7 @@
   function updateTabCounts() {
     document.getElementById('tab-cnt-vwfs').textContent = rowsCache.vwfs ? rowsCache.vwfs.length : 0;
     document.getElementById('tab-cnt-f01').textContent  = rowsCache.f01  ? rowsCache.f01.length  : 0;
+    document.getElementById('tab-cnt-ahorro').textContent = rowsCache.ahorro ? rowsCache.ahorro.length : 0;
   }
 
   function updateFilterCounts() {
