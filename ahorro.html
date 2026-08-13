@@ -587,7 +587,10 @@
       <div class="section-title"><div class="icon">🏢</div> Datos de la empresa</div>
       <div class="field"><label>Razón social</label><input type="text" id="pj-razonSocial" placeholder="Ej: Empresa S.A."></div>
       <div class="field"><label>CUIT</label><input type="text" id="pj-cuit" placeholder="30-12345678-9" inputmode="numeric"></div>
-      <div class="field"><label>Actividad de la empresa</label><input type="text" id="pj-actividad" placeholder="Ej: Comercio"></div>
+      <div class="row row-2">
+        <div class="field"><label>Fecha de constitución</label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pj-fechaConst"></div>
+        <div class="field"><label>Actividad de la empresa</label><input type="text" id="pj-actividad" placeholder="Ej: Comercio"></div>
+      </div>
       <div class="field"><label>Ingresos / Facturación mensual</label><input type="text" id="pj-ingresos" inputmode="numeric" placeholder="$"></div>
     </div>
     <div class="section-card">
@@ -612,6 +615,22 @@
         <div class="field"><label>Provincia</label><select id="pj-provincia"><option value="">Seleccionar</option><option>CABA</option><option>Buenos Aires</option><option>Catamarca</option><option>Chaco</option><option>Chubut</option><option>Córdoba</option><option>Corrientes</option><option>Entre Ríos</option><option>Formosa</option><option>Jujuy</option><option>La Pampa</option><option>La Rioja</option><option>Mendoza</option><option>Misiones</option><option>Neuquén</option><option>Río Negro</option><option>Salta</option><option>San Juan</option><option>San Luis</option><option>Santa Cruz</option><option>Santa Fe</option><option>Sgo. del Estero</option><option>Tierra del Fuego</option><option>Tucumán</option></select></div>
         <div class="field"><label>Código postal</label><input type="text" id="pj-cp" inputmode="numeric"></div>
       </div>
+    </div>
+    <div class="section-card">
+      <div class="section-title"><div class="icon">🏦</div> Datos bancarios</div>
+      <div class="field"><label>CBU</label><input type="text" id="pj-cbu" inputmode="numeric" maxlength="22" placeholder="22 dígitos"></div>
+      <div class="field"><label>Tarjeta de crédito <span class="optional">(si el débito es por tarjeta)</span></label><input type="text" id="pj-tarjeta" inputmode="numeric" placeholder="Nº de tarjeta"></div>
+    </div>
+    <div class="section-card">
+      <div class="section-title"><div class="icon">👥</div> Composición societaria</div>
+      <div class="info-callout">Cargá cada socio con su nombre, DNI y porcentaje de participación.</div>
+      <div id="pj-sociosList"></div>
+      <button type="button" class="btn btn-secondary" onclick="addSocio()" style="margin-top:8px;">+ Agregar socio</button>
+    </div>
+    <div class="section-card">
+      <div class="section-title"><div class="icon">📄</div> Estatuto / Contrato social</div>
+      <div class="info-callout">Adjuntá el estatuto o contrato social (PDF o imagen).</div>
+      <div class="field"><input type="file" id="pj-estatuto" accept="application/pdf,image/*"></div>
     </div>
   </div>
 
@@ -760,6 +779,41 @@
     }
   }
 
+  // ═══════ Composición societaria (socios dinámicos) ═══════
+  let socioSeq = 0;
+  function addSocio(pre) {
+    const list = document.getElementById('pj-sociosList');
+    if (!list) return;
+    const id = ++socioSeq;
+    const row = document.createElement('div');
+    row.className = 'socio-row';
+    row.id = 'socio-' + id;
+    row.style.cssText = 'border:1px solid var(--vw-new-horizon-20); border-radius:var(--radius-sm); padding:10px; margin-bottom:10px;';
+    row.innerHTML =
+      '<div class="field"><label>Nombre y apellido</label><input type="text" class="socio-nombre"' + (pre ? ' value="' + pre.nombre + '"' : '') + '></div>' +
+      '<div class="row row-2">' +
+        '<div class="field"><label>DNI</label><input type="text" inputmode="numeric" class="socio-dni"' + (pre ? ' value="' + pre.dni + '"' : '') + '></div>' +
+        '<div class="field"><label>% participación</label><input type="text" inputmode="decimal" class="socio-pct" placeholder="%"' + (pre ? ' value="' + pre.pct + '"' : '') + '></div>' +
+      '</div>' +
+      '<button type="button" class="socio-del" onclick="removeSocio(' + id + ')" style="background:none;border:none;color:#B00020;font-size:12px;cursor:pointer;padding:2px 0;">✕ Quitar socio</button>';
+    list.appendChild(row);
+  }
+  function removeSocio(id) {
+    const row = document.getElementById('socio-' + id);
+    if (row) row.remove();
+  }
+  function getSocios() {
+    const rows = document.querySelectorAll('#pj-sociosList .socio-row');
+    const out = [];
+    rows.forEach(function(r){
+      const nombre = (r.querySelector('.socio-nombre').value || '').trim();
+      const dni    = (r.querySelector('.socio-dni').value || '').trim();
+      const pct    = (r.querySelector('.socio-pct').value || '').trim();
+      if (nombre || dni || pct) out.push({ nombre: nombre, dni: dni, pct: pct });
+    });
+    return out;
+  }
+
   // ═══════ STATE para analisis IA del DNI ═══════
   const dniImages = {};         // { frente: {dataUrl, file, w, h}, dorso: {...} }
   let dniAnalisis = null;       // resultado de la Edge Function
@@ -790,6 +844,11 @@
     const quien = type === 'juridica' ? 'apoderado' : 'titular';
     const tt = document.getElementById('dniStepTitleText'); if (tt) tt.textContent = 'DNI del ' + quien;
     const lead = document.getElementById('dniStepLead'); if (lead) lead.textContent = 'Primero el DNI del ' + quien + '.';
+    // PJ: arrancar con una fila de socio vacía en composición societaria.
+    if (type === 'juridica') {
+      const sl = document.getElementById('pj-sociosList');
+      if (sl && sl.children.length === 0) addSocio();
+    }
     document.getElementById('selectorScreen').style.display = 'none';
     document.getElementById('progressBar').classList.add('visible');
     document.getElementById('navBar').classList.add('visible');
@@ -1778,13 +1837,29 @@
   }
 
   function getPJData() {
-    return [
-      ['Razón social', g('pj-razonSocial')], ['CUIT', g('pj-cuit')], ['Actividad', g('pj-actividad')],
+    const items = [
+      ['Razón social', g('pj-razonSocial')], ['CUIT', g('pj-cuit')],
+      ['Fecha de constitución', gDate('pj-fechaConst')], ['Actividad', g('pj-actividad')],
       ['Ingresos / Facturación', g('pj-ingresos')],
       ['Celular', g('pj-celular')], ['E-mail', g('pj-email')],
       ['— DOMICILIO EMPRESA —',''],
       ['Dirección', [g('pj-calle'),g('pj-nro')].filter(Boolean).join(' ')],
       ['Localidad', g('pj-localidad')], ['Provincia', g('pj-provincia')], ['CP', g('pj-cp')],
+      ['— DATOS BANCARIOS —',''],
+      ['CBU', g('pj-cbu')], ['Tarjeta de crédito', g('pj-tarjeta')],
+    ];
+    const socios = getSocios();
+    if (socios.length) {
+      items.push(['— COMPOSICIÓN SOCIETARIA —','']);
+      socios.forEach(function(s, i){
+        items.push(['Socio ' + (i+1), [s.nombre, s.dni ? 'DNI ' + s.dni : '', s.pct ? s.pct + '%' : ''].filter(Boolean).join(' — ')]);
+      });
+    }
+    const est = document.getElementById('pj-estatuto');
+    if (est && est.files && est.files[0]) {
+      items.push(['Estatuto adjunto', est.files[0].name]);
+    }
+    items.push(
       ['— APODERADO —',''],
       ['Cargo', g('pj-cargo')], ['Nombre', g('pj-firmNombre')],
       ['Doc.', g('pj-firmTipoDoc')+' '+g('pj-firmNroDoc')], ['CUIL', g('pj-firmCuil')],
@@ -1796,7 +1871,8 @@
       ['Modelo', g('ah-modelo')], ['Valor móvil', g('ah-valorMovil')],
       ['Plan', 'H'], ['Cuotas', '84'], ['Cód. plan', g('ah-codigoPlan')], ['Cód. suscripción', g('ah-codigoSusc')],
       ['Concesionario', 'Tito González Automotores S.A. (03079)']
-    ];
+    );
+    return items;
   }
 
   // Submit del wizard: ya no genera PDF, solo guarda en formularios_ahorro.
@@ -1905,6 +1981,25 @@
       // 1. Subir imagenes de DNI al bucket (reutiliza el helper de F01)
       const dniUrls = await uploadF01DniImages(safe, timestamp);
 
+      // 1b. Subir estatuto / contrato social (solo PJ)
+      let estatutoUrl = '';
+      if (formType === 'juridica') {
+        const estInput = document.getElementById('pj-estatuto');
+        const file = estInput && estInput.files && estInput.files[0];
+        if (file) {
+          const ext = (file.name.match(/\.([a-zA-Z0-9]+)$/) || [null, 'pdf'])[1].toLowerCase();
+          const fileName = 'estatuto/AHORRO_' + safe + '_' + timestamp + '.' + ext;
+          try {
+            const resEst = await supaFetch('/storage/v1/object/formularios-f01/' + fileName, {
+              method: 'POST',
+              headers: { 'Content-Type': file.type || 'application/octet-stream' },
+              body: file
+            });
+            if (resEst.ok) estatutoUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
+          } catch (e) { console.error('Estatuto upload failed', e); }
+        }
+      }
+
       // 2. Armar datos
       const documento = formType === 'fisica' ? (g('pf-tipoDoc') + ' ' + g('pf-nroDoc')) : g('pj-cuit');
       const celular = formType === 'fisica' ? g('pf-celular') : g('pj-celular');
@@ -1912,6 +2007,13 @@
       const allData = formType === 'fisica' ? getPFData() : getPJData();
       const datosObj = Object.fromEntries(allData.filter(function(p){ return p[0] && p[1] && !p[0].startsWith('\u2014'); }));
       Object.assign(datosObj, dniUrls);
+      if (formType === 'juridica') {
+        // Sacar las lineas planas "Socio N" (van estructuradas en el array socios)
+        Object.keys(datosObj).forEach(function(k){ if (/^Socio \d+$/.test(k)) delete datosObj[k]; });
+        const socios = getSocios();
+        if (socios.length) datosObj.socios = socios;
+        if (estatutoUrl) datosObj['Estatuto URL'] = estatutoUrl;
+      }
 
       // 3. Insertar registro
       const res = await supaFetch('/rest/v1/formularios_ahorro', {

@@ -1391,10 +1391,18 @@
     }
 
     // Tile: Datos del formulario
-    const datosEntries = Object.entries(datos).filter(([k,v]) => v && !k.endsWith('URL'));
+    const datosEntries = Object.entries(datos).filter(([k,v]) => v && k !== 'socios' && typeof v !== 'object' && !k.endsWith('URL'));
     let datosBody = '';
     for (const [k, v] of datosEntries) {
       datosBody += `<div class="kv"><span class="k">${escapeHtml(k)}</span><span class="v">${escapeHtml(v)}</span></div>`;
+    }
+    // Composición societaria (array socios), si viene
+    if (Array.isArray(datos.socios) && datos.socios.length) {
+      datosBody += `<div class="kv" style="margin-top:6px;"><span class="k" style="font-weight:700;">Composición societaria</span><span class="v"></span></div>`;
+      datos.socios.forEach((s, i) => {
+        const linea = [s.nombre, s.dni ? 'DNI ' + s.dni : '', s.pct ? s.pct + '%' : ''].filter(Boolean).join(' — ');
+        datosBody += `<div class="kv"><span class="k">Socio ${i+1}</span><span class="v">${escapeHtml(linea)}</span></div>`;
+      });
     }
     html += buildTile('datos', '📋', 'Datos del formulario', datosEntries.length + ' campos', datosBody || '<div style="color:#5A6B7F;">Sin datos.</div>');
 
