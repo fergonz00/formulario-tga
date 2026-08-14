@@ -591,7 +591,10 @@
         <div class="field"><label>Fecha de constitución</label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pj-fechaConst"></div>
         <div class="field"><label>Actividad de la empresa</label><input type="text" id="pj-actividad" placeholder="Ej: Comercio"></div>
       </div>
-      <div class="field"><label>Ingresos / Facturación mensual</label><input type="text" id="pj-ingresos" inputmode="numeric" placeholder="$"></div>
+      <div class="row row-2">
+        <div class="field"><label>Fecha de inscripción</label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pj-fechaInsc"></div>
+        <div class="field"><label>Nº de inscripción</label><input type="text" id="pj-nroInsc" placeholder="Ej: IGJ / RPC N°"></div>
+      </div>
     </div>
     <div class="section-card">
       <div class="section-title"><div class="icon">📞</div> Contacto de la empresa</div>
@@ -1496,10 +1499,38 @@
       if (ext.provincia) setIf('pf-dniProvincia', ext.provincia);
       if (ext.codigo_postal) setIf('pf-dniCP', String(ext.codigo_postal).replace(/^[A-Z]/i, ''));
     } else if (formType === 'juridica') {
+      // El DNI escaneado es del APODERADO → autocompletar sus datos.
       const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
-      if (full) setIf('pj-firmanteNombre', full);
-      if (ext.dni) setIf('pj-firmanteDni', ext.dni.replace(/\D/g, ''));
-      if (ext.cuil) setIf('pj-firmanteCuil', ext.cuil);
+      if (full) setIf('pj-firmNombre', full);
+      if (ext.dni) setIf('pj-firmNroDoc', ext.dni.replace(/\D/g, ''));
+      if (ext.cuil) setIf('pj-firmCuil', ext.cuil);
+      if (ext.sexo) {
+        const s = ext.sexo.toUpperCase();
+        const val = s === 'F' ? 'Femenino' : (s === 'M' ? 'Masculino' : (s === 'X' ? 'X' : ''));
+        if (val) setIf('pj-firmSexo', val);
+      }
+      if (ext.fecha_nacimiento) {
+        const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(ext.fecha_nacimiento.trim());
+        if (m) {
+          const d = m[1].padStart(2, '0'), mo = m[2].padStart(2, '0');
+          const y = m[3].length === 2 ? ('19' + m[3]) : m[3];
+          setIf('pj-firmFechaNac', d + '/' + mo + '/' + y);
+        }
+      }
+      if (ext.nacionalidad) setIf('pj-firmNacionalidad', ext.nacionalidad);
+      // Domicilio del apoderado
+      if (ext.calle || ext.altura) {
+        if (ext.calle) setIf('pj-firmCalle', ext.calle);
+        if (ext.altura) setIf('pj-firmNro', ext.altura);
+      } else if (ext.domicilio) {
+        const dom = ext.domicilio.trim();
+        const mm = /^(.+?)\s+(\d{1,6})(?:\s+.*)?$/.exec(dom);
+        if (mm) { setIf('pj-firmCalle', mm[1].trim()); setIf('pj-firmNro', mm[2]); }
+        else setIf('pj-firmCalle', dom);
+      }
+      if (ext.localidad) setIf('pj-firmLocalidad', ext.localidad);
+      if (ext.provincia) setIf('pj-firmProvincia', ext.provincia);
+      if (ext.codigo_postal) setIf('pj-firmCP', String(ext.codigo_postal).replace(/^[A-Z]/i, ''));
     }
   }
 
@@ -1860,7 +1891,7 @@
     const items = [
       ['Razón social', g('pj-razonSocial')], ['CUIT', g('pj-cuit')],
       ['Fecha de constitución', gDate('pj-fechaConst')], ['Actividad', g('pj-actividad')],
-      ['Ingresos / Facturación', g('pj-ingresos')],
+      ['Fecha de inscripción', gDate('pj-fechaInsc')], ['Nº de inscripción', g('pj-nroInsc')],
       ['Celular', g('pj-celular')], ['E-mail', g('pj-email')],
       ['— DOMICILIO EMPRESA —',''],
       ['Dirección', [g('pj-calle'),g('pj-nro')].filter(Boolean).join(' ')],
