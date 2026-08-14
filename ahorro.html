@@ -618,8 +618,18 @@
     </div>
     <div class="section-card">
       <div class="section-title"><div class="icon">🏦</div> Datos bancarios</div>
-      <div class="field"><label>CBU</label><input type="text" id="pj-cbu" inputmode="numeric" maxlength="22" placeholder="22 dígitos"></div>
-      <div class="field"><label>Tarjeta de crédito <span class="optional">(si el débito es por tarjeta)</span></label><input type="text" id="pj-tarjeta" inputmode="numeric" placeholder="Nº de tarjeta"></div>
+      <div class="field">
+        <label>¿Adhiere al débito automático (CBU / tarjeta)?</label>
+        <select id="pj-adhiereDebito" onchange="onAdhiereDebitoChange()">
+          <option value="">Seleccionar</option>
+          <option value="si">Sí</option>
+          <option value="no">No</option>
+        </select>
+      </div>
+      <div id="pj-bancariosFields" style="display:none;">
+        <div class="field"><label>CBU</label><input type="text" id="pj-cbu" inputmode="numeric" maxlength="22" placeholder="22 dígitos"></div>
+        <div class="field"><label>Tarjeta de crédito <span class="optional">(si el débito es por tarjeta)</span></label><input type="text" id="pj-tarjeta" inputmode="numeric" placeholder="Nº de tarjeta"></div>
+      </div>
     </div>
     <div class="section-card">
       <div class="section-title"><div class="icon">👥</div> Composición societaria</div>
@@ -801,6 +811,16 @@
   function removeSocio(id) {
     const row = document.getElementById('socio-' + id);
     if (row) row.remove();
+  }
+  function onAdhiereDebitoChange() {
+    const sel = document.getElementById('pj-adhiereDebito');
+    const box = document.getElementById('pj-bancariosFields');
+    const adhiere = sel && sel.value === 'si';
+    if (box) box.style.display = adhiere ? '' : 'none';
+    if (!adhiere) { // si no adhiere, limpiar los campos para no guardar datos viejos
+      const cbu = document.getElementById('pj-cbu'); if (cbu) cbu.value = '';
+      const tj = document.getElementById('pj-tarjeta'); if (tj) tj.value = '';
+    }
   }
   function getSocios() {
     const rows = document.querySelectorAll('#pj-sociosList .socio-row');
@@ -1846,6 +1866,7 @@
       ['Dirección', [g('pj-calle'),g('pj-nro')].filter(Boolean).join(' ')],
       ['Localidad', g('pj-localidad')], ['Provincia', g('pj-provincia')], ['CP', g('pj-cp')],
       ['— DATOS BANCARIOS —',''],
+      ['Adhiere a débito', g('pj-adhiereDebito') === 'si' ? 'Sí' : (g('pj-adhiereDebito') === 'no' ? 'No' : '')],
       ['CBU', g('pj-cbu')], ['Tarjeta de crédito', g('pj-tarjeta')],
     ];
     const socios = getSocios();
