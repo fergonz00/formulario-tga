@@ -1250,6 +1250,55 @@
     if (res) { res.innerHTML = ''; res.style.display = 'none'; }
   }
 
+  // ── PERITAJE DE AUTENTICIDAD ───────────────────────────────────────────
+  // Sube el archivo TAL CUAL lo eligio el usuario, sin pasar por el canvas.
+  // El canvas normaliza y comprime la imagen, y en el camino borra el EXIF y
+  // cambia las dimensiones: justo los dos datos que delatan a un DNI generado
+  // con IA. Por eso el peritaje necesita el binario original.
+  async function subirOriginalDni(basePath, which, file) {
+    if (!file) return null;
+    try {
+      const mime = file.type || 'image/jpeg';
+      const extn = mime === 'image/png' ? 'png' : (mime === 'application/pdf' ? 'pdf' : 'jpg');
+      const path = basePath + '/' + which + '-orig.' + extn;
+      const res = await supaFetch('/storage/v1/object/vwfs-dnis/' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': mime, 'x-upsert': 'true' },
+        body: file
+      });
+      if (!res.ok) return null;
+      return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
+    } catch (e) {
+      // Si falla, el peritaje corre igual con los chequeos de MRZ y CUIL.
+      console.warn('No se pudo subir el original para peritaje', which, e);
+      return null;
+    }
+  }
+
+  // Cartel de documento adulterado. No ofrece "reintentar" con la misma foto:
+  // el problema no es la calidad, es el documento.
+  function bloqueAdulterado(data) {
+    const aut = (data && data.autenticidad) || {};
+    const rojos = (aut.motivos || []).filter(m => m.nivel === 'rojo');
+    const items = rojos.map(m =>
+      '<li style="margin-bottom:6px;"><strong>' + m.titulo + '</strong>' +
+      '<div style="font-size:12px; color:#556;">' + m.detalle + '</div></li>'
+    ).join('');
+    return (
+      '<div class="info-callout err" style="border-left-width:6px;">' +
+        '<strong>✗ NO PODEMOS TOMAR ESTE DOCUMENTO.</strong><br><br>' +
+        'La verificación detectó que las fotos <strong>no corresponden a un DNI sin alterar</strong>. ' +
+        'Volkswagen Financial Services rechaza la carpeta y sanciona a la concesionaria si detecta ' +
+        'documentación adulterada, así que el trámite se frena acá.' +
+        '<ul style="margin:12px 0 0 18px; padding:0;">' + items + '</ul>' +
+        '<div style="margin-top:12px; font-size:13px;">' +
+          'Si es un error, sacá <strong>fotos nuevas del DNI físico</strong> con el celular, sin editar, ' +
+          'sin pasar por ninguna app de retoque y sin armar un PDF. Si el problema sigue, hablá con administración.' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
   // Lee EXIF orientation de un JPEG. 1 = sin rotacion. Ver EXIF 2.3 spec.
   async function getJpegOrientation(file) {
     if (!file || file.type !== 'image/jpeg') return 1;
@@ -1372,7 +1421,8 @@
       // al bucket tambien queda ya rotado/redimensionado).
       const blob = await (await fetch(norm.dataUrl)).blob();
       const normFile = new File([blob], (file.name || 'dni') + '.jpg', { type: norm.mime });
-      dniImages[which] = { dataUrl: norm.dataUrl, file: normFile, w: norm.w, h: norm.h };
+      // `orig` es el archivo intacto: lo necesita el peritaje de autenticidad.
+      dniImages[which] = { dataUrl: norm.dataUrl, file: normFile, orig: file, w: norm.w, h: norm.h };
       showDniPreview(which);
       updateAnalyzeBtnVisibility();
     } catch (e) {
@@ -1470,9 +1520,11 @@
         return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
       };
 
-      const [urlFrente, urlDorso] = await Promise.all([
+      const [urlFrente, urlDorso, origFrente, origDorso] = await Promise.all([
         uploadOne('frente'),
-        uploadOne('dorso')
+        uploadOne('dorso'),
+        subirOriginalDni(safe, 'frente', dniImages.frente.orig),
+        subirOriginalDni(safe, 'dorso', dniImages.dorso.orig)
       ]);
       dniFrenteUrlUploaded = urlFrente;
       dniDorsoUrlUploaded = urlDorso;
@@ -1488,6 +1540,9 @@
         body: JSON.stringify({
           dni_frente_url: urlFrente,
           dni_dorso_url: urlDorso,
+          dni_frente_orig_url: origFrente,
+          dni_dorso_orig_url: origDorso,
+          origen: 'vwfs',
           datero: {}
         })
       });
@@ -1523,7 +1578,14 @@
 
       const detalle = cardFor('Frente', cal.frente) + cardFor('Dorso', cal.dorso);
 
-      if (cal.ok_global === true) {
+      // El peritaje de autenticidad manda sobre cualquier otra consideracion:
+      // un documento adulterado no se toma ni aunque la foto sea perfecta.
+      if (data.adulterado) {
+        dniAnalisisOk = false;
+        resultEl.innerHTML = bloqueAdulterado(data) +
+          '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetDniForRetry()">Cargar otro documento</button>';
+        resultEl.style.display = '';
+      } else if (cal.ok_global === true) {
         dniAnalisisOk = true;
         resultEl.innerHTML =
           '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: var(--vw-green);">' +

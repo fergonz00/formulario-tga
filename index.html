@@ -1545,6 +1545,54 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     if (res) { res.innerHTML = ''; res.style.display = 'none'; }
   }
 
+  // ── PERITAJE DE AUTENTICIDAD ───────────────────────────────────────────
+  // Sube el archivo TAL CUAL lo eligio el usuario, sin pasar por el canvas.
+  // El canvas normaliza y comprime la imagen, y en el camino borra el EXIF y
+  // cambia las dimensiones: justo los dos datos que delatan a un DNI generado
+  // con IA. Por eso el peritaje necesita el binario original.
+  async function subirOriginalDni(basePath, which, file) {
+    if (!file) return null;
+    try {
+      const mime = file.type || 'image/jpeg';
+      const extn = mime === 'image/png' ? 'png' : (mime === 'application/pdf' ? 'pdf' : 'jpg');
+      const path = basePath + '/' + which + '-orig.' + extn;
+      const res = await supaFetch('/storage/v1/object/vwfs-dnis/' + path, {
+        method: 'POST',
+        headers: { 'Content-Type': mime, 'x-upsert': 'true' },
+        body: file
+      });
+      if (!res.ok) return null;
+      return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
+    } catch (e) {
+      // Si falla, el peritaje corre igual con los chequeos de MRZ y CUIL.
+      console.warn('No se pudo subir el original para peritaje', which, e);
+      return null;
+    }
+  }
+
+  // Cartel de documento adulterado. No ofrece "reintentar" con la misma foto:
+  // el problema no es la calidad, es el documento.
+  function bloqueAdulterado(data) {
+    const aut = (data && data.autenticidad) || {};
+    const rojos = (aut.motivos || []).filter(m => m.nivel === 'rojo');
+    const items = rojos.map(m =>
+      '<li style="margin-bottom:6px;"><strong>' + m.titulo + '</strong>' +
+      '<div style="font-size:12px; color:#556;">' + m.detalle + '</div></li>'
+    ).join('');
+    return (
+      '<div class="info-callout err" style="border-left-width:6px;">' +
+        '<strong>✗ NO PODEMOS TOMAR ESTE DOCUMENTO.</strong><br><br>' +
+        'La verificación detectó que las fotos <strong>no corresponden a un DNI sin alterar</strong>. ' +
+        'Presentar documentación adulterada ante Volkswagen es una falta grave, así que el trámite se frena acá.' +
+        '<ul style="margin:12px 0 0 18px; padding:0;">' + items + '</ul>' +
+        '<div style="margin-top:12px; font-size:13px;">' +
+          'Si es un error, sacá <strong>fotos nuevas del DNI físico</strong> con el celular, sin editar, ' +
+          'sin pasar por ninguna app de retoque y sin armar un PDF. Si el problema sigue, hablá con administración.' +
+        '</div>' +
+      '</div>'
+    );
+  }
+
   // Lee EXIF orientation de un JPEG. 1 = sin rotacion.
   async function getJpegOrientation(file) {
     if (!file || file.type !== 'image/jpeg') return 1;
@@ -1679,7 +1727,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       // excepcion -> "no se pudo procesar". El Blob ya tiene .type y .size y
       // sirve como body del upload a Supabase.
       const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
-      dniImages[which] = { dataUrl: norm.dataUrl, file: blob, mime: norm.mime, w: norm.w, h: norm.h };
+      // `orig` es el archivo intacto: lo necesita el peritaje de autenticidad.
+      dniImages[which] = { dataUrl: norm.dataUrl, file: blob, orig: file, mime: norm.mime, w: norm.w, h: norm.h };
       showDniPreview(which);
       updateAnalyzeBtnVisibility();
     } catch (e) {
@@ -1774,14 +1823,26 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         if (!res.ok) { const t = await res.text(); throw new Error('Fallo subida ' + which + ': ' + t); }
         return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
       };
-      const [urlFrente, urlDorso] = await Promise.all([uploadOne('frente'), uploadOne('dorso')]);
+      const [urlFrente, urlDorso, origFrente, origDorso] = await Promise.all([
+        uploadOne('frente'),
+        uploadOne('dorso'),
+        subirOriginalDni(safe, 'frente', dniImages.frente.orig),
+        subirOriginalDni(safe, 'dorso', dniImages.dorso.orig)
+      ]);
       dniFrenteUrlUploaded = urlFrente;
       dniDorsoUrlUploaded = urlDorso;
 
       const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-dni', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dni_frente_url: urlFrente, dni_dorso_url: urlDorso, datero: {} })
+        body: JSON.stringify({
+          dni_frente_url: urlFrente,
+          dni_dorso_url: urlDorso,
+          dni_frente_orig_url: origFrente,
+          dni_dorso_orig_url: origDorso,
+          origen: 'f01',
+          datero: {}
+        })
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'La IA no pudo analizar el DNI. Intenta de nuevo.');
@@ -1818,7 +1879,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const soloFaltaFondo = essentiallyOk && !cal.ok_global &&
         (!cal.frente.fondo_blanco || !cal.dorso.fondo_blanco);
 
-      if (cal.ok_global === true) {
+      // El peritaje de autenticidad manda sobre cualquier otra consideracion:
+      // un documento adulterado no se toma ni aunque la foto sea perfecta.
+      if (data.adulterado) {
+        dniAnalisisOk = false;
+        resultEl.innerHTML = bloqueAdulterado(data) +
+          '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetDniForRetry()">Cargar otro documento</button>';
+        resultEl.style.display = '';
+      } else if (cal.ok_global === true) {
         dniAnalisisOk = true;
         resultEl.innerHTML =
           '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: #00873C;">' +
@@ -1996,7 +2064,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const norm = await normalizeImageFromFile(file);
       // Blob directo (sin `new File`, incompatible con navegadores viejos).
       const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
-      conyDniImages[which] = { dataUrl: norm.dataUrl, file: blob, mime: norm.mime, w: norm.w, h: norm.h };
+      // `orig` es el archivo intacto: lo necesita el peritaje de autenticidad.
+      conyDniImages[which] = { dataUrl: norm.dataUrl, file: blob, orig: file, mime: norm.mime, w: norm.w, h: norm.h };
       showConyDniPreview(which);
       updateConyAnalyzeBtnVisibility();
     } catch (e) {
@@ -2084,14 +2153,26 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         if (!res.ok) { const t = await res.text(); throw new Error('Fallo subida ' + which + ': ' + t); }
         return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
       };
-      const [urlF, urlD] = await Promise.all([uploadOne('frente'), uploadOne('dorso')]);
+      const [urlF, urlD, origF, origD] = await Promise.all([
+        uploadOne('frente'),
+        uploadOne('dorso'),
+        subirOriginalDni(safe, 'frente', conyDniImages.frente.orig),
+        subirOriginalDni(safe, 'dorso', conyDniImages.dorso.orig)
+      ]);
       conyDniFrenteUrlUploaded = urlF;
       conyDniDorsoUrlUploaded = urlD;
 
       const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-dni', {
         method: 'POST',
         headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dni_frente_url: urlF, dni_dorso_url: urlD, datero: {} })
+        body: JSON.stringify({
+          dni_frente_url: urlF,
+          dni_dorso_url: urlD,
+          dni_frente_orig_url: origF,
+          dni_dorso_orig_url: origD,
+          origen: 'f01-conyuge',
+          datero: {}
+        })
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.error || 'La IA no pudo analizar el DNI del conyuge.');
@@ -2125,7 +2206,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const soloFaltaFondo = essentiallyOk && !cal.ok_global &&
         (!cal.frente.fondo_blanco || !cal.dorso.fondo_blanco);
 
-      if (cal.ok_global === true) {
+      // El peritaje de autenticidad manda sobre cualquier otra consideracion.
+      if (data.adulterado) {
+        conyDniAnalisisOk = false;
+        resultEl.innerHTML = bloqueAdulterado(data);
+        resultEl.style.display = '';
+      } else if (cal.ok_global === true) {
         conyDniAnalisisOk = true;
         resultEl.innerHTML =
           '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: #00873C;">' +
