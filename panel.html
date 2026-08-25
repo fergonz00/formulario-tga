@@ -377,6 +377,7 @@
       <button class="tab-btn" data-tab="f01" onclick="setTab('f01')">F01 <span class="tab-count" id="tab-cnt-f01">0</span></button>
       <button class="tab-btn" data-tab="ahorro" onclick="setTab('ahorro')">Plan de Ahorro <span class="tab-count" id="tab-cnt-ahorro">0</span></button>
       <button class="tab-btn" data-tab="prendas" id="tabPrendas" onclick="setTab('prendas')" style="display:none;">🔎 Revisor de Prendas</button>
+      <button class="tab-btn" data-tab="peritajes" id="tabPeritajes" onclick="setTab('peritajes')" style="display:none;">🪪 Peritajes DNI <span class="tab-count" id="tab-cnt-peritajes">0</span></button>
     </div>
 
     <div id="listView">
@@ -481,6 +482,32 @@
           </div>
         </div>
         <div id="prendasList"><div class="loading">Cargando…</div></div>
+      </div>
+    </div>
+
+    <!-- ═══════ SOLAPA PERITAJES DE DNI (solo whitelist) ═══════ -->
+    <div id="peritajesView" style="display:none;">
+      <div class="card">
+        <div class="detail-header" style="margin-bottom:14px;">
+          <h2 style="font-size:18px;font-weight:800;color:var(--vw-dark-blue);">🪪 Peritajes de DNI</h2>
+          <p style="font-size:13px;color:#5A6B7F;margin-top:4px;">
+            Documentos que el control de autenticidad <strong>rechazó</strong> (rojo) o dejó <strong>observados</strong> (amarillo).
+            Los rechazados frenan el trámite: el formulario no se envía y el DNI no llega a VW.
+          </p>
+        </div>
+
+        <div class="filter-chips" id="peritajeChips" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+          <button type="button" class="filter-chip active" data-pfilter="rojo" onclick="setPeritajeFilter('rojo')">Rechazados <span class="count" id="pcnt-rojo">0</span></button>
+          <button type="button" class="filter-chip" data-pfilter="amarillo" onclick="setPeritajeFilter('amarillo')">Observados <span class="count" id="pcnt-amarillo">0</span></button>
+          <button type="button" class="filter-chip" data-pfilter="all" onclick="setPeritajeFilter('all')">Todos <span class="count" id="pcnt-all">0</span></button>
+        </div>
+
+        <div style="margin-bottom:12px;">
+          <input type="text" id="peritajeSearch" placeholder="🔍 Buscar por nombre, apellido o DNI..." oninput="setPeritajeSearch(this.value)"
+            style="width:100%;padding:10px 14px;border:1.5px solid var(--vw-new-horizon);border-radius:var(--radius-sm);font-family:inherit;font-size:14px;">
+        </div>
+
+        <div id="peritajesList"><div class="loading">Cargando…</div></div>
       </div>
     </div>
   </div>
@@ -876,6 +903,10 @@
   // Usuarios que además pueden BORRAR informes guardados.
   const PRENDAS_DELETE_USERS = ['mlubrano', 'fngonzalez'];
 
+  // Usuarios con acceso a la solapa de Peritajes de DNI (whitelist).
+  // dlopez = Daniel López · fngonzalez = Fer · mgerez = Mónica Gerez · mlubrano = Matías Lubrano
+  const PERITAJES_USERS = ['dlopez', 'fngonzalez', 'mgerez', 'mlubrano'];
+
   let filterVendedor = '';
   let filterAdministrativa = '';
   let filterSearch = '';
@@ -994,6 +1025,11 @@
     document.getElementById('rowFilters').classList.toggle('two', isAdminOrOwner());
     // Revisor de Prendas: solapa visible solo para los usuarios del whitelist.
     document.getElementById('tabPrendas').style.display = PRENDAS_USERS.includes(user) ? '' : 'none';
+    // Peritajes de DNI: idem, whitelist propia. Se precarga para que el contador
+    // de rechazados se vea sin entrar a la solapa.
+    const vePeritajes = PERITAJES_USERS.includes(user);
+    document.getElementById('tabPeritajes').style.display = vePeritajes ? '' : 'none';
+    if (vePeritajes) loadPeritajes();
     Promise.all([loadTab('vwfs'), loadTab('f01'), loadTab('ahorro')]).then(() => setTab('vwfs'));
   }
 
@@ -1152,12 +1188,22 @@
     if (tab === 'prendas') {
       document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === 'prendas'));
       document.getElementById('listView').style.display = 'none';
+      document.getElementById('peritajesView').style.display = 'none';
       document.getElementById('prendasView').style.display = '';
       resetPrendas();
       loadPrendaInformes();
       return;
     }
+    if (tab === 'peritajes') {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab === 'peritajes'));
+      document.getElementById('listView').style.display = 'none';
+      document.getElementById('prendasView').style.display = 'none';
+      document.getElementById('peritajesView').style.display = '';
+      if (!peritajes.length) loadPeritajes(); else renderPeritajes();
+      return;
+    }
     document.getElementById('prendasView').style.display = 'none';
+    document.getElementById('peritajesView').style.display = 'none';
     document.getElementById('listView').style.display = '';
     currentTab = tab;
     selectedIds.clear();
@@ -1257,6 +1303,249 @@
       return `${d}/${m}/${y}`;
     }
     return s;
+  }
+
+  // ═══════ PERITAJES DE DNI ═══════
+  // Lee `dni_peritajes`, que escriben las Edge Functions `analizar-dni` (F01/VWFS)
+  // y `peritar-dni` (administracion-tga). Un peritaje ROJO frena el tramite: el
+  // formulario nunca se envia, asi que estas filas son el UNICO rastro que queda.
+  let peritajes = [];
+  let filterPeritajeNivel = 'rojo';
+  let filterPeritajeSearch = '';
+
+  const PERITAJE_ORIGEN = {
+    'f01':           'Formulario 01 online',
+    'f01-conyuge':   'Formulario 01 online (DNI del cónyuge)',
+    'vwfs':          'Formulario VWFS',
+    'administracion': 'Carpeta de prendas (administración)'
+  };
+
+  async function loadPeritajes() {
+    const el = document.getElementById('peritajesList');
+    try {
+      const res = await supaFetch('/rest/v1/dni_peritajes?select=*&order=creado_at.desc&limit=500',
+        { headers: { 'Accept': 'application/json' } });
+      const rows = await res.json();
+      peritajes = Array.isArray(rows) ? rows : [];
+      updatePeritajeCounts();
+      renderPeritajes();
+    } catch (e) {
+      console.error('loadPeritajes:', e);
+      if (el) el.innerHTML = '<div style="color:var(--vw-red);font-size:13px;">Error cargando los peritajes.</div>';
+    }
+  }
+
+  function updatePeritajeCounts() {
+    const rojos = peritajes.filter(r => r.nivel === 'rojo').length;
+    const amar  = peritajes.filter(r => r.nivel === 'amarillo').length;
+    const set = (id, v) => { const e = document.getElementById(id); if (e) e.textContent = v; };
+    set('pcnt-rojo', rojos);
+    set('pcnt-amarillo', amar);
+    set('pcnt-all', peritajes.length);
+    set('tab-cnt-peritajes', rojos);
+  }
+
+  function setPeritajeFilter(v) {
+    filterPeritajeNivel = v;
+    document.querySelectorAll('#peritajeChips .filter-chip').forEach(c =>
+      c.classList.toggle('active', c.dataset.pfilter === v));
+    renderPeritajes();
+  }
+  function setPeritajeSearch(v) { filterPeritajeSearch = v; renderPeritajes(); }
+
+  function fmtPeritajeFecha(iso) {
+    const d = iso ? new Date(iso) : null;
+    if (!d || isNaN(d)) return '—';
+    const p = n => String(n).padStart(2, '0');
+    return p(d.getDate()) + '/' + p(d.getMonth() + 1) + '/' + d.getFullYear() + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
+  }
+
+  function peritajeNivelChip(nivel) {
+    if (nivel === 'rojo')     return '<span class="chip rejected">RECHAZADO</span>';
+    if (nivel === 'amarillo') return '<span class="chip pending">OBSERVADO</span>';
+    return '<span class="chip approved">OK</span>';
+  }
+
+  function renderPeritajes() {
+    const el = document.getElementById('peritajesList');
+    if (!el) return;
+    let rows = peritajes.slice();
+    if (filterPeritajeNivel !== 'all') rows = rows.filter(r => r.nivel === filterPeritajeNivel);
+    const q = (filterPeritajeSearch || '').toLowerCase().trim();
+    if (q) rows = rows.filter(r =>
+      (r.nombre || '').toLowerCase().includes(q) ||
+      (r.apellido || '').toLowerCase().includes(q) ||
+      (r.dni || '').toLowerCase().includes(q)
+    );
+    if (!rows.length) {
+      el.innerHTML = '<div class="empty-state"><div class="emoji">✅</div>Sin peritajes en esta vista</div>';
+      return;
+    }
+    el.innerHTML = rows.map(r => {
+      const titular = escapeHtml([r.apellido, r.nombre].filter(Boolean).join(', ') || 'Titular sin identificar');
+      const dni = r.dni ? 'DNI ' + escapeHtml(r.dni) : 'sin DNI leído';
+      const origen = escapeHtml(PERITAJE_ORIGEN[r.origen] || r.origen || '—');
+      const motivos = Array.isArray(r.motivos) ? r.motivos : [];
+      const principal = motivos.find(m => m && m.nivel === r.nivel) || motivos[0];
+      const resumen = principal
+        ? '<div style="font-size:12px;color:var(--vw-red);margin-top:4px;font-weight:600;">' + escapeHtml(principal.titulo || '') + '</div>'
+        : '';
+      return '<div style="border:1px solid var(--vw-new-horizon);border-radius:10px;margin-bottom:8px;overflow:hidden;">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;padding:10px 12px;cursor:pointer;" onclick="togglePeritajeRow(' + r.id + ')">' +
+          '<div style="min-width:0;">' +
+            '<div style="font-weight:700;font-size:14px;">' + titular + ' · ' + dni + '</div>' +
+            '<div style="font-size:11px;color:#8899AA;">' + fmtPeritajeFecha(r.creado_at) + ' · ' + origen +
+              (r.referencia ? ' · ' + escapeHtml(r.referencia) : '') + '</div>' +
+            resumen +
+          '</div>' +
+          '<div style="flex-shrink:0;">' + peritajeNivelChip(r.nivel) + '</div>' +
+        '</div>' +
+        '<div id="peritajeDetail-' + r.id + '" style="display:none;padding:0 12px 12px;border-top:1px solid var(--vw-new-horizon);"></div>' +
+      '</div>';
+    }).join('');
+  }
+
+  function togglePeritajeRow(id) {
+    const d = document.getElementById('peritajeDetail-' + id);
+    if (!d) return;
+    if (!d.style.display || d.style.display === 'none') {
+      const r = peritajes.find(x => x.id === id);
+      d.innerHTML = r ? peritajeDetalleHtml(r) : '<div style="font-size:12px;color:#5A6B7F;">Sin detalle.</div>';
+      d.style.display = '';
+    } else {
+      d.style.display = 'none';
+    }
+  }
+
+  // Normaliza para comparar frente contra MRZ (saca puntos, espacios y acentos).
+  function normPeritaje(s) {
+    return String(s == null ? '' : s).toUpperCase()
+      .normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/[.\s]/g, '').trim();
+  }
+
+  function peritajeDetalleHtml(r) {
+    const motivos = Array.isArray(r.motivos) ? r.motivos : [];
+    const mrz = r.mrz || {};
+    const checks = mrz.checks || {};
+    const ex = r.extraido || {};
+    const fo = r.forense || {};
+    const sec = t => '<div style="font-size:11px;font-weight:800;color:var(--vw-dark-blue);text-transform:uppercase;letter-spacing:0.4px;margin:14px 0 6px;">' + t + '</div>';
+    const si = ok => ok ? '<span style="color:var(--vw-green);font-weight:700;">✓</span>' : '<span style="color:var(--vw-red);font-weight:700;">✗</span>';
+    let h = '';
+
+    // 1) Observaciones
+    h += sec('Observaciones del peritaje');
+    if (!motivos.length) {
+      h += '<div style="font-size:13px;color:#5A6B7F;">Sin observaciones.</div>';
+    } else {
+      h += '<ul style="margin:0 0 0 18px;padding:0;">' + motivos.map(m => {
+        const color = m.nivel === 'rojo' ? 'var(--vw-red)' : (m.nivel === 'amarillo' ? '#BF5A00' : '#5A6B7F');
+        return '<li style="margin-bottom:8px;">' +
+          '<div style="font-weight:700;font-size:13px;color:' + color + ';">' + escapeHtml(m.titulo || m.codigo || '') + '</div>' +
+          (m.detalle ? '<div style="font-size:12px;color:#5A6B7F;margin-top:2px;">' + escapeHtml(m.detalle) + '</div>' : '') +
+          (m.codigo ? '<div style="font-size:10px;color:#8899AA;margin-top:2px;font-family:monospace;">' + escapeHtml(m.codigo) + '</div>' : '') +
+        '</li>';
+      }).join('') + '</ul>';
+    }
+
+    // 2) Chequeos duros. Son los objetivos: si dan todos OK y el rechazo salio
+    // solo del analisis visual, lo mas probable es un falso positivo por foto
+    // pasada por app de escaneo o por fotocopia.
+    if (mrz.crudo || Object.keys(checks).length) {
+      h += sec('Chequeos duros (MRZ del dorso)');
+      const filas = [
+        ['Dígito verificador del documento', checks.documento],
+        ['Dígito verificador de fecha de nacimiento', checks.fechaNacimiento],
+        ['Dígito verificador de fecha de vencimiento', checks.fechaVencimiento],
+        ['Dígito verificador compuesto', checks.compuesto],
+        ['Documento: frente = MRZ', normPeritaje(ex.dni) === normPeritaje(mrz.nroDocumento)],
+        ['Fecha de nacimiento: frente = MRZ', normPeritaje(ex.fecha_nacimiento) === normPeritaje(mrz.fechaNacimiento)],
+        ['Fecha de vencimiento: frente = MRZ', normPeritaje(ex.fecha_vencimiento) === normPeritaje(mrz.fechaVencimiento)],
+        ['Apellido y nombre: frente = MRZ', normPeritaje(ex.apellido) === normPeritaje(mrz.apellido) &&
+                                            normPeritaje(ex.nombre) === normPeritaje(mrz.nombres)]
+      ];
+      h += '<div style="font-size:12px;">' + filas.map(([lbl, ok]) =>
+        '<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed #EEF1F4;">' +
+          '<span style="color:#5A6B7F;">' + lbl + '</span>' + si(ok === true) + '</div>').join('') + '</div>';
+      const todos = filas.every(f => f[1] === true);
+      if (todos && r.nivel === 'rojo') {
+        h += '<div style="margin-top:8px;font-size:12px;background:#FFF3E0;color:#BF5A00;padding:8px 10px;border-radius:8px;">' +
+          '<strong>Ojo:</strong> los chequeos duros dan todos OK. El rechazo salió solo del análisis visual, ' +
+          'que se dispara cuando la foto pasó por una app de escanear documentos o es una fotocopia. ' +
+          'Antes de escalar, pedí <strong>foto del DNI físico sin editar</strong> y volvé a correrlo.' +
+        '</div>';
+      }
+      if (mrz.crudo) {
+        h += '<div style="margin-top:8px;font-family:monospace;font-size:11px;background:#F5F7F9;padding:8px 10px;border-radius:8px;white-space:pre;overflow-x:auto;">' +
+          escapeHtml([mrz.crudo.linea1, mrz.crudo.linea2, mrz.crudo.linea3].filter(Boolean).join('\n')) + '</div>';
+      }
+    }
+
+    // 3) Fotos peritadas
+    if (r.url_frente || r.url_dorso) {
+      h += sec('Fotos que se subieron');
+      h += '<div style="display:flex;gap:10px;flex-wrap:wrap;">' +
+        [['Frente', r.url_frente], ['Dorso', r.url_dorso]].filter(x => x[1]).map(([lbl, url]) =>
+          '<a href="' + escapeHtml(url) + '" target="_blank" rel="noopener" style="text-decoration:none;color:inherit;">' +
+            '<img src="' + escapeHtml(url) + '" alt="' + lbl + '" style="width:180px;height:auto;border:1px solid var(--vw-new-horizon);border-radius:8px;display:block;">' +
+            '<div style="font-size:11px;color:#5A6B7F;text-align:center;margin-top:4px;">' + lbl + ' · abrir</div>' +
+          '</a>').join('') + '</div>';
+    }
+
+    // 4) Datos leidos
+    h += sec('Datos leídos del documento');
+    const datos = [
+      ['Apellido', ex.apellido], ['Nombre', ex.nombre], ['DNI', ex.dni], ['CUIL', ex.cuil],
+      ['Sexo', ex.sexo], ['Fecha de nacimiento', ex.fecha_nacimiento],
+      ['Fecha de emisión', ex.fecha_emision], ['Fecha de vencimiento', ex.fecha_vencimiento],
+      ['Domicilio', ex.domicilio], ['Localidad', ex.localidad], ['Provincia', ex.provincia]
+    ].filter(x => x[1]);
+    h += '<div style="font-size:12px;">' + (datos.length ? datos.map(([k, v]) =>
+      '<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0;border-bottom:1px dashed #EEF1F4;">' +
+        '<span style="color:#5A6B7F;">' + k + '</span><span style="font-weight:600;text-align:right;">' + escapeHtml(v) + '</span></div>').join('')
+      : '<span style="color:#5A6B7F;">Sin datos.</span>') + '</div>';
+
+    // 5) Forense del archivo
+    if (fo.frente || fo.dorso) {
+      h += sec('Forense del archivo');
+      h += '<div style="font-size:12px;">' + ['frente', 'dorso'].filter(c => fo[c]).map(c => {
+        const f = fo[c];
+        const partes = [
+          (f.ancho && f.alto) ? f.ancho + '×' + f.alto + ' px' : null,
+          f.bytes ? Math.round(f.bytes / 1024) + ' KB' : null,
+          f.formato ? String(f.formato).toUpperCase() : null,
+          'EXIF ' + (f.tieneExif ? 'sí' : 'no'),
+          'C2PA ' + (f.tieneC2PA ? 'sí' : 'no'),
+          f.resolucionEnListaNegra ? '⚠ resolución de generador' : null,
+          f.camara ? 'cámara: ' + f.camara : null
+        ].filter(Boolean).join(' · ');
+        return '<div style="padding:3px 0;border-bottom:1px dashed #EEF1F4;">' +
+          '<span style="color:#5A6B7F;text-transform:capitalize;">' + c + ':</span> ' + escapeHtml(partes) + '</div>';
+      }).join('') + '</div>';
+      const shas = [['Frente', r.sha256_frente], ['Dorso', r.sha256_dorso]].filter(x => x[1]);
+      if (shas.length) {
+        h += '<div style="margin-top:6px;font-family:monospace;font-size:10px;color:#8899AA;word-break:break-all;">' +
+          shas.map(([k, v]) => 'sha256 ' + k.toLowerCase() + ': ' + escapeHtml(v)).join('<br>') + '</div>';
+      }
+    }
+
+    // 6) Trazabilidad
+    h += sec('Trazabilidad');
+    h += '<div style="font-size:12px;color:#5A6B7F;">' +
+      'Peritaje #' + r.id + ' · ' + escapeHtml(PERITAJE_ORIGEN[r.origen] || r.origen || '—') +
+      (r.usuario ? ' · cargado por ' + escapeHtml(r.usuario) : '') +
+      (r.referencia ? ' · ref. ' + escapeHtml(r.referencia) : '') +
+      (r.origen_pdf ? ' · vino en PDF' : '') +
+      (r.nivel === 'rojo' ? (r.avisado ? ' · aviso de WhatsApp enviado' : ' · aviso de WhatsApp pendiente') : '') +
+    '</div>';
+    if (r.origen === 'f01' && !r.usuario && !r.referencia) {
+      h += '<div style="margin-top:6px;font-size:12px;color:#8899AA;">' +
+        'El formulario 01 online es público y el DNI es el paso 1: cuando el peritaje frena el trámite, ' +
+        'todavía no hay cliente ni vendedor cargado, así que no queda registrado quién lo subió.' +
+      '</div>';
+    }
+    return h;
   }
 
   // ═══════ DETAIL ═══════
