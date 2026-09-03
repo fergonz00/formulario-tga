@@ -454,6 +454,7 @@
         </div>
         <div class="field"><label>Ocupación</label><input type="text" id="pf-ocupacion" placeholder="Ej: Empleado"></div>
       </div>
+      <div class="field"><label>Profesión / Actividad</label><input type="text" id="pf-profesion" placeholder="Ej: Comerciante, Abogado, Empleado..."></div>
       <!-- Cónyuge inline (solo si Casado/a) -->
       <div class="conditional" id="pf-conyugeBlock">
         <div class="divider"></div>
@@ -467,21 +468,21 @@
           <div class="upload-icon">📇</div>
           <div class="upload-text">Cónyuge — <strong>Frente</strong></div>
           <div class="upload-hint">Apoyalo sobre fondo blanco — los 4 bordes visibles</div>
-          <input type="file" accept="image/*" id="conyDniFrenteFile" onchange="handleConyDniUpload('frente', this)">
+          <input type="file" accept="image/*" id="conyDniFrenteFile" onchange="peritajesDni.cony.handleUpload('frente', this)">
         </div>
         <div class="upload-preview" id="conyUploadFrentePreview"></div>
         <div class="upload-zone" id="conyUploadDorsoZone" style="margin-top: 10px;">
           <div class="upload-icon">📇</div>
           <div class="upload-text">Cónyuge — <strong>Dorso</strong></div>
           <div class="upload-hint">Apoyalo sobre fondo blanco — los 4 bordes visibles</div>
-          <input type="file" accept="image/*" id="conyDniDorsoFile" onchange="handleConyDniUpload('dorso', this)">
+          <input type="file" accept="image/*" id="conyDniDorsoFile" onchange="peritajesDni.cony.handleUpload('dorso', this)">
         </div>
         <div class="upload-preview" id="conyUploadDorsoPreview"></div>
         <div id="conyDniError" class="info-callout err" style="display:none; margin-top: 10px;"></div>
         <div id="conyBtnAnalyzeHint" style="display:none; margin-top: 10px; font-size: 13px; text-align: center; color: #0040C1; font-weight: 600;">
           👇 Apretá acá para validar el DNI del cónyuge
         </div>
-        <button type="button" class="btn btn-primary btn-block" id="conyBtnAnalyzeDni" style="margin-top: 6px; display:none;" onclick="analyzeConyDni()">
+        <button type="button" class="btn btn-primary btn-block" id="conyBtnAnalyzeDni" style="margin-top: 6px; display:none;" onclick="peritajesDni.cony.analyze()">
           Analizar DNI del cónyuge
         </button>
         <div id="conyDniAnalyzingState" style="display:none; padding:10px; background:#F2F5F8; border-radius:8px; margin-top:10px; font-size:13px;">
@@ -580,46 +581,87 @@
       </div>
       <div class="conditional" id="pf-t2fields">
         <div style="height:12px"></div>
-        <div class="field"><label>Nombre y apellido</label><input type="text" id="pf-t2nombre"></div>
-        <div class="row row-2">
-          <div class="field"><label>Tipo doc.</label><select id="pf-t2tipoDoc"><option>DNI</option><option>LE</option><option>LC</option><option>Pasaporte</option></select></div>
-          <div class="field"><label>Nº documento</label><input type="text" id="pf-t2nroDoc" inputmode="numeric"></div>
+
+        <!-- Mismo criterio que el titular y el conyuge: primero el DNI, la IA
+             lo valida y recien ahi se habilitan (y se precargan) los datos. -->
+        <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: #0040C1; font-size:13px;">
+          <strong>Primero el DNI del 2º titular.</strong> Subí frente y dorso y analizalo. De ahí sacamos sus datos automáticamente.
         </div>
-        <div class="row row-2">
-          <div class="field"><label>CUIL</label><input type="text" id="pf-t2cuil" inputmode="numeric"></div>
-          <div class="field"><label>Sexo</label><select id="pf-t2sexo"><option value="">Seleccionar</option><option>Masculino</option><option>Femenino</option><option>X</option></select></div>
+        <div class="upload-zone" id="t2UploadFrenteZone">
+          <div class="upload-icon">📇</div>
+          <div class="upload-text">2º titular — <strong>Frente</strong></div>
+          <div class="upload-hint">Apoyalo sobre fondo blanco — los 4 bordes visibles</div>
+          <input type="file" accept="image/*" id="t2DniFrenteFile" onchange="peritajesDni.t2.handleUpload('frente', this)">
         </div>
-        <div class="row row-2">
-          <div class="field"><label>Nacionalidad</label><input type="text" id="pf-t2nacionalidad" value="Argentina"></div>
-          <div class="field"><label>Autoridad</label><input type="text" id="pf-t2autoridad"></div>
+        <div class="upload-preview" id="t2UploadFrentePreview"></div>
+        <div class="upload-zone" id="t2UploadDorsoZone" style="margin-top: 10px;">
+          <div class="upload-icon">📇</div>
+          <div class="upload-text">2º titular — <strong>Dorso</strong></div>
+          <div class="upload-hint">Apoyalo sobre fondo blanco — los 4 bordes visibles</div>
+          <input type="file" accept="image/*" id="t2DniDorsoFile" onchange="peritajesDni.t2.handleUpload('dorso', this)">
         </div>
-        <div class="field"><label>Celular</label><input type="tel" id="pf-t2celular"></div>
-        <div class="field"><label>E-mail</label><input type="email" id="pf-t2email"></div>
-        <div class="row row-2">
-          <div class="field"><label>Fecha nac.</label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pf-t2fechaNac"></div>
-          <div class="field"><label>Lugar nac.</label><input type="text" id="pf-t2lugarNac"></div>
+        <div class="upload-preview" id="t2UploadDorsoPreview"></div>
+        <div id="t2DniError" class="info-callout err" style="display:none; margin-top: 10px;"></div>
+        <div id="t2BtnAnalyzeHint" style="display:none; margin-top: 10px; font-size: 13px; text-align: center; color: #0040C1; font-weight: 600;">
+          👇 Apretá acá para validar el DNI del 2º titular
         </div>
-        <div class="row row-2">
-          <div class="field"><label>Estado civil</label><select id="pf-t2estadoCivil"><option value="">Seleccionar</option><option>Soltero/a</option><option>Casado/a</option><option>Divorciado/a</option><option>Viudo/a</option><option>Unión convivencial</option></select></div>
-          <div class="field"><label>Ocupación</label><input type="text" id="pf-t2ocupacion"></div>
+        <button type="button" class="btn btn-primary btn-block" id="t2BtnAnalyzeDni" style="margin-top: 6px; display:none;" onclick="peritajesDni.t2.analyze()">
+          Analizar DNI del 2º titular
+        </button>
+        <div id="t2DniAnalyzingState" style="display:none; padding:10px; background:#F2F5F8; border-radius:8px; margin-top:10px; font-size:13px;">
+          <span class="spinner"></span> Analizando DNI del 2º titular…
         </div>
-        <div class="field"><label>% Titularidad</label><input type="text" id="pf-t2porcTit" placeholder="50%"></div>
-        <div class="divider"></div>
-        <div class="section-title"><div class="icon">🏠</div> Domicilio 2º titular (DNI)</div>
-        <div class="field"><label>Calle</label><input type="text" id="pf-t2calle"></div>
-        <div class="row row-3">
-          <div class="field"><label>Nro</label><input type="text" id="pf-t2nro" inputmode="numeric"></div>
-          <div class="field"><label>Piso <span class="optional">(opt)</span></label><input type="text" id="pf-t2piso"></div>
-          <div class="field"><label>Dpto <span class="optional">(opt)</span></label><input type="text" id="pf-t2dpto"></div>
+        <div id="t2DniAnalysisResult" style="display:none; margin-top: 10px;"></div>
+
+        <!-- Los datos del 2º titular quedan ocultos hasta que la IA valide el DNI. -->
+        <div class="conditional" id="pf-t2DataBlock">
+          <div style="height:12px"></div>
+          <div class="info-callout" style="background: rgba(0,135,60,0.06); border-left-color: #00873C; font-size: 12px;">
+            Los datos se precargaron desde el DNI. Editá si la IA leyó algo mal.
+          </div>
+          <div class="field"><label>Nombre y apellido</label><input type="text" id="pf-t2nombre"></div>
+          <div class="row row-2">
+            <div class="field"><label>Tipo doc.</label><select id="pf-t2tipoDoc"><option>DNI</option><option>LE</option><option>LC</option><option>Pasaporte</option></select></div>
+            <div class="field"><label>Nº documento</label><input type="text" id="pf-t2nroDoc" inputmode="numeric"></div>
+          </div>
+          <div class="row row-2">
+            <div class="field"><label>CUIL</label><input type="text" id="pf-t2cuil" inputmode="numeric"></div>
+            <div class="field"><label>Sexo</label><select id="pf-t2sexo"><option value="">Seleccionar</option><option>Masculino</option><option>Femenino</option><option>X</option></select></div>
+          </div>
+          <div class="row row-2">
+            <div class="field"><label>Nacionalidad</label><input type="text" id="pf-t2nacionalidad" value="Argentina"></div>
+            <div class="field"><label>Autoridad <span class="optional">(opt)</span></label><input type="text" id="pf-t2autoridad"></div>
+          </div>
+          <div class="field"><label>Celular</label><input type="tel" id="pf-t2celular"></div>
+          <div class="field"><label>E-mail</label><input type="email" id="pf-t2email"></div>
+          <div class="row row-2">
+            <div class="field"><label>Fecha nac.</label><input type="text" inputmode="numeric" maxlength="10" placeholder="DD/MM/AAAA" class="date-ar" id="pf-t2fechaNac"></div>
+            <div class="field"><label>Lugar nac.</label><input type="text" id="pf-t2lugarNac"></div>
+          </div>
+          <div class="row row-2">
+            <div class="field"><label>Estado civil</label><select id="pf-t2estadoCivil"><option value="">Seleccionar</option><option>Soltero/a</option><option>Casado/a</option><option>Divorciado/a</option><option>Viudo/a</option><option>Unión convivencial</option></select></div>
+            <div class="field"><label>Ocupación</label><input type="text" id="pf-t2ocupacion"></div>
+          </div>
+          <div class="field"><label>Profesión / Actividad</label><input type="text" id="pf-t2profesion" placeholder="Ej: Comerciante, Abogada, Empleada..."></div>
+          <div class="field"><label>% Titularidad</label><input type="text" id="pf-t2porcTit" placeholder="50%"></div>
+          <div class="divider"></div>
+          <div class="section-title"><div class="icon">🏠</div> Domicilio 2º titular (DNI)</div>
+          <div class="field"><label>Calle</label><input type="text" id="pf-t2calle"></div>
+          <div class="row row-3">
+            <div class="field"><label>Nro</label><input type="text" id="pf-t2nro" inputmode="numeric"></div>
+            <div class="field"><label>Piso <span class="optional">(opt)</span></label><input type="text" id="pf-t2piso"></div>
+            <div class="field"><label>Dpto <span class="optional">(opt)</span></label><input type="text" id="pf-t2dpto"></div>
+          </div>
+          <div class="row row-2">
+            <div class="field"><label>Localidad</label><input type="text" id="pf-t2localidad"></div>
+            <div class="field"><label>Provincia</label><select id="pf-t2provincia"><option value="">Seleccionar</option><option>CABA</option><option>Buenos Aires</option><option>Catamarca</option><option>Chaco</option><option>Chubut</option><option>Córdoba</option><option>Corrientes</option><option>Entre Ríos</option><option>Formosa</option><option>Jujuy</option><option>La Pampa</option><option>La Rioja</option><option>Mendoza</option><option>Misiones</option><option>Neuquén</option><option>Río Negro</option><option>Salta</option><option>San Juan</option><option>San Luis</option><option>Santa Cruz</option><option>Santa Fe</option><option>Sgo. del Estero</option><option>Tierra del Fuego</option><option>Tucumán</option></select></div>
+          </div>
+          <div class="field"><label>Código postal</label><input type="text" id="pf-t2cp" inputmode="numeric"></div>
         </div>
-        <div class="row row-2">
-          <div class="field"><label>Localidad</label><input type="text" id="pf-t2localidad"></div>
-          <div class="field"><label>Provincia</label><input type="text" id="pf-t2provincia"></div>
+
+        <div id="pf-t2LockMsg" class="info-callout" style="margin-top: 10px; background: rgba(255,140,0,0.08); border-left-color: #FF8C00; font-size: 12px;">
+          ⚠ Primero subí y analizá el DNI del 2º titular. Los datos se completan automáticamente después.
         </div>
-        <div class="field"><label>Código postal</label><input type="text" id="pf-t2cp" inputmode="numeric"></div>
-        <div class="divider"></div>
-        <div class="upload-zone"><div class="upload-icon">📷</div><div class="upload-text">DNI del 2º titular (frente)</div><input type="file" accept="image/*" onchange="handleUpload(this,'prev-pf-dniT2')"></div>
-        <div class="upload-preview" id="prev-pf-dniT2">✓ Cargado</div>
       </div>
     </div>
   </div>
@@ -636,10 +678,6 @@
           <button type="button" class="toggle-btn" data-field="pf-iva" data-value="Monotributista">Monotrib.</button>
           <button type="button" class="toggle-btn" data-field="pf-iva" data-value="Exento">Exento</button>
         </div>
-      </div>
-      <div class="field">
-        <label>Profesión / Actividad</label>
-        <input type="text" id="pf-profesion" placeholder="Ej: Comerciante, Abogado, Empleado...">
       </div>
       <div class="field">
         <label>Uso de la unidad</label>
@@ -1323,6 +1361,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     generatedPDFBlob = null;
     supabasePdfUrl = '';
 
+    // Los peritajes de DNI tambien arrancan de cero: si no, el "ok" viejo dejaba
+    // avanzar sin haber subido ningun documento.
+    dniAnalisis = null;
+    dniAnalisisOk = false;
+    Object.keys(dniImages).forEach(k => delete dniImages[k]);
+    dniFrenteUrlUploaded = '';
+    dniDorsoUrlUploaded = '';
+    Object.keys(peritajesDni).forEach(k => { peritajesDni[k].resetForRetry(); peritajesDni[k].updateBtn(); });
+
     // Clear all inputs
     document.querySelectorAll('input[type="text"], input[type="email"], input[type="tel"], input[type="date"], input[type="number"]').forEach(el => {
       if (el.id === 'pf-nacionalidad' || el.id === 'pf-t2nacionalidad' || el.id === 'pj-firmNacionalidad') {
@@ -1406,10 +1453,18 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           const ec = document.getElementById('pf-estadoCivil');
           const isCasado = ec && ec.value === 'Casado/a';
           const conyBlockVisible = document.getElementById('pf-conyugeBlock')?.classList.contains('show');
-          if (isCasado && conyBlockVisible && !conyDniAnalisisOk) {
+          if (isCasado && conyBlockVisible && !conyDni.ok) {
             alert('Primero subí y analizá el DNI del cónyuge antes de avanzar.\n\n(Está marcado como Casado/a pero el DNI del cónyuge aún no fue validado.)');
             const resultEl = document.getElementById('conyDniAnalysisResult') || document.getElementById('pf-conyugeLockMsg');
             if (resultEl) resultEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return;
+          }
+          // Si la unidad va a tener 2º titular, su DNI tambien tiene que estar peritado.
+          const tiene2do = document.getElementById('pf-tiene2do');
+          if (tiene2do && tiene2do.checked && !t2Dni.ok) {
+            alert('Primero subí y analizá el DNI del 2º titular antes de avanzar.');
+            const t2El = document.getElementById('t2DniAnalysisResult') || document.getElementById('pf-t2LockMsg');
+            if (t2El) t2El.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
           }
         }
@@ -1932,69 +1987,92 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     dniDorsoUrlUploaded = '';
   }
 
-  // Precarga los campos del F01 a partir de lo leido del DNI.
-  // Solo campos vacios (para no pisar si el usuario ya tipeo).
+  // Completa un campo solo si esta vacio. En los <select> busca la opcion
+  // por texto, insensitivo a mayusculas y tildes.
+  function setCampoSiVacio(id, v) {
+    const el = document.getElementById(id);
+    if (!el || v == null || String(v).trim() === '') return;
+    if (el.tagName === 'SELECT') {
+      if (el.value) return;
+      const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+      const wanted = norm(v);
+      for (const opt of el.options) {
+        if (norm(opt.value) === wanted || norm(opt.text) === wanted) { el.value = opt.value; return; }
+      }
+      // Si no hay match exacto, probar prefijo (ej "Sgo. del Estero" vs "Santiago del Estero")
+      for (const opt of el.options) {
+        if (opt.value && (norm(opt.value).startsWith(wanted) || wanted.startsWith(norm(opt.value)))) { el.value = opt.value; return; }
+      }
+    } else {
+      if (!el.value || el.value === '') el.value = v;
+    }
+  }
+
+  // Fecha del DNI (D/M/AA o DD/MM/AAAA) al formato DD/MM/AAAA de los inputs.
+  function fechaDniADdmm(valor) {
+    const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec((valor || '').trim());
+    if (!m) return '';
+    const y = m[3].length === 2 ? ('19' + m[3]) : m[3];
+    return m[1].padStart(2, '0') + '/' + m[2].padStart(2, '0') + '/' + y;
+  }
+
+  // Vuelca lo leido del DNI sobre los campos de una persona. `ids` mapea cada
+  // dato al id del input, asi sirve igual para el titular, el firmante de la
+  // persona juridica y el 2º titular. Solo pisa campos vacios.
+  function prefillPersonaDesdeDni(ext, ids) {
+    if (!ext || !ids) return;
+    const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
+    if (full && ids.nombre) setCampoSiVacio(ids.nombre, full);
+    if (ext.dni && ids.nroDoc) setCampoSiVacio(ids.nroDoc, ext.dni.replace(/\D/g, ''));
+    if (ext.cuil && ids.cuil) setCampoSiVacio(ids.cuil, ext.cuil);
+    if (ext.sexo && ids.sexo) {
+      const sx = ext.sexo.toUpperCase();
+      const val = sx === 'F' ? 'Femenino' : (sx === 'M' ? 'Masculino' : (sx === 'X' ? 'X' : ''));
+      if (val) setCampoSiVacio(ids.sexo, val);
+    }
+    if (ext.fecha_nacimiento && ids.fechaNac) {
+      const f = fechaDniADdmm(ext.fecha_nacimiento);
+      if (f) setCampoSiVacio(ids.fechaNac, f);
+    }
+    if (ext.nacionalidad && ids.nacionalidad) setCampoSiVacio(ids.nacionalidad, ext.nacionalidad);
+
+    // Domicilio: preferir calle+altura separados si los tiene, sino parsear "domicilio".
+    if (ext.calle || ext.altura) {
+      if (ext.calle && ids.calle) setCampoSiVacio(ids.calle, ext.calle);
+      if (ext.altura && ids.nro) setCampoSiVacio(ids.nro, ext.altura);
+    } else if (ext.domicilio) {
+      const dom = ext.domicilio.trim();
+      const mm = /^(.+?)\s+(\d{1,6})(?:\s+.*)?$/.exec(dom);
+      if (mm) {
+        if (ids.calle) setCampoSiVacio(ids.calle, mm[1].trim());
+        if (ids.nro) setCampoSiVacio(ids.nro, mm[2]);
+      } else if (ids.calle) setCampoSiVacio(ids.calle, dom);
+    }
+    if (ext.barrio && ids.barrio) setCampoSiVacio(ids.barrio, ext.barrio);
+    if (ext.localidad && ids.localidad) setCampoSiVacio(ids.localidad, ext.localidad);
+    if (ext.provincia && ids.provincia) setCampoSiVacio(ids.provincia, ext.provincia);
+    if (ext.codigo_postal && ids.cp) setCampoSiVacio(ids.cp, String(ext.codigo_postal).replace(/^[A-Z]/i, ''));
+  }
+
+  // Precarga los campos del F01 a partir de lo leido del DNI del paso 1.
   function prefillFromDniExtraido(ext) {
     if (!ext || !formType) return;
-    const setIf = (id, v) => {
-      const el = document.getElementById(id);
-      if (!el || v == null || String(v).trim() === '') return;
-      if (el.tagName === 'SELECT') {
-        // Para selects, buscamos una opcion cuyo texto coincida (insensitivo a mayusculas/tildes).
-        if (el.value) return;
-        const norm = s => (s || '').toString().toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
-        const wanted = norm(v);
-        for (const opt of el.options) {
-          if (norm(opt.value) === wanted || norm(opt.text) === wanted) { el.value = opt.value; return; }
-        }
-        // Si no hay match exacto, probar prefijo (ej "Sgo. del Estero" vs "Santiago del Estero")
-        for (const opt of el.options) {
-          if (opt.value && (norm(opt.value).startsWith(wanted) || wanted.startsWith(norm(opt.value)))) { el.value = opt.value; return; }
-        }
-      } else {
-        if (!el.value || el.value === '') el.value = v;
-      }
-    };
-
     if (formType === 'fisica') {
-      const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
-      if (full) setIf('pf-nombre', full);
-      if (ext.dni) setIf('pf-nroDoc', ext.dni.replace(/\D/g, ''));
-      if (ext.cuil) setIf('pf-cuil', ext.cuil);
-      if (ext.sexo) {
-        const s = ext.sexo.toUpperCase();
-        const val = s === 'F' ? 'Femenino' : (s === 'M' ? 'Masculino' : (s === 'X' ? 'X' : ''));
-        if (val) setIf('pf-sexo', val);
-      }
-      if (ext.fecha_nacimiento) {
-        const m = /^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/.exec(ext.fecha_nacimiento.trim());
-        if (m) {
-          const d = m[1].padStart(2, '0'), mo = m[2].padStart(2, '0');
-          const y = m[3].length === 2 ? ('19' + m[3]) : m[3];
-          setIf('pf-fechaNac', d + '/' + mo + '/' + y);
-        }
-      }
-      if (ext.nacionalidad) setIf('pf-nacionalidad', ext.nacionalidad);
-
-      // Domicilio: preferir calle+altura separados si los tiene, sino parsear desde "domicilio"
-      if (ext.calle || ext.altura) {
-        if (ext.calle) setIf('pf-dniCalle', ext.calle);
-        if (ext.altura) setIf('pf-dniNro', ext.altura);
-      } else if (ext.domicilio) {
-        const dom = ext.domicilio.trim();
-        const mm = /^(.+?)\s+(\d{1,6})(?:\s+.*)?$/.exec(dom);
-        if (mm) { setIf('pf-dniCalle', mm[1].trim()); setIf('pf-dniNro', mm[2]); }
-        else setIf('pf-dniCalle', dom);
-      }
-      if (ext.barrio) setIf('pf-dniBarrio', ext.barrio);
-      if (ext.localidad) setIf('pf-dniLocalidad', ext.localidad);
-      if (ext.provincia) setIf('pf-dniProvincia', ext.provincia);
-      if (ext.codigo_postal) setIf('pf-dniCP', String(ext.codigo_postal).replace(/^[A-Z]/i, ''));
+      prefillPersonaDesdeDni(ext, {
+        nombre: 'pf-nombre', nroDoc: 'pf-nroDoc', cuil: 'pf-cuil', sexo: 'pf-sexo',
+        fechaNac: 'pf-fechaNac', nacionalidad: 'pf-nacionalidad',
+        calle: 'pf-dniCalle', nro: 'pf-dniNro', barrio: 'pf-dniBarrio',
+        localidad: 'pf-dniLocalidad', provincia: 'pf-dniProvincia', cp: 'pf-dniCP'
+      });
     } else if (formType === 'juridica') {
-      const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
-      if (full) setIf('pj-firmanteNombre', full);
-      if (ext.dni) setIf('pj-firmanteDni', ext.dni.replace(/\D/g, ''));
-      if (ext.cuil) setIf('pj-firmanteCuil', ext.cuil);
+      // Los ids viejos (pj-firmanteNombre...) no existian, asi que la precarga
+      // del firmante nunca llegaba a completar nada.
+      prefillPersonaDesdeDni(ext, {
+        nombre: 'pj-firmNombre', nroDoc: 'pj-firmNroDoc', cuil: 'pj-firmCuil', sexo: 'pj-firmSexo',
+        fechaNac: 'pj-firmFechaNac', nacionalidad: 'pj-firmNacionalidad',
+        calle: 'pj-firmCalle', nro: 'pj-firmNro',
+        localidad: 'pj-firmLocalidad', provincia: 'pj-firmProvincia', cp: 'pj-firmCP'
+      });
     }
   }
 
@@ -2019,249 +2097,275 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     setSlot('prev-' + prefix + '-dni2', 'dorso');
   }
 
-  // ═══════ DNI del CÓNYUGE: IA + regla relajada (solo F01) ═══════
-  const conyDniImages = {};
-  let conyDniAnalisis = null;
-  let conyDniAnalisisOk = false;
-  let conyDniFrenteUrlUploaded = '';
-  let conyDniDorsoUrlUploaded = '';
+  // ═══════ Peritaje de DNI reutilizable: CÓNYUGE y 2º TITULAR (solo F01) ═══════
+  // El titular tiene su propio flujo en el paso 1 (con matcheo contra el datero).
+  // Cónyuge y 2º titular comparten esto: subir frente y dorso, analizar con IA y
+  // recién ahí habilitar (y precargar) los campos de texto.
+  // Los ids del HTML siguen el patron <key>UploadFrenteZone, <key>DniError, etc.
+  const peritajesDni = {};
 
-  function resetConyDniAnalysisState() {
-    conyDniAnalisis = null;
-    conyDniAnalisisOk = false;
-    const res = document.getElementById('conyDniAnalysisResult');
-    if (res) { res.innerHTML = ''; res.style.display = 'none'; }
-    updateConyDataBlockVisibility();
-  }
+  function crearPeritajeDni(cfg) {
+    const el = id => document.getElementById(id);
+    const idz = suf => cfg.key + suf;
+    const cap = which => (which === 'frente' ? 'Frente' : 'Dorso');
 
-  // Muestra/oculta los campos de texto del conyuge segun si ya se valido el DNI.
-  function updateConyDataBlockVisibility() {
-    const dataBlock = document.getElementById('pf-conyugeDataBlock');
-    const lockMsg = document.getElementById('pf-conyugeLockMsg');
-    if (!dataBlock || !lockMsg) return;
-    if (conyDniAnalisisOk) {
-      dataBlock.classList.add('show');
-      lockMsg.style.display = 'none';
-    } else {
-      dataBlock.classList.remove('show');
-      lockMsg.style.display = '';
-    }
-  }
+    const st = {
+      images: {},
+      analisis: null,
+      ok: false,
+      frenteUrl: '',
+      dorsoUrl: ''
+    };
 
-  async function handleConyDniUpload(which, input) {
-    const err = document.getElementById('conyDniError');
-    err.style.display = 'none'; err.textContent = '';
-    const file = input.files && input.files[0];
-    if (!file) return;
-    resetConyDniAnalysisState();
-    if (!file.type.startsWith('image/')) {
-      err.textContent = 'El archivo debe ser una imagen.'; err.style.display = ''; input.value = ''; return;
-    }
-    if (file.size < DNI_MIN_BYTES) {
-      err.textContent = 'La foto pesa muy poco. Sacala con mas resolucion.'; err.style.display = ''; input.value = ''; return;
-    }
-    try {
-      const norm = await normalizeImageFromFile(file);
-      // Blob directo (sin `new File`, incompatible con navegadores viejos).
-      const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
-      // `orig` es el archivo intacto: lo necesita el peritaje de autenticidad.
-      conyDniImages[which] = { dataUrl: norm.dataUrl, file: blob, orig: file, mime: norm.mime, w: norm.w, h: norm.h };
-      showConyDniPreview(which);
-      updateConyAnalyzeBtnVisibility();
-    } catch (e) {
-      console.error('Error al procesar DNI conyuge:', e);
-      err.textContent = dniProcessErrorMsg(file); err.style.display = ''; input.value = '';
-    }
-  }
-
-  function showConyDniPreview(which) {
-    const prefix = which === 'frente' ? 'Frente' : 'Dorso';
-    const zone = document.getElementById('conyUpload' + prefix + 'Zone');
-    const prev = document.getElementById('conyUpload' + prefix + 'Preview');
-    const img = conyDniImages[which];
-    if (!zone || !prev || !img) return;
-    zone.classList.add('has-file');
-    prev.style.display = 'block';
-    prev.innerHTML =
-      '<img src="' + img.dataUrl + '" alt="Vista previa" style="max-width:100%; border-radius:8px; max-height:180px; object-fit:contain;">' +
-      '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:12px; color:#556;">' +
-        '<span>✓ ' + img.w + 'x' + img.h + ' px</span>' +
-        '<button type="button" onclick="removeConyDniImage(\'' + which + '\')" style="border:none; background:transparent; color:#E4002B; font-weight:600; cursor:pointer;">Quitar</button>' +
-      '</div>';
-  }
-
-  function removeConyDniImage(which) {
-    delete conyDniImages[which];
-    const prefix = which === 'frente' ? 'Frente' : 'Dorso';
-    const zone = document.getElementById('conyUpload' + prefix + 'Zone');
-    const prev = document.getElementById('conyUpload' + prefix + 'Preview');
-    const input = document.getElementById('conyDni' + prefix + 'File');
-    if (zone) zone.classList.remove('has-file');
-    if (prev) { prev.innerHTML = ''; prev.style.display = 'none'; }
-    if (input) input.value = '';
-    resetConyDniAnalysisState();
-    updateConyAnalyzeBtnVisibility();
-  }
-
-  function updateConyAnalyzeBtnVisibility() {
-    const btn = document.getElementById('conyBtnAnalyzeDni');
-    const hint = document.getElementById('conyBtnAnalyzeHint');
-    if (!btn) return;
-    const ready = !!conyDniImages.frente && !!conyDniImages.dorso && !conyDniAnalisisOk;
-    btn.style.display = ready ? '' : 'none';
-    if (ready) btn.disabled = false;
-    if (hint) hint.style.display = ready ? '' : 'none';
-  }
-
-  function resetConyDniForRetry() {
-    removeConyDniImage('frente');
-    removeConyDniImage('dorso');
-    conyDniFrenteUrlUploaded = '';
-    conyDniDorsoUrlUploaded = '';
-  }
-
-  async function analyzeConyDni() {
-    const btn = document.getElementById('conyBtnAnalyzeDni');
-    const loader = document.getElementById('conyDniAnalyzingState');
-    const resultEl = document.getElementById('conyDniAnalysisResult');
-    const errEl = document.getElementById('conyDniError');
-    errEl.style.display = 'none'; errEl.textContent = '';
-    resultEl.innerHTML = ''; resultEl.style.display = 'none';
-
-    if (!conyDniImages.frente || !conyDniImages.dorso) {
-      errEl.textContent = 'Subi el frente y el dorso del DNI del conyuge.';
-      errEl.style.display = ''; return;
-    }
-    btn.disabled = true; btn.style.display = 'none';
-    const hint = document.getElementById('conyBtnAnalyzeHint');
-    if (hint) hint.style.display = 'none';
-    loader.style.display = '';
-
-    try {
-      const timestamp = Date.now();
-      const safe = 'cony_tmp_' + timestamp;
-      const uploadOne = async (which) => {
-        const img = conyDniImages[which];
-        const mime = img.mime || (img.file && img.file.type) || 'image/jpeg';
-        const extn = mime === 'image/png' ? 'png' : 'jpg';
-        const path = safe + '/' + which + '.' + extn;
-        const res = await supaFetch('/storage/v1/object/vwfs-dnis/' + path, {
-          method: 'POST',
-          headers: { 'Content-Type': mime, 'x-upsert': 'true' },
-          body: dataUrlToBytes(img.dataUrl)
-        });
-        if (!res.ok) { const t = await res.text(); throw new Error('Fallo subida ' + which + ': ' + t); }
-        return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
-      };
-      const [urlF, urlD, origF, origD] = await Promise.all([
-        uploadOne('frente'),
-        uploadOne('dorso'),
-        subirOriginalDni(safe, 'frente', conyDniImages.frente.orig),
-        subirOriginalDni(safe, 'dorso', conyDniImages.dorso.orig)
-      ]);
-      conyDniFrenteUrlUploaded = urlF;
-      conyDniDorsoUrlUploaded = urlD;
-
-      const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-dni', {
-        method: 'POST',
-        headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          dni_frente_url: urlF,
-          dni_dorso_url: urlD,
-          dni_frente_orig_url: origF,
-          dni_dorso_orig_url: origD,
-          origen: 'f01-conyuge',
-          datero: {}
-        })
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data.error || 'La IA no pudo analizar el DNI del conyuge.');
-
-      conyDniAnalisis = data;
-      loader.style.display = 'none';
-
-      const cal = data.calidad || {};
-      const cardFor = (label, c) => {
-        if (!c) return '';
-        const row = (ok, txtOk, txtBad) =>
-          '<div style="display:flex; gap:6px; align-items:center; font-size:13px; padding:2px 0;">' +
-            '<span style="color:' + (ok ? '#00873C' : '#E4002B') + '; font-weight:700;">' + (ok ? '✓' : '✗') + '</span>' +
-            '<span>' + (ok ? txtOk : txtBad) + '</span></div>';
-        return '<div style="background:#fff; border:1px solid #DAE4ED; border-radius:10px; padding:10px 12px; margin-top:8px;">' +
-          '<div style="font-weight:700; margin-bottom:4px;">' + label + '</div>' +
-          row(!!c.legible, 'Legible', 'No se lee bien') +
-          row(!c.blur, 'Foto nitida (sin blur)', 'Foto con blur') +
-          row(!c.bordes_cortados, 'Los 4 bordes visibles', 'Bordes cortados') +
-          row(!!c.fondo_blanco, 'Sobre fondo blanco', 'No esta sobre fondo blanco') +
-          (c.vencido !== undefined ? row(!c.vencido, 'DNI vigente', 'DNI VENCIDO - no sirve') : '') +
-          (c.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + c.motivo + '</div>' : '') +
-          '</div>';
-      };
-      const detalle = cardFor('Frente', cal.frente) + cardFor('Dorso', cal.dorso);
-
-      // Misma regla relajada que el titular en F01: pasa sin fondo blanco
-      // si todo lo demas esta bien, pero advierte.
-      const faceOkNoFondo = c => c && c.legible && !c.blur && !c.bordes_cortados && !c.vencido;
-      const essentiallyOk = faceOkNoFondo(cal.frente) && faceOkNoFondo(cal.dorso);
-      const soloFaltaFondo = essentiallyOk && !cal.ok_global &&
-        (!cal.frente.fondo_blanco || !cal.dorso.fondo_blanco);
-
-      // El peritaje de autenticidad manda sobre cualquier otra consideracion.
-      if (data.adulterado) {
-        conyDniAnalisisOk = false;
-        resultEl.innerHTML = bloqueAdulterado(data);
-        resultEl.style.display = '';
-      } else if (cal.ok_global === true) {
-        conyDniAnalisisOk = true;
-        resultEl.innerHTML =
-          '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: #00873C;">' +
-            '<strong>✓ DNI del cónyuge OK.</strong> Se lee bien y esta completo.' +
-          '</div>' + detalle;
-        resultEl.style.display = '';
-        // Precarga nombre y CUIL del conyuge si campos vacios
-        if (data.extraido) {
-          const ext = data.extraido;
-          const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
-          if (full && !g('pf-conyugeNombre')) setField('pf-conyugeNombre', full);
-          if (ext.cuil && !g('pf-conyugeCuil')) setField('pf-conyugeCuil', ext.cuil);
-        }
-      } else if (soloFaltaFondo) {
-        conyDniAnalisisOk = true;
-        resultEl.innerHTML =
-          '<div class="info-callout" style="background: rgba(255,140,0,0.08); border-left-color: #FF8C00;">' +
-            '<strong>⚠ DNI del cónyuge aceptado para F01.</strong> Se ve bien pero no esta sobre fondo blanco. ' +
-            'Si despues vas a sacar credito VWFS, te vamos a pedir cargarlo sobre fondo blanco.' +
-          '</div>' + detalle;
-        resultEl.style.display = '';
-        if (data.extraido) {
-          const ext = data.extraido;
-          const full = [ext.nombre, ext.apellido].filter(Boolean).join(' ').trim();
-          if (full && !g('pf-conyugeNombre')) setField('pf-conyugeNombre', full);
-          if (ext.cuil && !g('pf-conyugeCuil')) setField('pf-conyugeCuil', ext.cuil);
-        }
+    // Muestra u oculta los campos de texto segun si ya se valido el DNI.
+    st.updateDataBlock = function () {
+      const dataBlock = el(cfg.dataBlockId);
+      const lockMsg = el(cfg.lockMsgId);
+      if (!dataBlock || !lockMsg) return;
+      if (st.ok) {
+        dataBlock.classList.add('show');
+        lockMsg.style.display = 'none';
       } else {
-        conyDniAnalisisOk = false;
-        resultEl.innerHTML =
-          '<div class="info-callout err"><strong>✗ El DNI del cónyuge no cumple.</strong> Mira el detalle y subilo de nuevo.</div>' +
-          detalle +
-          '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetConyDniForRetry()">Volver a subir</button>';
-        resultEl.style.display = '';
+        dataBlock.classList.remove('show');
+        lockMsg.style.display = '';
       }
-      updateConyDataBlockVisibility();
-    } catch (e) {
-      console.error('analyzeConyDni error', e);
-      loader.style.display = 'none';
-      errEl.textContent = 'No pudimos analizar el DNI del conyuge: ' + (e.message || 'error');
-      errEl.style.display = '';
-      btn.disabled = false;
-      updateConyAnalyzeBtnVisibility();
-    }
+    };
+
+    st.resetAnalysis = function () {
+      st.analisis = null;
+      st.ok = false;
+      const res = el(idz('DniAnalysisResult'));
+      if (res) { res.innerHTML = ''; res.style.display = 'none'; }
+      st.updateDataBlock();
+    };
+
+    st.updateBtn = function () {
+      const btn = el(idz('BtnAnalyzeDni'));
+      const hint = el(idz('BtnAnalyzeHint'));
+      if (!btn) return;
+      const ready = !!st.images.frente && !!st.images.dorso && !st.ok;
+      btn.style.display = ready ? '' : 'none';
+      if (ready) btn.disabled = false;
+      if (hint) hint.style.display = ready ? '' : 'none';
+    };
+
+    st.showPreview = function (which) {
+      const zone = el(idz('Upload' + cap(which) + 'Zone'));
+      const prev = el(idz('Upload' + cap(which) + 'Preview'));
+      const img = st.images[which];
+      if (!zone || !prev || !img) return;
+      zone.classList.add('has-file');
+      prev.style.display = 'block';
+      prev.innerHTML =
+        '<img src="' + img.dataUrl + '" alt="Vista previa" style="max-width:100%; border-radius:8px; max-height:180px; object-fit:contain;">' +
+        '<div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px; font-size:12px; color:#556;">' +
+          '<span>✓ ' + img.w + 'x' + img.h + ' px</span>' +
+          '<button type="button" onclick="peritajesDni.' + cfg.key + '.remove(\'' + which + '\')" style="border:none; background:transparent; color:#E4002B; font-weight:600; cursor:pointer;">Quitar</button>' +
+        '</div>';
+    };
+
+    st.handleUpload = async function (which, input) {
+      const err = el(idz('DniError'));
+      err.style.display = 'none'; err.textContent = '';
+      const file = input.files && input.files[0];
+      if (!file) return;
+      st.resetAnalysis();
+      if (!file.type.startsWith('image/')) {
+        err.textContent = 'El archivo debe ser una imagen.'; err.style.display = ''; input.value = ''; return;
+      }
+      if (file.size < DNI_MIN_BYTES) {
+        err.textContent = 'La foto pesa muy poco. Sacala con mas resolucion.'; err.style.display = ''; input.value = ''; return;
+      }
+      try {
+        const norm = await normalizeImageFromFile(file);
+        // Blob directo (sin `new File`, incompatible con navegadores viejos).
+        const blob = norm.blob || await (await fetch(norm.dataUrl)).blob();
+        // `orig` es el archivo intacto: lo necesita el peritaje de autenticidad.
+        st.images[which] = { dataUrl: norm.dataUrl, file: blob, orig: file, mime: norm.mime, w: norm.w, h: norm.h };
+        st.showPreview(which);
+        st.updateBtn();
+      } catch (e) {
+        console.error('Error al procesar DNI ' + cfg.quien + ':', e);
+        err.textContent = dniProcessErrorMsg(file); err.style.display = ''; input.value = '';
+      }
+    };
+
+    st.remove = function (which) {
+      delete st.images[which];
+      const zone = el(idz('Upload' + cap(which) + 'Zone'));
+      const prev = el(idz('Upload' + cap(which) + 'Preview'));
+      const input = el(idz('Dni' + cap(which) + 'File'));
+      if (zone) zone.classList.remove('has-file');
+      if (prev) { prev.innerHTML = ''; prev.style.display = 'none'; }
+      if (input) input.value = '';
+      st.resetAnalysis();
+      st.updateBtn();
+    };
+
+    st.resetForRetry = function () {
+      st.remove('frente');
+      st.remove('dorso');
+      st.frenteUrl = '';
+      st.dorsoUrl = '';
+    };
+
+    st.analyze = async function () {
+      const btn = el(idz('BtnAnalyzeDni'));
+      const loader = el(idz('DniAnalyzingState'));
+      const resultEl = el(idz('DniAnalysisResult'));
+      const errEl = el(idz('DniError'));
+      errEl.style.display = 'none'; errEl.textContent = '';
+      resultEl.innerHTML = ''; resultEl.style.display = 'none';
+
+      if (!st.images.frente || !st.images.dorso) {
+        errEl.textContent = 'Subi el frente y el dorso del DNI ' + cfg.quien + '.';
+        errEl.style.display = ''; return;
+      }
+      btn.disabled = true; btn.style.display = 'none';
+      const hint = el(idz('BtnAnalyzeHint'));
+      if (hint) hint.style.display = 'none';
+      loader.style.display = '';
+
+      try {
+        const timestamp = Date.now();
+        const safe = cfg.key + '_tmp_' + timestamp;
+        const uploadOne = async (which) => {
+          const img = st.images[which];
+          const mime = img.mime || (img.file && img.file.type) || 'image/jpeg';
+          const extn = mime === 'image/png' ? 'png' : 'jpg';
+          const path = safe + '/' + which + '.' + extn;
+          const res = await supaFetch('/storage/v1/object/vwfs-dnis/' + path, {
+            method: 'POST',
+            headers: { 'Content-Type': mime, 'x-upsert': 'true' },
+            body: dataUrlToBytes(img.dataUrl)
+          });
+          if (!res.ok) { const t = await res.text(); throw new Error('Fallo subida ' + which + ': ' + t); }
+          return SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
+        };
+        const [urlF, urlD, origF, origD] = await Promise.all([
+          uploadOne('frente'),
+          uploadOne('dorso'),
+          subirOriginalDni(safe, 'frente', st.images.frente.orig),
+          subirOriginalDni(safe, 'dorso', st.images.dorso.orig)
+        ]);
+        st.frenteUrl = urlF;
+        st.dorsoUrl = urlD;
+
+        const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-dni', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            dni_frente_url: urlF,
+            dni_dorso_url: urlD,
+            dni_frente_orig_url: origF,
+            dni_dorso_orig_url: origD,
+            origen: cfg.origen,
+            datero: {}
+          })
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'La IA no pudo analizar el DNI ' + cfg.quien + '.');
+
+        st.analisis = data;
+        loader.style.display = 'none';
+
+        const cal = data.calidad || {};
+        const cardFor = (label, c) => {
+          if (!c) return '';
+          const row = (ok, txtOk, txtBad) =>
+            '<div style="display:flex; gap:6px; align-items:center; font-size:13px; padding:2px 0;">' +
+              '<span style="color:' + (ok ? '#00873C' : '#E4002B') + '; font-weight:700;">' + (ok ? '✓' : '✗') + '</span>' +
+              '<span>' + (ok ? txtOk : txtBad) + '</span></div>';
+          return '<div style="background:#fff; border:1px solid #DAE4ED; border-radius:10px; padding:10px 12px; margin-top:8px;">' +
+            '<div style="font-weight:700; margin-bottom:4px;">' + label + '</div>' +
+            row(!!c.legible, 'Legible', 'No se lee bien') +
+            row(!c.blur, 'Foto nitida (sin blur)', 'Foto con blur') +
+            row(!c.bordes_cortados, 'Los 4 bordes visibles', 'Bordes cortados') +
+            row(!!c.fondo_blanco, 'Sobre fondo blanco', 'No esta sobre fondo blanco') +
+            (c.vencido !== undefined ? row(!c.vencido, 'DNI vigente', 'DNI VENCIDO - no sirve') : '') +
+            (c.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + c.motivo + '</div>' : '') +
+            '</div>';
+        };
+        const detalle = cardFor('Frente', cal.frente) + cardFor('Dorso', cal.dorso);
+
+        // Misma regla relajada que el titular en F01: pasa sin fondo blanco
+        // si todo lo demas esta bien, pero advierte.
+        const faceOkNoFondo = c => c && c.legible && !c.blur && !c.bordes_cortados && !c.vencido;
+        const essentiallyOk = faceOkNoFondo(cal.frente) && faceOkNoFondo(cal.dorso);
+        const soloFaltaFondo = essentiallyOk && !cal.ok_global &&
+          (!cal.frente.fondo_blanco || !cal.dorso.fondo_blanco);
+
+        const precargar = () => { if (data.extraido && cfg.prefill) cfg.prefill(data.extraido); };
+
+        // El peritaje de autenticidad manda sobre cualquier otra consideracion.
+        if (data.adulterado) {
+          st.ok = false;
+          resultEl.innerHTML = bloqueAdulterado(data) +
+            '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="peritajesDni.' + cfg.key + '.resetForRetry()">Cargar otro documento</button>';
+          resultEl.style.display = '';
+        } else if (cal.ok_global === true) {
+          st.ok = true;
+          resultEl.innerHTML =
+            '<div class="info-callout" style="background: rgba(0,135,60,0.08); border-left-color: #00873C;">' +
+              '<strong>✓ DNI ' + cfg.quien + ' OK.</strong> Se lee bien y esta completo.' +
+            '</div>' + detalle;
+          resultEl.style.display = '';
+          precargar();
+        } else if (soloFaltaFondo) {
+          st.ok = true;
+          resultEl.innerHTML =
+            '<div class="info-callout" style="background: rgba(255,140,0,0.08); border-left-color: #FF8C00;">' +
+              '<strong>⚠ DNI ' + cfg.quien + ' aceptado para F01.</strong> Se ve bien pero no esta sobre fondo blanco. ' +
+              'Si despues vas a sacar credito VWFS, te vamos a pedir cargarlo sobre fondo blanco.' +
+            '</div>' + detalle;
+          resultEl.style.display = '';
+          precargar();
+        } else {
+          st.ok = false;
+          resultEl.innerHTML =
+            '<div class="info-callout err"><strong>✗ El DNI ' + cfg.quien + ' no cumple.</strong> Mira el detalle y subilo de nuevo.</div>' +
+            detalle +
+            '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="peritajesDni.' + cfg.key + '.resetForRetry()">Volver a subir</button>';
+          resultEl.style.display = '';
+        }
+        st.updateDataBlock();
+      } catch (e) {
+        console.error('analyze ' + cfg.key + ' error', e);
+        loader.style.display = 'none';
+        errEl.textContent = 'No pudimos analizar el DNI ' + cfg.quien + ': ' + (e.message || 'error');
+        errEl.style.display = '';
+        btn.disabled = false;
+        st.updateBtn();
+      }
+    };
+
+    peritajesDni[cfg.key] = st;
+    return st;
   }
 
-  function setField(id, value) {
-    const el = document.getElementById(id);
-    if (el && !el.value) el.value = value;
-  }
+  const conyDni = crearPeritajeDni({
+    key: 'cony',
+    quien: 'del cónyuge',
+    origen: 'f01-conyuge',
+    dataBlockId: 'pf-conyugeDataBlock',
+    lockMsgId: 'pf-conyugeLockMsg',
+    // Del conyuge solo pedimos nombre y CUIL.
+    prefill: ext => prefillPersonaDesdeDni(ext, { nombre: 'pf-conyugeNombre', cuil: 'pf-conyugeCuil' })
+  });
+
+  const t2Dni = crearPeritajeDni({
+    key: 't2',
+    quien: 'del 2º titular',
+    origen: 'f01-2do-titular',
+    dataBlockId: 'pf-t2DataBlock',
+    lockMsgId: 'pf-t2LockMsg',
+    prefill: ext => prefillPersonaDesdeDni(ext, {
+      nombre: 'pf-t2nombre', nroDoc: 'pf-t2nroDoc', cuil: 'pf-t2cuil', sexo: 'pf-t2sexo',
+      fechaNac: 'pf-t2fechaNac', nacionalidad: 'pf-t2nacionalidad',
+      calle: 'pf-t2calle', nro: 'pf-t2nro',
+      localidad: 'pf-t2localidad', provincia: 'pf-t2provincia', cp: 'pf-t2cp'
+    })
+  });
 
   // Cédulas
   function toggleCedulaAzul(prefix) {
@@ -2357,7 +2461,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       ['E-mail', g('pf-email')], ['Tel. fijo', g('pf-telFijo')],
       ['Fecha nac.', gDate('pf-fechaNac')], ['Lugar nac.', g('pf-lugarNac')],
       ['Estado civil', g('pf-estadoCivil')], ['Ocupación', g('pf-ocupacion')],
-      ['% Titularidad', g('pf-porcTit')],
+      ['Profesión / Actividad', g('pf-profesion')], ['% Titularidad', g('pf-porcTit')],
       ['— DOM. DNI —',''], ['Dirección', dirLine('pf-dniCalle','pf-dniNro','pf-dniPiso','pf-dniDpto')],
       ['Localidad', g('pf-dniLocalidad')], ['Provincia', g('pf-dniProvincia')], ['CP', g('pf-dniCP')],
     ];
@@ -2379,12 +2483,12 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         ['Celular', g('pf-t2celular')], ['E-mail', g('pf-t2email')],
         ['Fecha nac.', gDate('pf-t2fechaNac')], ['Lugar nac.', g('pf-t2lugarNac')],
         ['Estado civil', g('pf-t2estadoCivil')], ['Ocupación', g('pf-t2ocupacion')],
-        ['% Tit.', g('pf-t2porcTit')],
+        ['Profesión / Actividad', g('pf-t2profesion')], ['% Tit.', g('pf-t2porcTit')],
         ['— DOM. 2º TITULAR —',''],
         ['Dirección', dirLine('pf-t2calle','pf-t2nro','pf-t2piso','pf-t2dpto')],
         ['Localidad', g('pf-t2localidad')], ['Provincia', g('pf-t2provincia')], ['CP', g('pf-t2cp')]);
     }
-    items.push(['— OPERACIÓN —',''], ['Cond. IVA', toggleValues['pf-iva']||''], ['Profesión / Actividad', g('pf-profesion')], ['Uso unidad', toggleValues['pf-uso']||'']);
+    items.push(['— OPERACIÓN —',''], ['Cond. IVA', toggleValues['pf-iva']||''], ['Uso unidad', toggleValues['pf-uso']||'']);
     return items;
   }
 
@@ -2495,22 +2599,21 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
 
     // ── Images ──
     // Antes de iterar uploadedImages, copiamos las del conyuge analizadas con IA
-    // (conyDniImages) a uploadedImages para que el PDF las incluya.
-    if (formType === 'fisica' && typeof conyDniImages === 'object') {
-      if (conyDniImages.frente) {
-        uploadedImages['prev-pf-dniConFrente'] = {
-          data: conyDniImages.frente.dataUrl,
-          name: 'cony-frente.jpg',
-          type: conyDniImages.frente.file ? conyDniImages.frente.file.type : 'image/jpeg'
-        };
-      }
-      if (conyDniImages.dorso) {
-        uploadedImages['prev-pf-dniConDorso'] = {
-          data: conyDniImages.dorso.dataUrl,
-          name: 'cony-dorso.jpg',
-          type: conyDniImages.dorso.file ? conyDniImages.dorso.file.type : 'image/jpeg'
-        };
-      }
+    // a uploadedImages para que el PDF las incluya.
+    if (formType === 'fisica') {
+      const copiarDniPeritado = (peritaje, prefijo, slotFrente, slotDorso) => {
+        [['frente', slotFrente], ['dorso', slotDorso]].forEach(([which, slot]) => {
+          const img = peritaje.images[which];
+          if (!img) return;
+          uploadedImages[slot] = {
+            data: img.dataUrl,
+            name: prefijo + '-' + which + '.jpg',
+            type: img.file ? img.file.type : 'image/jpeg'
+          };
+        });
+      };
+      copiarDniPeritado(conyDni, 'cony', 'prev-pf-dniConFrente', 'prev-pf-dniConDorso');
+      copiarDniPeritado(t2Dni, 't2', 'prev-pf-dniT2Frente', 'prev-pf-dniT2Dorso');
     }
     const imageKeys = formType === 'fisica'
       ? [
@@ -2519,7 +2622,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           ['prev-pf-dniConFrente','DNI Cónyuge — Frente'],
           ['prev-pf-dniConDorso', 'DNI Cónyuge — Dorso'],
           ['prev-pf-dniCon','DNI Cónyuge (legacy)'],
-          ['prev-pf-dniT2','DNI 2° Titular']
+          ['prev-pf-dniT2Frente','DNI 2º Titular — Frente'],
+          ['prev-pf-dniT2Dorso', 'DNI 2º Titular — Dorso'],
+          ['prev-pf-dniT2','DNI 2º Titular (legacy)']
         ]
       : [['prev-pj-dni1','DNI Firmante — Frente'],['prev-pj-dni2','DNI Firmante — Dorso']];
 
@@ -2627,7 +2732,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           ['prev-pf-dni2',        'DNI Titular Dorso'],
           ['prev-pf-dniConFrente','DNI Cónyuge Frente'],
           ['prev-pf-dniConDorso', 'DNI Cónyuge Dorso'],
-          ['prev-pf-dniT2',       'DNI 2° Titular']
+          ['prev-pf-dniT2Frente', 'DNI 2º Titular Frente'],
+          ['prev-pf-dniT2Dorso',  'DNI 2º Titular Dorso'],
+          ['prev-pf-dniT2',       'DNI 2º Titular legacy']
         ]
       : [
           ['prev-pj-dni1', 'DNI Firmante Frente'],
@@ -2704,9 +2811,15 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       Object.assign(datosObj, dniUrls);
 
       // DNI del cónyuge (si se analizó con IA): guardamos URLs y resumen de análisis.
-      if (conyDniFrenteUrlUploaded) datosObj['DNI Cónyuge Frente URL'] = conyDniFrenteUrlUploaded;
-      if (conyDniDorsoUrlUploaded)  datosObj['DNI Cónyuge Dorso URL']  = conyDniDorsoUrlUploaded;
-      if (conyDniAnalisis) datosObj['DNI Cónyuge análisis IA'] = JSON.stringify(conyDniAnalisis);
+      if (conyDni.frenteUrl) datosObj['DNI Cónyuge Frente URL'] = conyDni.frenteUrl;
+      if (conyDni.dorsoUrl)  datosObj['DNI Cónyuge Dorso URL']  = conyDni.dorsoUrl;
+      if (conyDni.analisis) datosObj['DNI Cónyuge análisis IA'] = JSON.stringify(conyDni.analisis);
+
+      // Lo mismo para el 2º titular: administracion tiene que poder ver que
+      // documento se perito y con que resultado.
+      if (t2Dni.frenteUrl) datosObj['DNI 2º Titular Frente URL'] = t2Dni.frenteUrl;
+      if (t2Dni.dorsoUrl)  datosObj['DNI 2º Titular Dorso URL']  = t2Dni.dorsoUrl;
+      if (t2Dni.analisis) datosObj['DNI 2º Titular análisis IA'] = JSON.stringify(t2Dni.analisis);
 
       // 3. Insert record
       await supaFetch('/rest/v1/formularios_f01', {
