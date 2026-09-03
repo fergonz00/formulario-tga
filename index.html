@@ -554,12 +554,12 @@
         <div class="field"><label>Calle</label><input type="text" id="pf-realCalle"></div>
         <div class="row row-3">
           <div class="field"><label>Nro</label><input type="text" id="pf-realNro" inputmode="numeric"></div>
-          <div class="field"><label>Piso</label><input type="text" id="pf-realPiso"></div>
-          <div class="field"><label>Dpto</label><input type="text" id="pf-realDpto"></div>
+          <div class="field"><label>Piso <span class="optional">(opt)</span></label><input type="text" id="pf-realPiso"></div>
+          <div class="field"><label>Dpto <span class="optional">(opt)</span></label><input type="text" id="pf-realDpto"></div>
         </div>
         <div class="row row-2">
           <div class="field"><label>Localidad</label><input type="text" id="pf-realLocalidad"></div>
-          <div class="field"><label>Barrio</label><input type="text" id="pf-realBarrio"></div>
+          <div class="field"><label>Barrio <span class="optional">(opt)</span></label><input type="text" id="pf-realBarrio"></div>
         </div>
         <div class="row row-2">
           <div class="field"><label>Provincia</label><select id="pf-realProvincia"><option value="">Seleccionar</option><option>CABA</option><option>Buenos Aires</option><option>Catamarca</option><option>Chaco</option><option>Chubut</option><option>Córdoba</option><option>Corrientes</option><option>Entre Ríos</option><option>Formosa</option><option>Jujuy</option><option>La Pampa</option><option>La Rioja</option><option>Mendoza</option><option>Misiones</option><option>Neuquén</option><option>Río Negro</option><option>Salta</option><option>San Juan</option><option>San Luis</option><option>Santa Cruz</option><option>Santa Fe</option><option>Sgo. del Estero</option><option>Tierra del Fuego</option><option>Tucumán</option></select></div>
@@ -600,7 +600,7 @@
           <div class="field"><label>Lugar nac.</label><input type="text" id="pf-t2lugarNac"></div>
         </div>
         <div class="row row-2">
-          <div class="field"><label>Estado civil</label><select id="pf-t2estadoCivil"><option value="">Seleccionar</option><option>Soltero/a</option><option>Casado/a</option><option>Divorciado/a</option><option>Viudo/a</option></select></div>
+          <div class="field"><label>Estado civil</label><select id="pf-t2estadoCivil"><option value="">Seleccionar</option><option>Soltero/a</option><option>Casado/a</option><option>Divorciado/a</option><option>Viudo/a</option><option>Unión convivencial</option></select></div>
           <div class="field"><label>Ocupación</label><input type="text" id="pf-t2ocupacion"></div>
         </div>
         <div class="field"><label>% Titularidad</label><input type="text" id="pf-t2porcTit" placeholder="50%"></div>
@@ -609,8 +609,8 @@
         <div class="field"><label>Calle</label><input type="text" id="pf-t2calle"></div>
         <div class="row row-3">
           <div class="field"><label>Nro</label><input type="text" id="pf-t2nro" inputmode="numeric"></div>
-          <div class="field"><label>Piso</label><input type="text" id="pf-t2piso"></div>
-          <div class="field"><label>Dpto</label><input type="text" id="pf-t2dpto"></div>
+          <div class="field"><label>Piso <span class="optional">(opt)</span></label><input type="text" id="pf-t2piso"></div>
+          <div class="field"><label>Dpto <span class="optional">(opt)</span></label><input type="text" id="pf-t2dpto"></div>
         </div>
         <div class="row row-2">
           <div class="field"><label>Localidad</label><input type="text" id="pf-t2localidad"></div>
@@ -2341,6 +2341,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     document.getElementById(target).innerHTML = html || '<p style="color:#8899AA;font-size:13px">No se completaron datos.</p>';
   }
 
+  // "Robertson 552, Piso 3, Dpto B". Antes el PDF solo mostraba calle y numero.
+  function dirLine(calle, nro, piso, dpto) {
+    const partes = [[g(calle), g(nro)].filter(Boolean).join(' ')];
+    if (piso && g(piso)) partes.push('Piso ' + g(piso));
+    if (dpto && g(dpto)) partes.push('Dpto ' + g(dpto));
+    return partes.filter(Boolean).join(', ');
+  }
+
   function getPFData() {
     const items = [
       ['Nombre', g('pf-nombre')], ['Documento', g('pf-tipoDoc')+' '+g('pf-nroDoc')],
@@ -2350,21 +2358,31 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       ['Fecha nac.', gDate('pf-fechaNac')], ['Lugar nac.', g('pf-lugarNac')],
       ['Estado civil', g('pf-estadoCivil')], ['Ocupación', g('pf-ocupacion')],
       ['% Titularidad', g('pf-porcTit')],
-      ['— DOM. DNI —',''], ['Dirección', [g('pf-dniCalle'),g('pf-dniNro')].filter(Boolean).join(' ')],
+      ['— DOM. DNI —',''], ['Dirección', dirLine('pf-dniCalle','pf-dniNro','pf-dniPiso','pf-dniDpto')],
       ['Localidad', g('pf-dniLocalidad')], ['Provincia', g('pf-dniProvincia')], ['CP', g('pf-dniCP')],
     ];
     if (document.getElementById('pf-mismoDom').checked) {
       items.push(['— DOM. REAL —','Igual al DNI']);
     } else {
-      items.push(['— DOM. REAL —',''], ['Dirección', [g('pf-realCalle'),g('pf-realNro')].filter(Boolean).join(' ')],
+      items.push(['— DOM. REAL —',''], ['Dirección', dirLine('pf-realCalle','pf-realNro','pf-realPiso','pf-realDpto')],
         ['Localidad', g('pf-realLocalidad')], ['Provincia', g('pf-realProvincia')], ['CP', g('pf-realCP')]);
     }
     if (g('pf-conyugeNombre')) {
       items.push(['— CÓNYUGE —',''], ['Nombre cónyuge', g('pf-conyugeNombre')], ['CUIL cónyuge', g('pf-conyugeCuil')], ['Nupcias cónyuge', toggleValues['nupcias']||'']);
     }
     if (document.getElementById('pf-tiene2do').checked) {
+      // Administracion necesita del 2º titular lo mismo que del titular:
+      // estado civil, e-mail, ocupacion y domicilio completo con CP.
       items.push(['— 2º TITULAR —',''], ['Nombre', g('pf-t2nombre')], ['Doc.', g('pf-t2tipoDoc')+' '+g('pf-t2nroDoc')],
-        ['CUIL', g('pf-t2cuil')], ['Celular', g('pf-t2celular')], ['% Tit.', g('pf-t2porcTit')]);
+        ['CUIL', g('pf-t2cuil')], ['Sexo', g('pf-t2sexo')],
+        ['Nacionalidad', g('pf-t2nacionalidad')], ['Autoridad emisora', g('pf-t2autoridad')],
+        ['Celular', g('pf-t2celular')], ['E-mail', g('pf-t2email')],
+        ['Fecha nac.', gDate('pf-t2fechaNac')], ['Lugar nac.', g('pf-t2lugarNac')],
+        ['Estado civil', g('pf-t2estadoCivil')], ['Ocupación', g('pf-t2ocupacion')],
+        ['% Tit.', g('pf-t2porcTit')],
+        ['— DOM. 2º TITULAR —',''],
+        ['Dirección', dirLine('pf-t2calle','pf-t2nro','pf-t2piso','pf-t2dpto')],
+        ['Localidad', g('pf-t2localidad')], ['Provincia', g('pf-t2provincia')], ['CP', g('pf-t2cp')]);
     }
     items.push(['— OPERACIÓN —',''], ['Cond. IVA', toggleValues['pf-iva']||''], ['Profesión / Actividad', g('pf-profesion')], ['Uso unidad', toggleValues['pf-uso']||'']);
     return items;
@@ -2671,7 +2689,18 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const email = formType === 'fisica' ? g('pf-email') : g('pj-email');
       const allData = formType === 'fisica' ? getPFData() : getPJData();
 
-      const datosObj = Object.fromEntries(allData.filter(([l,v]) => l && v && !l.startsWith('—')));
+      // Las etiquetas se repiten entre secciones (Nombre, CUIL, Localidad, CP...).
+      // Al aplanar a JSON, el 2º titular pisaba los datos del titular. Ahora la
+      // primera aparicion queda con la etiqueta limpia y las siguientes llevan
+      // la seccion: "Nombre (2º TITULAR)".
+      const datosObj = {};
+      let seccionActual = '';
+      for (const [l, v] of allData) {
+        if (!l) continue;
+        if (l.startsWith('—')) { seccionActual = l.replace(/—/g, '').trim(); continue; }
+        if (!v) continue;
+        datosObj[(l in datosObj) && seccionActual ? l + ' (' + seccionActual + ')' : l] = v;
+      }
       Object.assign(datosObj, dniUrls);
 
       // DNI del cónyuge (si se analizó con IA): guardamos URLs y resumen de análisis.
