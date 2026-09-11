@@ -141,11 +141,18 @@ const PROMPT = `Sos un analista experto en contratos de prenda con registro de V
    - Compará también la CANTIDAD de cuotas: la cantidad de filas del cuadro (columna CU) tiene que ser la misma N que dice el contrato.
    - El error típico es que al contrato le falte o le sobre un dígito. Ejemplo real: el cuadro dice 1.416.666,67 y la prenda dice 141.666,67 → RECHAZO.
    - Para saber cuál de los dos está mal, multiplicá el importe de la cuota por la cantidad de cuotas y comparalo con el MONTO DEL CONTRATO de la primera hoja: el valor correcto es el que se aproxima a ese monto. En el ejemplo, 12 × 1.416.666,67 = 17.000.000 y el contrato es por $16.999.999,96, así que el cuadro está bien y el error está en el cuerpo de la prenda.
-   - Si encontrás una hoja de salvedad/enmienda que corrige el importe (del estilo "LÉASE EN CONTRATO DE PRENDA: LAS CUOTAS SE FIJAN EN LA SUMA DE $..."), **igual marcá la condición como NO cumplida** porque el cuerpo del contrato está mal, pero aclaralo en el detalle diciendo que hay una hoja de salvedad que lo corrige.
+   - Si los importes no coinciden pero hay una **hoja de salvedad** que corrige el error, ver la sección "HOJAS DE SALVEDAD" más abajo: la condición se da por cumplida y se aprueba con observación.
    - Ignorá diferencias de formato: 1.416.666,67 / 1416666.67 / $ 1.416.666,67 son el mismo número.
 
+## HOJAS DE SALVEDAD (enmiendas)
+A veces la prenda trae una hoja de salvedad que corrige un dato mal escrito en el cuerpo del contrato. Son del estilo "LÉASE EN CONTRATO DE PRENDA Y EN CONTINUACIÓN DEL CONTRATO DE PRENDA: LAS CUOTAS SE FIJA EN LA SUMA DE $ 1.416.666,67 - VALE", y suelen ir firmadas por el acreedor y el deudor.
+
+- Si hay un **error de escritura** en el cuerpo (importe de cuota, cantidad de cuotas, nombre, DNI, domicilio, un campo mal completado) **y una hoja de salvedad que lo corrige**: esa condición se marca como **cumplida (ok: true)**, la prenda se **APRUEBA**, y el detalle tiene que decir cuál era el error y que queda salvado por la hoja de salvedad. Además agregá una entrada en "observaciones" describiendo el error salvado.
+- La salvedad **NO salva**: la falta de firmas (condición 3), que el documento sea una COPIA (condición 6), ni que falte una hoja entera (por ejemplo que no venga el cuadro de cuotas). Eso es rechazo aunque haya salvedad.
+- Si hay un **error de escritura y NO hay** una hoja de salvedad que lo corrija: la condición NO se cumple y el motivo de rechazo correspondiente tiene que **terminar con "— mandar a enmendar"**.
+
 ## Cómo decidir
-- Si TODAS las 7 condiciones se cumplen → aprobado = true.
+- Si TODAS las 7 condiciones se cumplen → aprobado = true (puede ser con observaciones si alguna quedó salvada por una hoja de salvedad).
 - Si CUALQUIERA falla → aprobado = false, y explicá el/los motivo(s) concreto(s).
 - Ante una duda razonable sobre una firma o un dato, marcá la condición como no cumplida y explicá qué revisar (mejor pecar de cuidadoso: es una aprobación con consecuencias legales).
 
@@ -158,7 +165,7 @@ Devolvé EXCLUSIVAMENTE un objeto JSON (sin texto adicional, sin markdown, sin b
   "deudor_dni": "número de DNI del deudor principal, solo dígitos",
   "estado_civil_detectado": "soltero",
   "firmas": { "esperadas": 1, "encontradas": 1 },
-  "cuotas": { "cuadro_adjunto": true, "amortizacion_cuadro": "1416666.67", "cuota_prenda": "1416666.67", "cantidad_cuadro": 12, "cantidad_prenda": 12 },
+  "cuotas": { "cuadro_adjunto": true, "amortizacion_cuadro": "1416666.67", "cuota_prenda": "1416666.67", "cantidad_cuadro": 12, "cantidad_prenda": 12, "salvedad": false },
   "checks": [
     { "regla": "Nombre y apellido bien escrito", "ok": true, "detalle": "Texto corto en español rioplatense explicando qué viste." },
     { "regla": "DNI idéntico en todos lados", "ok": true, "detalle": "..." },
@@ -169,6 +176,7 @@ Devolvé EXCLUSIVAMENTE un objeto JSON (sin texto adicional, sin markdown, sin b
     { "regla": "Cuadro de cuotas coincide con la prenda", "ok": true, "detalle": "..." }
   ],
   "motivos_rechazo": [],
+  "observaciones": [],
   "resumen": "Una o dos oraciones con la conclusión general."
 }
 
@@ -181,7 +189,9 @@ Reglas del JSON:
 - "checks" debe tener SIEMPRE las 7 reglas, en ese orden, con sus nombres exactos.
 - "cuotas.cuadro_adjunto" es true solo si encontraste la hoja del cuadro de cuotas. Si es false, poné los demás campos de "cuotas" en "" o null.
 - "cuotas.amortizacion_cuadro" y "cuotas.cuota_prenda" van como string con punto decimal y sin separador de miles (ej. "1416666.67"). Si no lo podés leer, poné "".
-- "motivos_rechazo" es una lista de strings con los motivos concretos si aprobado=false; lista vacía [] si aprobado=true.
+- "cuotas.salvedad" es true si encontraste una hoja de salvedad que corrige el importe de la cuota.
+- "motivos_rechazo" es una lista de strings con los motivos concretos si aprobado=false; lista vacía [] si aprobado=true. Cuando el motivo es un error de escritura sin hoja de salvedad, el texto termina con "— mandar a enmendar".
+- "observaciones" es una lista de strings con los errores que existen pero quedaron salvados por una hoja de salvedad. Va vacía [] si no hay ninguno. Si tiene contenido, la prenda igual se aprueba.
 - Todo el texto visible en español rioplatense, claro y breve.
 - Devolvé SOLO el JSON, nada más.`;
 
