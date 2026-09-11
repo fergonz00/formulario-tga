@@ -1,7 +1,7 @@
 // Edge Function: analizar-prenda
 // Revisor de Prendas de Volkswagen Financial Services. Recibe una o varias
 // URLs de documento (PDF escaneado y/o fotos de la prenda) y le pide a Claude
-// que verifique 6 condiciones. Devuelve un veredicto estructurado (aprobado /
+// que verifique 7 condiciones. Devuelve un veredicto estructurado (aprobado /
 // rechazado + detalle por regla). NO guarda nada — es solo una revisión.
 //
 // La ANTHROPIC_API_KEY se lee del entorno de Supabase (secret), nunca del cliente.
@@ -108,7 +108,7 @@ Deno.serve(async (req: Request) => {
   return json({ veredicto });
 });
 
-const PROMPT = `Sos un analista experto en contratos de prenda con registro de Volkswagen Financial Services Compañía Financiera S.A. (Argentina). Te paso el/los documento(s) de UNA prenda escaneada (puede venir en varias hojas: la "Solicitud de Inscripción Contrato Prendario" formulario 03, el "Contrato de Prenda con Registro" del Ministerio de Justicia, y la "Continuación del Contrato de Prenda" con las cláusulas). Tu tarea es REVISAR si la prenda está bien confeccionada según reglas estrictas y decir si se APRUEBA o se RECHAZA.
+const PROMPT = `Sos un analista experto en contratos de prenda con registro de Volkswagen Financial Services Compañía Financiera S.A. (Argentina). Te paso el/los documento(s) de UNA prenda escaneada (puede venir en varias hojas: la "Solicitud de Inscripción Contrato Prendario" formulario 03, el "Contrato de Prenda con Registro" del Ministerio de Justicia, la "Continuación del Contrato de Prenda" con las cláusulas, y la hoja del CUADRO DE CUOTAS de Volkswagen Financial Services). Tu tarea es REVISAR si la prenda está bien confeccionada según reglas estrictas y decir si se APRUEBA o se RECHAZA.
 
 ## Cómo es una prenda BIEN hecha (referencia)
 - El ACREEDOR siempre es Volkswagen Financial Services Compañía Financiera S.A., Inscripción N° 9095 L°117 T°A, CUIT 30-68241957-8.
@@ -116,7 +116,7 @@ const PROMPT = `Sos un analista experto en contratos de prenda con registro de V
 - Los datos del automotor (dominio/patente, marca, tipo, modelo, motor, chasis) y los montos/cuotas están completos.
 - El documento está firmado por el acreedor y por el/los deudor(es).
 
-## LAS 6 CONDICIONES A VERIFICAR (todas deben cumplirse para APROBAR)
+## LAS 7 CONDICIONES A VERIFICAR (todas deben cumplirse para APROBAR)
 
 1. **Nombre y apellido bien escrito**: el nombre y apellido del/los deudor(es) tiene que estar escrito correctamente (sin errores evidentes de ortografía/tipeo) y escrito igual en todas las hojas donde aparece. Si en una hoja dice un apellido y en otra otro, o está claramente mal escrito, es una falla.
 
@@ -134,8 +134,18 @@ const PROMPT = `Sos un analista experto en contratos de prenda con registro de V
 
 6. **Original, no copia**: el documento tiene que ser un ORIGINAL. Si en CUALQUIER parte del documento aparece la palabra "COPIA" (por ejemplo "copia del original", "copia fiel", "duplicado", "es copia", o cualquier leyenda que indique que es una copia) → RECHAZO. Una prenda original no debe tener ninguna leyenda de copia.
 
+7. **Cuadro de cuotas adjunto y coincidente con la prenda**:
+   - Entre las hojas TIENE que venir el **cuadro de cuotas de Volkswagen Financial Services**: la planilla con las columnas CU / F.VTO. / AMORTIZAC. / INTERES / SEG.AUTO / OTROS IMP. / IVA / DESC. INTERESES / DESC. IVA / TOTAL CUOTA. **Si ese cuadro no está entre las hojas, la condición NO se cumple** y hay que pedirlo (decilo así en el detalle: "falta la hoja del cuadro de cuotas").
+   - Si está, tomá el importe de la columna **AMORTIZAC.** (es el mismo en todas las filas) y comparalo con el importe de cuota que declara el contrato de prenda, donde dice "pagadero en N cuotas mensuales y consecutivas de $ X de capital e intereses". **Tienen que ser exactamente el MISMO número.**
+   - ⚠️ Compará SIEMPRE contra la columna **AMORTIZAC.**, NUNCA contra "TOTAL CUOTA". El TOTAL CUOTA es más alto porque le suma seguro automotor, otros impuestos e IVA — el propio contrato aclara que "al importe de la cuota se le adicionarán intereses, IVA, gastos administrativos y seguros contratados". Comparar contra TOTAL CUOTA da un rechazo falso.
+   - Compará también la CANTIDAD de cuotas: la cantidad de filas del cuadro (columna CU) tiene que ser la misma N que dice el contrato.
+   - El error típico es que al contrato le falte o le sobre un dígito. Ejemplo real: el cuadro dice 1.416.666,67 y la prenda dice 141.666,67 → RECHAZO.
+   - Para saber cuál de los dos está mal, multiplicá el importe de la cuota por la cantidad de cuotas y comparalo con el MONTO DEL CONTRATO de la primera hoja: el valor correcto es el que se aproxima a ese monto. En el ejemplo, 12 × 1.416.666,67 = 17.000.000 y el contrato es por $16.999.999,96, así que el cuadro está bien y el error está en el cuerpo de la prenda.
+   - Si encontrás una hoja de salvedad/enmienda que corrige el importe (del estilo "LÉASE EN CONTRATO DE PRENDA: LAS CUOTAS SE FIJAN EN LA SUMA DE $..."), **igual marcá la condición como NO cumplida** porque el cuerpo del contrato está mal, pero aclaralo en el detalle diciendo que hay una hoja de salvedad que lo corrige.
+   - Ignorá diferencias de formato: 1.416.666,67 / 1416666.67 / $ 1.416.666,67 son el mismo número.
+
 ## Cómo decidir
-- Si TODAS las 6 condiciones se cumplen → aprobado = true.
+- Si TODAS las 7 condiciones se cumplen → aprobado = true.
 - Si CUALQUIERA falla → aprobado = false, y explicá el/los motivo(s) concreto(s).
 - Ante una duda razonable sobre una firma o un dato, marcá la condición como no cumplida y explicá qué revisar (mejor pecar de cuidadoso: es una aprobación con consecuencias legales).
 
@@ -148,13 +158,15 @@ Devolvé EXCLUSIVAMENTE un objeto JSON (sin texto adicional, sin markdown, sin b
   "deudor_dni": "número de DNI del deudor principal, solo dígitos",
   "estado_civil_detectado": "soltero",
   "firmas": { "esperadas": 1, "encontradas": 1 },
+  "cuotas": { "cuadro_adjunto": true, "amortizacion_cuadro": "1416666.67", "cuota_prenda": "1416666.67", "cantidad_cuadro": 12, "cantidad_prenda": 12 },
   "checks": [
     { "regla": "Nombre y apellido bien escrito", "ok": true, "detalle": "Texto corto en español rioplatense explicando qué viste." },
     { "regla": "DNI idéntico en todos lados", "ok": true, "detalle": "..." },
     { "regla": "Firmas según estado civil", "ok": true, "detalle": "..." },
     { "regla": "Domicilio completo y coherente", "ok": true, "detalle": "..." },
     { "regla": "Sin campos básicos vacíos", "ok": true, "detalle": "..." },
-    { "regla": "Original (no copia)", "ok": true, "detalle": "..." }
+    { "regla": "Original (no copia)", "ok": true, "detalle": "..." },
+    { "regla": "Cuadro de cuotas coincide con la prenda", "ok": true, "detalle": "..." }
   ],
   "motivos_rechazo": [],
   "resumen": "Una o dos oraciones con la conclusión general."
@@ -163,10 +175,12 @@ Devolvé EXCLUSIVAMENTE un objeto JSON (sin texto adicional, sin markdown, sin b
 Reglas del JSON:
 - "deudor_nombre": apellido y nombre del deudor principal (si hay 2 titulares, el primero/principal). Si no lo podés leer, poné "".
 - "deudor_dni": el número de DNI del deudor principal, solo dígitos (sin puntos). Si no lo podés leer, poné "".
-- "aprobado" es true SOLO si los 6 "ok" son true.
+- "aprobado" es true SOLO si los 7 "ok" son true.
 - "estado_civil_detectado" debe ser exactamente "soltero", "casado" o "no_detectado".
 - "firmas.esperadas" es 1 para soltero, 2 para casado; "firmas.encontradas" es cuántas contaste en los lugares de firma del deudor.
-- "checks" debe tener SIEMPRE las 6 reglas, en ese orden, con sus nombres exactos.
+- "checks" debe tener SIEMPRE las 7 reglas, en ese orden, con sus nombres exactos.
+- "cuotas.cuadro_adjunto" es true solo si encontraste la hoja del cuadro de cuotas. Si es false, poné los demás campos de "cuotas" en "" o null.
+- "cuotas.amortizacion_cuadro" y "cuotas.cuota_prenda" van como string con punto decimal y sin separador de miles (ej. "1416666.67"). Si no lo podés leer, poné "".
 - "motivos_rechazo" es una lista de strings con los motivos concretos si aprobado=false; lista vacía [] si aprobado=true.
 - Todo el texto visible en español rioplatense, claro y breve.
 - Devolvé SOLO el JSON, nada más.`;

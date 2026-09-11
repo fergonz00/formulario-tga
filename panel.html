@@ -436,6 +436,9 @@
           <p style="font-size:13px;color:#5A6B7F;margin-top:4px;">
             Subí la prenda (PDF escaneado y/o fotos, una o varias hojas). La IA la revisa contra las condiciones. Si querés, guardás el informe.
           </p>
+          <p style="font-size:12px;color:#5A6B7F;margin-top:8px;background:rgba(0,64,193,0.05);border-left:3px solid var(--vw-cobalt);border-radius:6px;padding:8px 10px;">
+            <strong>Acordate de incluir la hoja del cuadro de cuotas</strong> (la planilla de Volkswagen Financial Services con las columnas CU / F.VTO. / AMORTIZAC. / TOTAL CUOTA). Sin esa hoja no se puede verificar que el importe de la cuota coincida con el de la prenda.
+          </p>
         </div>
         <div class="field" style="margin-bottom:12px;">
           <label style="display:block;font-size:12px;font-weight:600;margin-bottom:6px;color:var(--vw-dark-blue);text-transform:uppercase;letter-spacing:0.3px;">Documento(s) de la prenda</label>
@@ -447,7 +450,7 @@
             <input type="file" id="prendaFiles" accept="application/pdf,image/*" multiple onchange="onPrendasFiles()" style="display:none;">
             <div class="pd-icon">📄</div>
             <div class="pd-text">Arrastrá la prenda acá o <u>hacé click para elegir</u></div>
-            <div class="pd-hint">PDF escaneado o fotos · una o varias hojas</div>
+            <div class="pd-hint">PDF escaneado o fotos · una o varias hojas · incluí el cuadro de cuotas</div>
           </div>
           <div id="prendaFilesList" style="font-size:12px;color:#5A6B7F;margin-top:10px;"></div>
           <div id="prendaProgress" style="display:none;margin-top:10px;">
@@ -726,6 +729,30 @@
     const ec = v.estado_civil_detectado ? ('Estado civil: <strong>' + escapeHtml(v.estado_civil_detectado) + '</strong>') : '';
     const fi = v.firmas ? (' · Firmas encontradas: <strong>' + (v.firmas.encontradas != null ? v.firmas.encontradas : '?') + '</strong> de <strong>' + (v.firmas.esperadas != null ? v.firmas.esperadas : '?') + '</strong> esperadas') : '';
     if (ec || fi) html += '<div style="font-size:12px;color:#5A6B7F;margin-bottom:10px;">' + ec + fi + '</div>';
+    // Comparacion del importe de cuota: cuadro de VWFS contra el cuerpo de la prenda.
+    const cu = v.cuotas;
+    if (cu && typeof cu === 'object') {
+      const plata = n => {
+        // La IA deberia mandar "1416666.67", pero a veces devuelve "1.416.666,67".
+        // Si hay coma, se asume formato es-AR: puntos de miles y coma decimal.
+        let t = String(n == null ? '' : n).replace(/[^\d.,-]/g, '');
+        t = t.indexOf(',') >= 0 ? t.replace(/\./g, '').replace(',', '.') : t;
+        const x = Number(t);
+        return isFinite(x) && x ? x.toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '—';
+      };
+      if (cu.cuadro_adjunto === false) {
+        html += '<div style="font-size:12px;color:var(--vw-red);background:rgba(228,0,43,0.06);border-radius:6px;padding:8px 10px;margin-bottom:10px;">Falta la hoja del cuadro de cuotas — hay que pedirla para poder verificar el importe.</div>';
+      } else if (cu.amortizacion_cuadro || cu.cuota_prenda) {
+        const iguales = plata(cu.amortizacion_cuadro) === plata(cu.cuota_prenda);
+        const col = iguales ? '#00873C' : '#E4002B';
+        html += '<div style="font-size:12px;color:#5A6B7F;background:var(--vw-new-horizon);border-radius:6px;padding:8px 10px;margin-bottom:10px;">' +
+          'Cuota en el cuadro (AMORTIZAC.): <strong style="color:' + col + ';">$ ' + plata(cu.amortizacion_cuadro) + '</strong>' +
+          (cu.cantidad_cuadro ? ' <span style="color:#8899AA;">×' + cu.cantidad_cuadro + '</span>' : '') +
+          '<br>Cuota en la prenda: <strong style="color:' + col + ';">$ ' + plata(cu.cuota_prenda) + '</strong>' +
+          (cu.cantidad_prenda ? ' <span style="color:#8899AA;">×' + cu.cantidad_prenda + '</span>' : '') +
+          '</div>';
+      }
+    }
     const checks = Array.isArray(v.checks) ? v.checks : [];
     html += checks.map(c => {
       const ok = c && c.ok === true;
