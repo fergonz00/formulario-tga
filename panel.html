@@ -1011,9 +1011,10 @@
     }
     try {
       // 1) Buscar primero en tasador_usuarios (fuente de verdad del ecosistema TGA)
-      const tuRes = await supaFetch('/rest/v1/tasador_usuarios?usuario=eq.' + encodeURIComponent(user)
-        + '&clave=eq.' + encodeURIComponent(pass) + '&activo=eq.true&select=usuario,nombre,roles,rol',
-        { headers: { 'Accept': 'application/json' } });
+      // Login server-side (bcrypt) via RPC: la anon key ya no lee ni compara la clave.
+      const tuRes = await supaFetch('/rest/v1/rpc/login_tasador',
+        { method: 'POST', body: JSON.stringify({ p_usuario: user, p_clave: pass }),
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' } });
       const tuData = await tuRes.json();
 
       if (Array.isArray(tuData) && tuData.length > 0) {
@@ -1030,8 +1031,9 @@
       }
 
       // 2) Fallback: cuentas compartidas legacy en f01_admins (administracion / ventas)
-      const res = await supaFetch('/rest/v1/f01_admins?usuario=eq.' + encodeURIComponent(user)
-        + '&clave=eq.' + encodeURIComponent(pass), { headers: { 'Accept': 'application/json' } });
+      const res = await supaFetch('/rest/v1/rpc/login_f01admin',
+        { method: 'POST', body: JSON.stringify({ p_usuario: user, p_clave: pass }),
+          headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' } });
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) {
         err.textContent = 'Usuario o contraseña incorrectos.';

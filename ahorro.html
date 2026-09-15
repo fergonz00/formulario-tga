@@ -2143,7 +2143,8 @@
     document.getElementById('adminLoginError').style.display = 'none';
 
     try {
-      const res = await supaFetch('/rest/v1/f01_admins?usuario=eq.' + encodeURIComponent(user) + '&clave=eq.' + encodeURIComponent(pass), {
+      const res = await supaFetch('/rest/v1/rpc/login_f01admin', {
+        method: 'POST', body: JSON.stringify({ p_usuario: user, p_clave: pass }),
         headers: { 'Content-Type': 'application/json' }
       });
       const data = await res.json();
