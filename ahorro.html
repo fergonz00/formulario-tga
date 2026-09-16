@@ -1944,6 +1944,21 @@
   const SUPABASE_URL = 'https://wjfglsafgaltusmbnccl.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndqZmdsc2FmZ2FsdHVzbWJuY2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM0MzM2OTksImV4cCI6MjA4OTAwOTY5OX0.OOwgyKDNQsbBaGDaL0OhJfc8eOsCClvvAPW0VFBKrOA';
 
+  // Sesión firmada del admin (login_f01admin) para el forms-gateway.
+  // Las tablas con PII tienen RLS: el panel admin lee por la Edge Function.
+  let adminSession = null;
+  async function gatewayFetch(action, extra) {
+    return fetch(SUPABASE_URL + '/functions/v1/forms-gateway', {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(Object.assign({ action: action, session: adminSession }, extra || {}))
+    });
+  }
+
   async function supaFetch(path, options = {}) {
     const res = await fetch(SUPABASE_URL + path, {
       ...options,
@@ -2149,6 +2164,7 @@
       });
       const data = await res.json();
       if (data.length > 0) {
+        adminSession = { usuario: user, session_exp: data[0].session_exp, session_sig: data[0].session_sig };
         document.getElementById('adminLogin').style.display = 'none';
         document.getElementById('adminPanel').style.display = 'block';
         loadFormularios();
@@ -2173,10 +2189,10 @@
 
   async function loadFormularios() {
     try {
-      const res = await supaFetch('/rest/v1/formularios_f01?order=created_at.desc&limit=100', {
-        headers: { 'Content-Type': 'application/json' }
-      });
-      adminFormularios = await res.json();
+      const res = await gatewayFetch('list-forms', { tabla: 'f01', limit: 100, incluirEliminados: true });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      adminFormularios = Array.isArray(data.rows) ? data.rows : [];
       buildMonthFilter();
       filterFormularios();
     } catch (e) {

@@ -1200,11 +1200,7 @@
         eliminado_por: currentUser,
         eliminado_at: new Date().toISOString()
       };
-      const res = await supaFetch('/rest/v1/' + cfg.table + '?id=in.(' + ids.join(',') + ')', {
-        method: 'PATCH',
-        body: JSON.stringify(body),
-        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }
-      });
+      const res = await gatewayFetch('patch-forms', { tabla: currentTab, ids: ids, patch: body });
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
         throw new Error('Error al borrar: ' + (errText || res.status));
@@ -1224,11 +1220,10 @@
     const list = document.getElementById('rowList');
     list.innerHTML = '<div class="loading">Cargando…</div>';
     try {
-      const res = await supaFetch('/rest/v1/' + cfg.table + '?eliminado=eq.false&order=created_at.desc&limit=500', {
-        headers: { 'Accept': 'application/json' }
-      });
-      const rows = await res.json();
-      rowsCache[tab] = Array.isArray(rows) ? rows : [];
+      const res = await gatewayFetch('list-forms', { tabla: tab, limit: 500 });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      rowsCache[tab] = Array.isArray(data.rows) ? data.rows : [];
       updateTabCounts();
       updateFilterCounts();
       buildMonthFilter();
@@ -2463,11 +2458,7 @@
   async function updateRow(id, patch, keepDetailOpen) {
     const cfg = TAB_CONFIG[currentTab];
     try {
-      const res = await supaFetch('/rest/v1/' + cfg.table + '?id=eq.' + id, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify(patch)
-      });
+      const res = await gatewayFetch('patch-forms', { tabla: currentTab, ids: [id], patch: patch });
       if (!res.ok) throw new Error('HTTP ' + res.status);
       await loadTab(currentTab);
       if (keepDetailOpen && currentDetailId) {
