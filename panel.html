@@ -539,6 +539,23 @@
     });
   }
 
+  // Puerta de servidor para las tablas con PII (RLS prendido): las lecturas y
+  // escrituras del staff van por la Edge Function forms-gateway, que verifica la
+  // firma del tga_session y usa service_role. La anon key ya no lee estas tablas.
+  const FORMS_GATEWAY = SUPABASE_URL + '/functions/v1/forms-gateway';
+  async function gatewayFetch(action, extra) {
+    const session = getSharedCookie();
+    return fetch(FORMS_GATEWAY, {
+      method: 'POST',
+      headers: {
+        'apikey': SUPABASE_KEY,
+        'Authorization': 'Bearer ' + SUPABASE_KEY,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(Object.assign({ action: action, session: session }, extra || {}))
+    });
+  }
+
   // ═══════ REVISOR DE PRENDAS ═══════
   let prendaVeredicto = null;      // último análisis (para guardar)
   let prendaArchivos = null;       // URLs ya subidas, listas para analizar
@@ -701,11 +718,7 @@
         aprobado: v.aprobado === true,
         veredicto: v
       };
-      const res = await supaFetch('/rest/v1/prendas_informes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify(payload)
-      });
+      const res = await gatewayFetch('save-prenda', { payload: payload });
       if (!res.ok) { const t = await res.text(); throw new Error(t); }
       resetPrendas();
       await loadPrendaInformes();
@@ -795,8 +808,10 @@
   async function loadPrendaInformes() {
     const el = document.getElementById('prendasList');
     try {
-      const res = await supaFetch('/rest/v1/prendas_informes?select=*&order=created_at.desc&limit=500', { headers: { 'Accept': 'application/json' } });
-      const rows = await res.json();
+      const res = await gatewayFetch('list-prendas');
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const rows = data && data.rows;
       prendaInformes = Array.isArray(rows) ? rows : [];
       buildPrendaMonthFilter();
       renderPrendasList();
@@ -873,10 +888,7 @@
     if (!PRENDAS_DELETE_USERS.includes(currentUser)) { alert('No tenés permiso para borrar.'); return; }
     if (!confirm('¿Borrar este informe? Esta acción no se puede deshacer.')) return;
     try {
-      const res = await supaFetch('/rest/v1/prendas_informes?id=eq.' + id, {
-        method: 'DELETE',
-        headers: { 'Prefer': 'return=minimal' }
-      });
+      const res = await gatewayFetch('delete-prenda', { id: id });
       if (!res.ok) { const t = await res.text(); throw new Error(t); }
       prendaInformes = prendaInformes.filter(x => x.id !== id);
       renderPrendasList();
@@ -1041,7 +1053,9 @@
       }
       const role = data[0].rol || (user === 'administracion' ? 'administracion' : 'ventas');
       enterPanel(user, role);
-      saveSession(user, role);
+      // También dejamos la cookie firmada (data[0] trae session_exp/session_sig),
+      // para que las Edge Functions de datos acepten a estas cuentas legacy.
+      saveSession(user, role, Object.assign({ usuario: user }, data[0]));
     } catch (e) {
       console.error(e);
       err.textContent = 'Error de conexión. Intentá de nuevo.';
