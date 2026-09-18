@@ -1069,6 +1069,14 @@
   // Puerta de servidor para formularios_f01 (RLS prendido): el flujo de cliente
   // (buscar el F01 por documento y adjuntarle el DNI) pasa por la Edge Function
   // forms-gateway con service_role, acotado, en vez de leer la tabla con anon.
+  // Sesión firmada del staff (cookie compartida tga_session), para las acciones
+  // del gateway que la exigen (leer/editar un formulario del panel). Las acciones
+  // de cliente (f01-buscar/f01-vincular-dni) la ignoran.
+  function getSharedCookie() {
+    var m = document.cookie.match(/(?:^|;\s*)tga_session=([^;]+)/);
+    if (!m) return null;
+    try { return JSON.parse(decodeURIComponent(m[1])); } catch (e) { return null; }
+  }
   async function gatewayFetch(action, extra) {
     return fetch(SUPABASE_URL + '/functions/v1/forms-gateway', {
       method: 'POST',
@@ -1077,7 +1085,7 @@
         'Authorization': 'Bearer ' + SUPABASE_KEY,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(Object.assign({ action: action }, extra || {}))
+      body: JSON.stringify(Object.assign({ action: action, session: getSharedCookie() }, extra || {}))
     });
   }
 
@@ -2452,21 +2460,14 @@
       };
 
       if (editMode && editingId) {
-        await supaFetch('/rest/v1/formularios_vwfs?id=eq.' + editingId, {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-            'Prefer': 'return=minimal'
-          },
-          body: JSON.stringify(Object.assign({}, basePayload, {
-            estado: 'datero_cargado',
-            errores_adm: null,
-            motivo_rechazo_dni: null,
-            dni_aprobado_admin: null,
-            editado_por: editUser,
-            editado_at: new Date().toISOString()
-          }))
-        });
+        await gatewayFetch('patch-forms', { tabla: 'vwfs', ids: [editingId], patch: Object.assign({}, basePayload, {
+          estado: 'datero_cargado',
+          errores_adm: null,
+          motivo_rechazo_dni: null,
+          dni_aprobado_admin: null,
+          editado_por: editUser,
+          editado_at: new Date().toISOString()
+        }) });
       } else {
         await supaFetch('/rest/v1/formularios_vwfs', {
           method: 'POST',
@@ -2684,10 +2685,10 @@
 
   async function loadEditRecord(id) {
     try {
-      const res = await supaFetch('/rest/v1/formularios_vwfs?id=eq.' + id, {
-        headers: { 'Accept': 'application/json' }
-      });
-      const rows = await res.json();
+      const res = await gatewayFetch('get-form', { tabla: 'vwfs', id: id });
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const data = await res.json();
+      const rows = data && data.rows;
       if (!Array.isArray(rows) || !rows.length) {
         alert('No se encontró el formulario a editar.');
         return false;

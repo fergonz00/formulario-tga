@@ -222,6 +222,17 @@ Deno.serve(async (req: Request) => {
         const rows = await r.json();
         return json({ rows: Array.isArray(rows) ? rows : [] });
       }
+      case "get-form": {
+        const role = await panelRole(usuario);
+        if (!role) return json({ error: "Sin acceso al panel" }, 403);
+        const tabla = FORM_TABLES[String(body?.tabla || "")];
+        if (!tabla) return json({ error: "Tabla inválida" }, 400);
+        const id = Number(body?.id);
+        if (!Number.isFinite(id)) return json({ error: "id inválido" }, 400);
+        const r = await svc(`${tabla}?id=eq.${id}&limit=1`);
+        const rows = await r.json();
+        return json({ rows: Array.isArray(rows) ? rows : [] });
+      }
       case "patch-forms": {
         const role = await panelRole(usuario);
         if (!role) return json({ error: "Sin acceso al panel" }, 403);
