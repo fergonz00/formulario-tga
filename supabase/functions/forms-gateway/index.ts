@@ -131,6 +131,7 @@ const OV_VENDEDORES: Record<number, string> = {
   3: "Daniel López",
   5: "José Castro",
   6: "Antonio Loisi",
+  15: "TG — Ventas de Gerencia", // "Gonzalez Fernando" en Oversoft
   22: "TG — Ventas de Gerencia", // "T.G." en Oversoft
   24: "Marta Castro",
   52: "Jorge Fazzini",
