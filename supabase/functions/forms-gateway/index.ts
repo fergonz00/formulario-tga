@@ -7,7 +7,9 @@
 //
 // Acciones de STAFF (exigen sesión firmada + rol de panel):
 //   list-prendas / save-prenda / delete-prenda   → prendas_informes
-//   list-forms   → lista vwfs/f01/ahorro (panel + paneles admin de index/ahorro)
+//   list-forms   → lista vwfs/f01/ahorro (panel + paneles admin de index/ahorro);
+//                  en F01/ahorro completa el vendedor faltante desde Oversoft
+//                  (secrets OVERSOFT_URL / OVERSOFT_KEY, réplica solo lectura)
 //   patch-forms  → edita/borra-lógico filas de vwfs/f01/ahorro por id(s)
 // Acciones de CLIENTE (sin login, acotadas — flujo VWFS de continuación):
 //   f01-buscar        → busca UN F01 por documento + fecha de nac. (no enumera)
@@ -117,6 +119,131 @@ async function panelRole(usuario: string): Promise<"owner" | "administracion" | 
   return null;
 }
 
+// ─── Vendedor automático del F01 / Plan de Ahorro desde Oversoft ───
+// El vendedor casi nunca se carga a mano en el panel. Oversoft lo sabe: el
+// cliente (por DNI o CUIT/CUIL) tiene una preventa con vendedorid. Al listar
+// F01/ahorro, los que no tienen vendedor se buscan en la réplica (solo lectura)
+// y se GRABAN con el vendedor de la preventa más cercana a la fecha del form:
+// una vez cargado no se vuelve a consultar. Los VWFS lo heredan de su F01 por
+// trigger en la base (formularios_vwfs.f01_id), no pasan por acá.
+// Mapa vendedorid de Oversoft → nombre EXACTO de la lista VENDEDORES del panel.
+const OV_VENDEDORES: Record<number, string> = {
+  3: "Daniel López",
+  5: "José Castro",
+  6: "Antonio Loisi",
+  22: "TG — Ventas de Gerencia", // "T.G." en Oversoft
+  24: "Marta Castro",
+  52: "Jorge Fazzini",
+  226: "Julián Naddeo",
+  260: "Inés Alonso",
+  289: "Gisela Buena",
+  292: "Tomas Bandiera",
+};
+const AUTO_VEND_DIAS = 120; // solo forms recientes: los viejos sin match no se re-consultan en cada listado
+const AUTO_VEND_ANTES = 60; // preventa hasta 60 días antes del form…
+const AUTO_VEND_DESPUES = 30; // …o hasta 30 después (la PV a veces se arma después)
+const DIA_MS = 86_400_000;
+
+function ovBase(): string | null {
+  const raw = (Deno.env.get("OVERSOFT_URL") || "").replace(/\/+$/, "");
+  if (!raw || !Deno.env.get("OVERSOFT_KEY")) return null;
+  return raw.endsWith("/rest/v1") ? raw : raw + "/rest/v1";
+}
+
+async function ovGet(base: string, path: string): Promise<any[]> {
+  const key = Deno.env.get("OVERSOFT_KEY")!;
+  const r = await fetch(`${base}/${path}`, {
+    headers: { apikey: key, Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(8000),
+  });
+  if (!r.ok) throw new Error(`Oversoft HTTP ${r.status}`);
+  const rows = await r.json();
+  return Array.isArray(rows) ? rows : [];
+}
+
+// Trae en lotes (los in.(...) largos revientan la URL).
+async function ovIn(base: string, tabla: string, select: string, col: string, vals: string[], quote = false) {
+  const out: any[] = [];
+  for (let i = 0; i < vals.length; i += 100) {
+    const lote = vals.slice(i, i + 100).map((v) => (quote ? `"${v.replace(/"/g, "")}"` : v));
+    out.push(...await ovGet(base, `${tabla}?select=${select}&${col}=in.(${encodeURIComponent(lote.join(","))})`));
+  }
+  return out;
+}
+
+const soloDigitos = (s: unknown) => String(s ?? "").replace(/\D/g, "");
+const cuitFmt = (d: string) => `${d.slice(0, 2)}-${d.slice(2, 10)}-${d.slice(10)}`;
+
+// DNIs y CUIT/CUIL (con guiones, como los guarda Oversoft) de un F01/ahorro.
+function clavesForm(r: any): { dnis: Set<string>; cuits: Set<string> } {
+  const dnis = new Set<string>();
+  const cuits = new Set<string>();
+  const doc = soloDigitos(r.documento);
+  if (doc.length >= 7 && doc.length <= 8) dnis.add(doc.replace(/^0+/, ""));
+  for (const x of [doc, soloDigitos(r.datos?.["CUIL"]), soloDigitos(r.datos?.["CUIT"])]) {
+    if (x.length !== 11) continue;
+    cuits.add(cuitFmt(x));
+    dnis.add(x.slice(2, 10).replace(/^0+/, ""));
+  }
+  return { dnis, cuits };
+}
+
+// Completa (en la base y en las filas devueltas) el vendedor de los forms sin
+// vendedor. Best-effort: si Oversoft falla, el listado sale igual.
+async function autoVendedorOversoft(tabla: string, rows: any[]): Promise<void> {
+  const base = ovBase();
+  if (!base) return;
+  const desde = Date.now() - AUTO_VEND_DIAS * DIA_MS;
+  const pend = rows
+    .filter((r) => !r.vendedor && !r.eliminado && new Date(r.created_at).getTime() >= desde)
+    .map((r) => ({ r, ...clavesForm(r) }))
+    .filter((p) => p.dnis.size || p.cuits.size);
+  if (!pend.length) return;
+
+  const dnis = [...new Set(pend.flatMap((p) => [...p.dnis]))];
+  const cuits = [...new Set(pend.flatMap((p) => [...p.cuits]))];
+  const clientes = [
+    ...await ovIn(base, "clientes", "codigo,dni,cuit_cuil", "dni", dnis, true),
+    ...await ovIn(base, "clientes", "codigo,dni,cuit_cuil", "cuit_cuil", cuits, true),
+  ];
+  const codigos = [...new Set(clientes.map((c) => String(c.codigo || "").trim()).filter(Boolean))];
+  if (!codigos.length) return;
+  const preventas = await ovIn(base, "preventas", "fecha,cliente,vendedorid,anulada", "cliente", codigos, true);
+
+  // Agrupa los cambios por vendedor → un PATCH por vendedor.
+  const porVendedor: Record<string, number[]> = {};
+  for (const p of pend) {
+    const codigosCli = new Set(
+      clientes
+        .filter((c) =>
+          p.dnis.has(soloDigitos(c.dni).replace(/^0+/, "")) || p.cuits.has(String(c.cuit_cuil || "").trim())
+        )
+        .map((c) => String(c.codigo || "").trim()),
+    );
+    const t = new Date(p.r.created_at).getTime();
+    const cand = preventas
+      .filter((pv) => codigosCli.has(String(pv.cliente || "").trim()) && OV_VENDEDORES[pv.vendedorid])
+      .map((pv) => ({ pv, d: new Date(pv.fecha).getTime() - t }))
+      .filter((x) => x.d >= -AUTO_VEND_ANTES * DIA_MS && x.d <= AUTO_VEND_DESPUES * DIA_MS)
+      // Preferir preventas vigentes y, entre ellas, la más cercana al F01.
+      .sort((a, b) => (Number(!!a.pv.anulada) - Number(!!b.pv.anulada)) || (Math.abs(a.d) - Math.abs(b.d)));
+    if (!cand.length) continue;
+    const vend = OV_VENDEDORES[cand[0].pv.vendedorid];
+    (porVendedor[vend] ||= []).push(p.r.id);
+  }
+
+  for (const [vend, ids] of Object.entries(porVendedor)) {
+    // vendedor=is.null: si alguien lo asignó a mano mientras tanto, no se pisa.
+    const r = await svc(`${tabla}?id=in.(${ids.join(",")})&vendedor=is.null`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify({ vendedor: vend }),
+    });
+    if (!r.ok) continue;
+    for (const row of rows) if (ids.includes(row.id) && !row.vendedor) row.vendedor = vend;
+  }
+}
+
 // Normaliza una fecha a DD/MM/AAAA (los F01 guardan ISO; el form manda DD/MM/AAAA).
 function toDdmm(s: string): string {
   const t = String(s || "").trim();
@@ -220,6 +347,13 @@ Deno.serve(async (req: Request) => {
         const filtro = body?.incluirEliminados ? "" : "eliminado=eq.false&";
         const r = await svc(`${tabla}?${filtro}order=created_at.desc&limit=${limit}`);
         const rows = await r.json();
+        if ((tabla === "formularios_f01" || tabla === "formularios_ahorro") && Array.isArray(rows)) {
+          try {
+            await autoVendedorOversoft(tabla, rows);
+          } catch (e) {
+            console.error("autoVendedorOversoft:", e);
+          }
+        }
         return json({ rows: Array.isArray(rows) ? rows : [] });
       }
       case "get-form": {
