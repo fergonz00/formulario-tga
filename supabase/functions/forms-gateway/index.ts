@@ -163,11 +163,11 @@ async function ovGet(base: string, path: string): Promise<any[]> {
 }
 
 // Trae en lotes (los in.(...) largos revientan la URL).
-async function ovIn(base: string, tabla: string, select: string, col: string, vals: string[], quote = false) {
+async function ovIn(base: string, tabla: string, select: string, col: string, vals: string[], quote = false, extra = "") {
   const out: any[] = [];
   for (let i = 0; i < vals.length; i += 100) {
     const lote = vals.slice(i, i + 100).map((v) => (quote ? `"${v.replace(/"/g, "")}"` : v));
-    out.push(...await ovGet(base, `${tabla}?select=${select}&${col}=in.(${encodeURIComponent(lote.join(","))})`));
+    out.push(...await ovGet(base, `${tabla}?select=${select}&${col}=in.(${encodeURIComponent(lote.join(","))})${extra}`));
   }
   return out;
 }
@@ -203,27 +203,54 @@ async function autoVendedorOversoft(tabla: string, rows: any[]): Promise<void> {
 
   const dnis = [...new Set(pend.flatMap((p) => [...p.dnis]))];
   const cuits = [...new Set(pend.flatMap((p) => [...p.cuits]))];
-  const clientes = [
-    ...await ovIn(base, "clientes", "codigo,dni,cuit_cuil", "dni", dnis, true),
-    ...await ovIn(base, "clientes", "codigo,dni,cuit_cuil", "cuit_cuil", cuits, true),
+  const sinCeros = (s: unknown) => soloDigitos(s).replace(/^0+/, "");
+
+  // La compra no siempre está a nombre del que llenó el form. Se buscan 3 caminos:
+  // 1) el propio cliente (por DNI o CUIT/CUIL);
+  // 2) el cónyuge: una ficha de Oversoft cuyo dniconyuge es el DNI del form
+  //    (ej. compró el marido y el F01 lo llenó la esposa);
+  // 3) una factura a su nombre (cotitular) → su referencia "PV 08716/3" es el
+  //    número de la preventa, aunque esté a nombre de otra persona.
+  const minFecha = new Date(Math.min(...pend.map((p) => new Date(p.r.created_at).getTime())) - AUTO_VEND_ANTES * DIA_MS)
+    .toISOString().slice(0, 10);
+  const [propios, conyuges, facturas] = await Promise.all([
+    Promise.all([
+      ovIn(base, "clientes", "codigo,dni,cuit_cuil", "dni", dnis, true),
+      ovIn(base, "clientes", "codigo,dni,cuit_cuil", "cuit_cuil", cuits, true),
+    ]).then((x) => x.flat()),
+    ovIn(base, "clientes", "codigo,dniconyuge", "dniconyuge", dnis, true),
+    ovIn(base, "comprobantes", "referencia,cuitcuildni", "cuitcuildni", [...cuits, ...dnis], true,
+      `&or=(referencia.like.PV*,referencia.like.US*)&fecha=gte.${minFecha}`),
+  ]);
+  const codigos = [...new Set([...propios, ...conyuges].map((c) => String(c.codigo || "").trim()).filter(Boolean))];
+  const numeros = [...new Set(facturas.map((f) => String(f.referencia || "").trim()).filter(Boolean))];
+  if (!codigos.length && !numeros.length) return;
+  const sel = "fecha,cliente,numero,vendedorid,anulada";
+  const preventas = [
+    ...await ovIn(base, "preventas", sel, "cliente", codigos, true),
+    ...await ovIn(base, "preventas", sel, "numero", numeros, true),
   ];
-  const codigos = [...new Set(clientes.map((c) => String(c.codigo || "").trim()).filter(Boolean))];
-  if (!codigos.length) return;
-  const preventas = await ovIn(base, "preventas", "fecha,cliente,vendedorid,anulada", "cliente", codigos, true);
 
   // Agrupa los cambios por vendedor → un PATCH por vendedor.
   const porVendedor: Record<string, number[]> = {};
   for (const p of pend) {
-    const codigosCli = new Set(
-      clientes
-        .filter((c) =>
-          p.dnis.has(soloDigitos(c.dni).replace(/^0+/, "")) || p.cuits.has(String(c.cuit_cuil || "").trim())
-        )
+    const codigosCli = new Set([
+      ...propios
+        .filter((c) => p.dnis.has(sinCeros(c.dni)) || p.cuits.has(String(c.cuit_cuil || "").trim()))
         .map((c) => String(c.codigo || "").trim()),
+      ...conyuges.filter((c) => p.dnis.has(sinCeros(c.dniconyuge))).map((c) => String(c.codigo || "").trim()),
+    ]);
+    const numerosCli = new Set(
+      facturas
+        .filter((f) => p.cuits.has(String(f.cuitcuildni || "").trim()) || p.dnis.has(sinCeros(f.cuitcuildni)))
+        .map((f) => String(f.referencia || "").trim()),
     );
     const t = new Date(p.r.created_at).getTime();
     const cand = preventas
-      .filter((pv) => codigosCli.has(String(pv.cliente || "").trim()) && OV_VENDEDORES[pv.vendedorid])
+      .filter((pv) =>
+        (codigosCli.has(String(pv.cliente || "").trim()) || numerosCli.has(String(pv.numero || "").trim())) &&
+        OV_VENDEDORES[pv.vendedorid]
+      )
       .map((pv) => ({ pv, d: new Date(pv.fecha).getTime() - t }))
       .filter((x) => x.d >= -AUTO_VEND_ANTES * DIA_MS && x.d <= AUTO_VEND_DESPUES * DIA_MS)
       // Preferir preventas vigentes y, entre ellas, la más cercana al F01.
