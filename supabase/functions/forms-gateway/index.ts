@@ -10,6 +10,8 @@
 //   list-forms   → lista vwfs/f01/ahorro (panel + paneles admin de index/ahorro);
 //                  en F01/ahorro completa el vendedor faltante desde Oversoft
 //                  (secrets OVERSOFT_URL / OVERSOFT_KEY, réplica solo lectura)
+//   Un VENDEDOR de salón (ver vendedorPropio) solo lista, abre y edita los
+//   formularios con su nombre de vendedor.
 //   patch-forms  → edita/borra-lógico filas de vwfs/f01/ahorro por id(s)
 // Acciones de CLIENTE (sin login, acotadas — flujo VWFS de continuación):
 //   f01-buscar        → busca UN F01 por documento + fecha de nac. (no enumera)
@@ -74,10 +76,20 @@ function timingSafeEqual(a: string, b: string): boolean {
   return diff === 0;
 }
 
-// Verifica la firma del tga_session. Devuelve el usuario si es válida, o null.
+// Superadmins del portal: los únicos que pueden "entrar como" otro usuario
+// (espejo de SUPERADMINS_USUARIOS en portal-tga/index.html).
+const SUPERADMINS = ["fngonzalez", "fgonzalez", "cgonzalez", "mlubrano"];
+
+// Verifica la firma del tga_session. Devuelve el usuario con el que se opera, o null.
+// La firma es HMAC de "<usuario>.<exp>" atada al usuario al que se le emitió:
+// cuando un superadmin impersona, la cookie trae `usuario` = el impersonado y
+// `session_usuario` = el operador real (dueño de la firma). Se verifica contra
+// el dueño y se opera como el impersonado solo si el dueño es superadmin; si
+// no, `usuario` sería una identidad inventada y se ignora.
 async function verifySession(sess: any): Promise<string | null> {
   if (!sess || typeof sess !== "object") return null;
-  const usuario = String(sess.usuario || "").trim().toLowerCase();
+  const usuario = String(sess.session_usuario || sess.usuario || "").trim().toLowerCase();
+  const visto = String(sess.usuario || "").trim().toLowerCase();
   const exp = Number(sess.session_exp);
   const sig = String(sess.session_sig || "");
   if (!usuario || !exp || !sig) return null;
@@ -92,7 +104,20 @@ async function verifySession(sess: any): Promise<string | null> {
     ["sign"],
   );
   const mac = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${usuario}.${exp}`));
-  return timingSafeEqual(toHex(mac), sig) ? usuario : null;
+  if (!timingSafeEqual(toHex(mac), sig)) return null;
+  return visto && visto !== usuario && SUPERADMINS.includes(usuario) ? visto : usuario;
+}
+
+// Si el usuario es un VENDEDOR de salón (su nombre en tasador_usuarios es uno
+// de la lista de vendedores del panel), devuelve ese nombre: solo puede ver y
+// tocar los formularios con ese vendedor. Para el resto (administrativas,
+// admins, owners) devuelve null = ve todo. El rol "ventas" del panel también lo
+// tienen las administrativas, por eso se decide por el nombre y no por el rol.
+async function vendedorPropio(usuario: string): Promise<string | null> {
+  const r = await svc(`tasador_usuarios?usuario=eq.${encodeURIComponent(usuario)}&select=nombre&limit=1`);
+  const rows = await r.json().catch(() => []);
+  const nombre = String((Array.isArray(rows) && rows[0]?.nombre) || "").trim();
+  return nombre && new Set(Object.values(OV_VENDEDORES)).has(nombre) ? nombre : null;
 }
 
 // Rol de panel del usuario (owner > administracion > ventas), o null si no tiene.
@@ -382,7 +407,14 @@ Deno.serve(async (req: Request) => {
             console.error("autoVendedorOversoft:", e);
           }
         }
-        return json({ rows: Array.isArray(rows) ? rows : [] });
+        // El vendedor solo ve lo suyo (después de autocompletar, así ve también
+        // los que se le acaban de asignar).
+        const propio = role === "ventas" ? await vendedorPropio(usuario) : null;
+        const lista = Array.isArray(rows) ? rows : [];
+        return json({
+          rows: propio ? lista.filter((x: any) => x.vendedor === propio) : lista,
+          vendedorPropio: propio,
+        });
       }
       case "get-form": {
         const role = await panelRole(usuario);
@@ -393,7 +425,9 @@ Deno.serve(async (req: Request) => {
         if (!Number.isFinite(id)) return json({ error: "id inválido" }, 400);
         const r = await svc(`${tabla}?id=eq.${id}&limit=1`);
         const rows = await r.json();
-        return json({ rows: Array.isArray(rows) ? rows : [] });
+        const propio = role === "ventas" ? await vendedorPropio(usuario) : null;
+        const lista = Array.isArray(rows) ? rows : [];
+        return json({ rows: propio ? lista.filter((x: any) => x.vendedor === propio) : lista });
       }
       case "patch-forms": {
         const role = await panelRole(usuario);
@@ -407,6 +441,18 @@ Deno.serve(async (req: Request) => {
         // Borrado lógico (eliminado=true) reservado a administración/owner.
         if ("eliminado" in patch && role === "ventas") return json({ error: "Sin permiso para borrar" }, 403);
         const filtro = ids.length === 1 ? `id=eq.${ids[0]}` : `id=in.(${ids.join(",")})`;
+        // El vendedor solo edita formularios suyos y no se los pasa a otro.
+        const propio = role === "ventas" ? await vendedorPropio(usuario) : null;
+        if (propio) {
+          if ("vendedor" in patch && patch.vendedor !== propio) {
+            return json({ error: "No podés asignar el formulario a otro vendedor" }, 403);
+          }
+          const rv = await svc(`${tabla}?${filtro}&select=id,vendedor`);
+          const actuales = await rv.json().catch(() => []);
+          if (!Array.isArray(actuales) || actuales.some((x: any) => x.vendedor !== propio)) {
+            return json({ error: "Ese formulario no es tuyo" }, 403);
+          }
+        }
         const r = await svc(`${tabla}?${filtro}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json", Prefer: "return=minimal" },

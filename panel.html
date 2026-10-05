@@ -1224,6 +1224,11 @@
       if (!res.ok) throw new Error('HTTP ' + res.status);
       const data = await res.json();
       rowsCache[tab] = Array.isArray(data.rows) ? data.rows : [];
+      // Un vendedor solo recibe sus formularios: el filtro por vendedor sobra.
+      if (data.vendedorPropio) {
+        const vf = document.getElementById('vendedorFilter');
+        if (vf && vf.closest('.rf-item')) vf.closest('.rf-item').style.display = 'none';
+      }
       updateTabCounts();
       updateFilterCounts();
       buildMonthFilter();
