@@ -473,20 +473,26 @@ export function calidadImpresion(f: ForenseArchivo | null): CalidadImpresion {
       nivel: "justo",
       parece_captura: pareceCaptura,
       motivo:
-        `La imagen es de ${f.ancho}x${f.alto} px. Se lee, pero impresa va a ` +
-        `quedar justa. Si podes, sacala de nuevo mas cerca.`,
+        `Impresa, la imagen va a quedar al limite de lo legible. ` +
+        `Tiene ${f.ancho}x${f.alto} px: si podes, sacala de nuevo mas de cerca.`,
     };
   }
+  // La explicacion en castellano va PRIMERO y el dato tecnico despues: el que
+  // sube la foto no tiene por que saber que son los pixeles, pero si tiene que
+  // entender por que no sirve.
+  const consecuencia =
+    "Con esta imagen, el documento impreso no va a resultar legible y puede " +
+    "salir deformado.";
   return {
     lado_corto: corto,
     nivel: "bajo",
     parece_captura: pareceCaptura,
     motivo: pareceCaptura
-      ? `La imagen es de ${f.ancho}x${f.alto} px y no tiene datos de camara: ` +
-        `parece una captura de pantalla o una foto reenviada varias veces. ` +
-        `Sacala directo con la camara y mandala sin reenviar.`
-      : `La imagen es de ${f.ancho}x${f.alto} px. Impresa no se va a leer: ` +
-        `hace falta al menos ${IMPR_MIN_ACEPTABLE} px del lado corto.`,
+      ? `${consecuencia} Parece una captura de pantalla o una foto reenviada ` +
+        `varias veces (${f.ancho}x${f.alto} px, sin datos de camara). Sacala ` +
+        `directo con la camara y mandala sin reenviar.`
+      : `${consecuencia} La foto tiene ${f.ancho}x${f.alto} px y hacen falta ` +
+        `al menos ${IMPR_MIN_ACEPTABLE} del lado corto.`,
   };
 }
 
