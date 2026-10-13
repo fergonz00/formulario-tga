@@ -1906,7 +1906,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       loader.style.display = 'none';
 
       const cal = data.calidad || {};
-      const cardFor = (label, c) => {
+      const impr = data.impresion || {};
+      const cardFor = (label, c, imp) => {
         if (!c) return '';
         const row = (ok, txtOk, txtBad) =>
           '<div style="display:flex; gap:6px; align-items:center; font-size:13px; padding:2px 0;">' +
@@ -1921,11 +1922,22 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
             row(!c.bordes_cortados, 'Los 4 bordes visibles', 'Bordes cortados / DNI fuera de encuadre') +
             row(!!c.fondo_blanco, 'Sobre fondo blanco (bordes nitidos)', 'No esta sobre fondo blanco — apoyalo en una hoja o mesa blanca') +
             (c.vencido !== undefined ? row(!c.vencido, 'DNI vigente', 'DNI VENCIDO — no se puede usar') : '') +
+            (imp && imp.nivel && imp.nivel !== 'desconocido'
+              ? row(imp.nivel === 'ok',
+                    'Resolucion suficiente para imprimir (' + imp.lado_corto + ' px)',
+                    (imp.nivel === 'justo' ? 'Resolucion justa para imprimir' : 'Resolucion insuficiente para imprimir') + ' (' + imp.lado_corto + ' px)')
+              : '') +
+            (imp && imp.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + imp.motivo + '</div>' : '') +
             (c.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + c.motivo + '</div>' : '') +
           '</div>'
         );
       };
-      const detalle = cardFor('Frente', cal.frente) + cardFor('Dorso', cal.dorso);
+      const avisoImpresion = impr.nivel === 'aviso'
+        ? '<div class="info-callout" style="background: rgba(255,140,0,0.08); border-left-color: #FF8C00;">' +
+            '<strong>⚠ La foto entra justa para imprimir.</strong> Se acepta, pero si podés sacala de nuevo más de cerca: impresa va a quedar al límite.' +
+          '</div>'
+        : '';
+      const detalle = avisoImpresion + cardFor('Frente', cal.frente, impr.frente) + cardFor('Dorso', cal.dorso, impr.dorso);
 
       // F01 es mas laxo que VWFS: acepta que el DNI no este sobre fondo blanco,
       // pero avisa que para el tramite VWFS se va a requerir re-cargarlo.
@@ -1940,6 +1952,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         dniAnalisisOk = false;
         resultEl.innerHTML = bloqueAdulterado(data) +
           '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetDniForRetry()">Cargar otro documento</button>';
+        resultEl.style.display = '';
+      } else if (impr.nivel === 'rechaza') {
+        // La IA la lee, pero impresa no se va a leer. Es un control de pixeles,
+        // aparte del de la IA: se midio que entraban DNIs de 446x300 px.
+        dniAnalisisOk = false;
+        resultEl.innerHTML =
+          '<div class="info-callout err">' +
+            '<strong>✗ La foto es muy chica para imprimir.</strong> Se lee en pantalla, pero en papel no se va a leer. ' +
+            'Sacá la foto directo con la cámara, de cerca, y mandala sin reenviar (si va por WhatsApp, mandala como <strong>Documento</strong> y no como foto).' +
+          '</div>' + detalle +
+          '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetDniForRetry()">Sacar fotos de nuevo</button>';
         resultEl.style.display = '';
       } else if (cal.ok_global === true) {
         dniAnalisisOk = true;
@@ -2270,7 +2293,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         loader.style.display = 'none';
 
         const cal = data.calidad || {};
-        const cardFor = (label, c) => {
+        const impr = data.impresion || {};
+        const cardFor = (label, c, imp) => {
           if (!c) return '';
           const row = (ok, txtOk, txtBad) =>
             '<div style="display:flex; gap:6px; align-items:center; font-size:13px; padding:2px 0;">' +
@@ -2283,10 +2307,21 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
             row(!c.bordes_cortados, 'Los 4 bordes visibles', 'Bordes cortados') +
             row(!!c.fondo_blanco, 'Sobre fondo blanco', 'No esta sobre fondo blanco') +
             (c.vencido !== undefined ? row(!c.vencido, 'DNI vigente', 'DNI VENCIDO - no sirve') : '') +
+            (imp && imp.nivel && imp.nivel !== 'desconocido'
+              ? row(imp.nivel === 'ok',
+                    'Resolucion suficiente para imprimir (' + imp.lado_corto + ' px)',
+                    (imp.nivel === 'justo' ? 'Resolucion justa para imprimir' : 'Resolucion insuficiente para imprimir') + ' (' + imp.lado_corto + ' px)')
+              : '') +
+            (imp && imp.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + imp.motivo + '</div>' : '') +
             (c.motivo ? '<div style="font-size:12px; color:#556; margin-top:6px;">' + c.motivo + '</div>' : '') +
             '</div>';
         };
-        const detalle = cardFor('Frente', cal.frente) + cardFor('Dorso', cal.dorso);
+        const avisoImpresion = impr.nivel === 'aviso'
+          ? '<div class="info-callout" style="background: rgba(255,140,0,0.08); border-left-color: #FF8C00;">' +
+              '<strong>⚠ La foto entra justa para imprimir.</strong> Se acepta, pero si podés sacala de nuevo más de cerca: impresa va a quedar al límite.' +
+            '</div>'
+          : '';
+        const detalle = avisoImpresion + cardFor('Frente', cal.frente, impr.frente) + cardFor('Dorso', cal.dorso, impr.dorso);
 
         // Misma regla relajada que el titular en F01: pasa sin fondo blanco
         // si todo lo demas esta bien, pero advierte.
@@ -2302,6 +2337,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           st.ok = false;
           resultEl.innerHTML = bloqueAdulterado(data) +
             '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="peritajesDni.' + cfg.key + '.resetForRetry()">Cargar otro documento</button>';
+          resultEl.style.display = '';
+        } else if (impr.nivel === 'rechaza') {
+          // La IA la lee, pero impresa no se va a leer. Es un control de pixeles,
+          // aparte del de la IA: se midio que entraban DNIs de 446x300 px.
+          dniAnalisisOk = false;
+          resultEl.innerHTML =
+            '<div class="info-callout err">' +
+              '<strong>✗ La foto es muy chica para imprimir.</strong> Se lee en pantalla, pero en papel no se va a leer. ' +
+              'Sacá la foto directo con la cámara, de cerca, y mandala sin reenviar (si va por WhatsApp, mandala como <strong>Documento</strong> y no como foto).' +
+            '</div>' + detalle +
+            '<button type="button" class="btn btn-secondary btn-block" style="margin-top:10px;" onclick="resetDniForRetry()">Sacar fotos de nuevo</button>';
           resultEl.style.display = '';
         } else if (cal.ok_global === true) {
           st.ok = true;

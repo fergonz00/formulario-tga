@@ -422,6 +422,91 @@ export async function forenseArchivo(
 // PDF: extraccion de las imagenes embebidas.
 // ---------------------------------------------------------------------------
 
+// ===========================================================================
+// CALIDAD PARA IMPRIMIR
+// ===========================================================================
+// La IA contesta "puedo leer esto", que NO es lo mismo que "esto imprime bien".
+// Una foto chica y nitida se lee perfecto en pantalla y en papel sale una
+// mancha. Esto se decide con los pixeles, no con la IA: es gratis, instantaneo
+// y da un mensaje concreto.
+//
+// El DNI mide 8,6 cm de ancho. Para que imprima bien necesita del orden de
+// 300 DPI, o sea ~1000 px de ancho DE DOCUMENTO. Como en la foto el documento
+// ocupa casi todo el lado largo, el que manda es el LADO CORTO de la imagen.
+//
+// Los cortes salen de medir 149 imagenes reales (07-10-2026):
+//   - WhatsApp comprime a ~1600 px de lado largo -> lado corto ~900. Imprime
+//     bien. O sea que esto NO rechaza al que manda la foto por WhatsApp.
+//   - Las que imprimen mal son capturas de pantalla, reenvios de reenvios o
+//     fotos a la pantalla de otro celular: 300, 306, 376 px. Eran 11 de 149.
+export const IMPR_MIN_ACEPTABLE = 600;  // debajo de esto no se puede imprimir
+export const IMPR_MIN_COMODO = 900;     // de aca para arriba, sin observaciones
+
+export type CalidadImpresion = {
+  lado_corto: number | null;
+  nivel: "ok" | "justo" | "bajo" | "desconocido";
+  // Pista de por que quedo chica, para que el mensaje sea util y no generico.
+  parece_captura: boolean;
+  motivo: string;
+};
+
+export function calidadImpresion(f: ForenseArchivo | null): CalidadImpresion {
+  if (!f || !f.ancho || !f.alto) {
+    return {
+      lado_corto: null,
+      nivel: "desconocido",
+      parece_captura: false,
+      motivo: "No se pudo leer el tamano de la imagen.",
+    };
+  }
+  const corto = Math.min(f.ancho, f.alto);
+  // Sin datos de camara y chica: casi siempre es captura o reenviada varias
+  // veces. Una foto sacada en el momento conserva el EXIF.
+  const pareceCaptura = corto < IMPR_MIN_COMODO && !f.tieneExif;
+
+  if (corto >= IMPR_MIN_COMODO) {
+    return { lado_corto: corto, nivel: "ok", parece_captura: false, motivo: "" };
+  }
+  if (corto >= IMPR_MIN_ACEPTABLE) {
+    return {
+      lado_corto: corto,
+      nivel: "justo",
+      parece_captura: pareceCaptura,
+      motivo:
+        `La imagen es de ${f.ancho}x${f.alto} px. Se lee, pero impresa va a ` +
+        `quedar justa. Si podes, sacala de nuevo mas cerca.`,
+    };
+  }
+  return {
+    lado_corto: corto,
+    nivel: "bajo",
+    parece_captura: pareceCaptura,
+    motivo: pareceCaptura
+      ? `La imagen es de ${f.ancho}x${f.alto} px y no tiene datos de camara: ` +
+        `parece una captura de pantalla o una foto reenviada varias veces. ` +
+        `Sacala directo con la camara y mandala sin reenviar.`
+      : `La imagen es de ${f.ancho}x${f.alto} px. Impresa no se va a leer: ` +
+        `hace falta al menos ${IMPR_MIN_ACEPTABLE} px del lado corto.`,
+  };
+}
+
+// El peor de los dos lados manda.
+// OJO con "desconocido": pasa cuando el formulario no manda el archivo original
+// (hoy ahorro.html no lo manda) o no se pudo bajar. En ese caso NO se puede
+// decir "ok" —seria afirmar algo que no se midio— ni rechazar, que dejaria el
+// formulario trabado por una limitacion nuestra. Se devuelve "desconocido" y el
+// front no muestra ni bloquea nada.
+export function nivelImpresionGlobal(
+  frente: CalidadImpresion,
+  dorso: CalidadImpresion,
+): "ok" | "aviso" | "rechaza" | "desconocido" {
+  const n = [frente.nivel, dorso.nivel];
+  if (n.includes("bajo")) return "rechaza";
+  if (n.includes("justo")) return "aviso";
+  if (n.every((x) => x === "desconocido")) return "desconocido";
+  return "ok";
+}
+
 export type ImagenDePDF = {
   bytes: Uint8Array;
   mime: string;

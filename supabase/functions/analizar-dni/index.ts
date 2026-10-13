@@ -17,7 +17,9 @@
 // deno-lint-ignore-file no-explicit-any
 
 import {
+  calidadImpresion,
   forenseArchivo,
+  nivelImpresionGlobal,
   peritar,
   type ForenseArchivo,
 } from "../_shared/peritaje-dni.ts";
@@ -418,8 +420,20 @@ Deno.serve(async (req: Request) => {
       (v) => v != null && String(v).trim() !== ""
     );
 
+    // Calidad para IMPRIMIR: se decide con los pixeles del archivo, no con la
+    // IA. Una foto chica y nitida se lee en pantalla y en papel sale una mancha
+    // (medido: habia DNIs de 446x300 px que pasaban todos los controles).
+    const imprFrente = calidadImpresion(forFrente);
+    const imprDorso = calidadImpresion(forDorso);
+    const impresion = {
+      frente: imprFrente,
+      dorso: imprDorso,
+      nivel: nivelImpresionGlobal(imprFrente, imprDorso),
+    };
+
     const resultado: Record<string, unknown> = {
       calidad: parsed.calidad || null,
+      impresion,
       extraido: ext,
       vencido,
       vence_pronto_dias: venceProntoDias,
