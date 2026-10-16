@@ -870,6 +870,7 @@
     <div id="uploadErrorState" style="display:none;">
       <div id="uploadError" style="margin-top:12px; font-size:13px; color:var(--vw-red);"></div>
       <div style="margin-top:20px; max-width:320px; margin-left:auto; margin-right:auto;">
+        <button id="btnReintentarF01" class="btn btn-success" style="width:100%; display:none; align-items:center; justify-content:center; gap:8px; padding:16px 20px; font-size:16px; margin-bottom:10px;" onclick="reintentarGuardadoF01()">🔄 Reintentar</button>
         <button class="btn btn-send" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:16px 20px; font-size:16px;" onclick="downloadPDFLocal()">
           <span style="font-size:20px">⬇️</span> Descargar PDF (local)
         </button>
@@ -2755,6 +2756,30 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     return res;
   }
 
+  // 16/10/2026: guardar el registro de un formulario. Antes no se miraba la respuesta:
+  // si la base lo rechazaba (un "\u0000" que venía en el EXIF de la foto del DNI de un
+  // Motorola) o se cortaba la conexión, el cliente veía "listo", el PDF quedaba subido
+  // y el formulario NO existía (F01 de Soler, PV 8775/3). Ahora se sacan los caracteres
+  // nulos que Postgres no acepta, se reintenta ante cortes o errores del servidor y,
+  // si igual falla, se avisa: nunca más un "listo" sin registro.
+  function jsonSinNulos(obj) {
+    return JSON.stringify(obj, (k, v) => typeof v === 'string' ? v.replace(/\u0000/g, '') : v);
+  }
+  async function guardarRegistro(path, options) {
+    let ultimo = '';
+    for (let intento = 1; intento <= 3; intento++) {
+      try {
+        const res = await supaFetch(path, options);
+        if (res.ok) return res;
+        ultimo = 'HTTP ' + res.status + ' ' + (await res.text()).slice(0, 300);
+        // Un rechazo de los datos (4xx) no se arregla reintentando.
+        if (res.status < 500 && res.status !== 408 && res.status !== 429) break;
+      } catch (e) { ultimo = (e && e.message) || String(e); }
+      if (intento < 3) await new Promise(r => setTimeout(r, 1500 * intento));
+    }
+    throw new Error('No se pudo guardar el registro: ' + ultimo);
+  }
+
   function getImageDimensions(dataUrl) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -2882,14 +2907,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       if (t2Dni.dorsoUrl)  datosObj['DNI 2º Titular Dorso URL']  = t2Dni.dorsoUrl;
       if (t2Dni.analisis) datosObj['DNI 2º Titular análisis IA'] = JSON.stringify(t2Dni.analisis);
 
-      // 3. Insert record
-      await supaFetch('/rest/v1/formularios_f01', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal'
-        },
-        body: JSON.stringify({
+      // 3. Insert record (con reintentos; si falla, NO se muestra "listo")
+      ultimoGuardadoF01 = { path: '/rest/v1/formularios_f01', body: null };
+      ultimoGuardadoF01.body = jsonSinNulos({
           tipo: formType,
           nombre: nombre,
           documento: documento,
@@ -2901,9 +2921,51 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           dni_frente_url: dniFrenteUrlUploaded || null,
           dni_dorso_url: dniDorsoUrlUploaded || null,
           dni_analisis: dniAnalisis || null
-        })
+        });
+      await guardarRegistro(ultimoGuardadoF01.path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: ultimoGuardadoF01.body
       });
+      ultimoGuardadoF01 = null;
+      mostrarF01Listo();
 
+    } catch (e) {
+      console.error('Upload error:', e);
+      document.getElementById('uploadingState').style.display = 'none';
+      document.getElementById('uploadErrorState').style.display = '';
+      // Si el PDF ya se subió pero el registro no se guardó, se puede reintentar solo el guardado.
+      const soloRegistro = !!(ultimoGuardadoF01 && ultimoGuardadoF01.body);
+      document.getElementById('btnReintentarF01').style.display = soloRegistro ? '' : 'none';
+      document.getElementById('uploadError').textContent = soloRegistro
+        ? 'El formulario NO quedó registrado (el PDF se generó, pero el sistema no lo guardó). Tocá «Reintentar». Si vuelve a fallar, descargá el PDF y avisá a Administración: sin el registro, la operación no avanza.'
+        : 'No se pudo subir el formulario. Descargalo desde acá y envialo manualmente.';
+    }
+  }
+
+  let ultimoGuardadoF01 = null;
+  async function reintentarGuardadoF01() {
+    if (!ultimoGuardadoF01) return;
+    const btn = document.getElementById('btnReintentarF01');
+    btn.disabled = true; btn.textContent = 'Guardando…';
+    try {
+      await guardarRegistro(ultimoGuardadoF01.path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: ultimoGuardadoF01.body
+      });
+      ultimoGuardadoF01 = null;
+      document.getElementById('uploadErrorState').style.display = 'none';
+      mostrarF01Listo();
+    } catch (e) {
+      console.error('Reintento F01:', e);
+      document.getElementById('uploadError').textContent = 'Sigue sin poder guardarse. Descargá el PDF y avisá a Administración (' + String(e.message || e).slice(0, 160) + ').';
+    } finally {
+      btn.disabled = false; btn.textContent = '🔄 Reintentar';
+    }
+  }
+
+  function mostrarF01Listo() {
       // Show ready state with Supabase link
       document.getElementById('uploadingState').style.display = 'none';
       document.getElementById('uploadReady').style.display = '';
@@ -2924,13 +2986,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           slot.appendChild(btn);
         }
       }
-
-    } catch (e) {
-      console.error('Upload error:', e);
-      document.getElementById('uploadingState').style.display = 'none';
-      document.getElementById('uploadErrorState').style.display = '';
-      document.getElementById('uploadError').textContent = 'No se pudo subir el formulario. Descargalo desde acá y envialo manualmente.';
-    }
   }
 
   function sharePDF() {

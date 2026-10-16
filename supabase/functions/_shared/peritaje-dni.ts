@@ -310,9 +310,14 @@ function leerMakeModel(b: Uint8Array, tiffStart: number): string | null {
       if (tag !== 0x010f && tag !== 0x0110) continue;
       const count = u32(e + 4);
       const off = count <= 4 ? e + 8 : tiffStart + u32(e + 8);
+      // El texto EXIF termina en el primer byte 0. Algunos celulares (Motorola)
+      // rellenan Make/Model con ceros: si se copiaban, el "\u0000" llegaba al
+      // dni_analisis y Postgres rechazaba el F01 entero (16/10/2026, F01 de Soler).
       let s = "";
       for (let j = 0; j < count - 1 && off + j < b.length; j++) {
-        s += String.fromCharCode(b[off + j]);
+        const c = b[off + j];
+        if (c === 0) break;
+        if (c >= 32 && c !== 127) s += String.fromCharCode(c);
       }
       s = s.trim();
       if (s) partes.push(s);

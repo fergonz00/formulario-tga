@@ -1961,6 +1961,30 @@
     });
   }
 
+  // 16/10/2026: guardar el registro de un formulario. Antes no se miraba la respuesta:
+  // si la base lo rechazaba (un "\u0000" que venía en el EXIF de la foto del DNI de un
+  // Motorola) o se cortaba la conexión, el cliente veía "listo", el PDF quedaba subido
+  // y el formulario NO existía (F01 de Soler, PV 8775/3). Ahora se sacan los caracteres
+  // nulos que Postgres no acepta, se reintenta ante cortes o errores del servidor y,
+  // si igual falla, se avisa: nunca más un "listo" sin registro.
+  function jsonSinNulos(obj) {
+    return JSON.stringify(obj, (k, v) => typeof v === 'string' ? v.replace(/\u0000/g, '') : v);
+  }
+  async function guardarRegistro(path, options) {
+    let ultimo = '';
+    for (let intento = 1; intento <= 3; intento++) {
+      try {
+        const res = await supaFetch(path, options);
+        if (res.ok) return res;
+        ultimo = 'HTTP ' + res.status + ' ' + (await res.text()).slice(0, 300);
+        // Un rechazo de los datos (4xx) no se arregla reintentando.
+        if (res.status < 500 && res.status !== 408 && res.status !== 429) break;
+      } catch (e) { ultimo = (e && e.message) || String(e); }
+      if (intento < 3) await new Promise(r => setTimeout(r, 1500 * intento));
+    }
+    throw new Error('No se pudo guardar el registro: ' + ultimo);
+  }
+
   async function supaFetch(path, options = {}) {
     const res = await fetch(SUPABASE_URL + path, {
       ...options,
@@ -2085,10 +2109,10 @@
       }
 
       // 3. Insertar registro
-      const res = await supaFetch('/rest/v1/formularios_ahorro', {
+      const res = await guardarRegistro('/rest/v1/formularios_ahorro', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: JSON.stringify({
+        body: jsonSinNulos({
           tipo: formType,
           nombre: nombre,
           documento: documento,
