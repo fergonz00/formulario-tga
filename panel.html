@@ -163,6 +163,16 @@
   .action-bar button, .action-bar a.btn-action { border: none; cursor: pointer; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; }
   .action-bar .btn-action { background: #F0F2F5; color: #1F2937; }
   .action-bar .btn-action:hover { background: #E0E5EB; }
+  .docs-menu { position: relative; }
+  .docs-menu summary { list-style: none; cursor: pointer; padding: 8px 14px; border-radius: 6px; font-size: 13px; font-weight: 600; user-select: none; }
+  .docs-menu summary::-webkit-details-marker { display: none; }
+  .docs-menu[open] summary { background: #E0E5EB; }
+  .docs-list { position: absolute; top: calc(100% + 6px); left: 0; z-index: 50; width: 300px; max-width: calc(100vw - 32px);
+    background: white; border-radius: 8px; box-shadow: 0 8px 24px rgba(0,30,80,.18); padding: 6px; }
+  .docs-list a { display: block; padding: 9px 10px; border-radius: 6px; text-decoration: none; color: #1F2937; }
+  .docs-list a:hover { background: #F0F2F5; }
+  .docs-list b { display: block; font-size: 13px; color: #001E50; }
+  .docs-list small { display: block; font-size: 11.5px; color: #6A7487; margin-top: 2px; }
 
   .chip {
     font-size: 11px; padding: 3px 10px; border-radius: 10px;
@@ -384,7 +394,14 @@
     <div class="action-bar">
       <button class="btn-action" type="button" onclick="copyFormLink()">📋 Copiar link p/ cliente</button>
       <button class="btn-action" type="button" onclick="openPublicForm()">🔗 Ir al formulario</button>
-      <a class="btn-action" href="documentacion-entrega-usado.pdf" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;line-height:1;">📄 Doc. ingreso usado</a>
+      <details class="docs-menu">
+        <summary class="btn-action">📁 Usados</summary>
+        <div class="docs-list">
+          <a href="usados/1-preacuerdo-de-venta.pdf" target="_blank" rel="noopener"><b>1. Preacuerdo de venta</b><small>Se firma al acordar el precio, si falta documentación</small></a>
+          <a href="usados/2-documentacion-para-ingresar.pdf" target="_blank" rel="noopener"><b>2. Documentación para ingresar</b><small>Checklist que se controla al entregar la unidad</small></a>
+          <a href="usados/3-acuerdo-de-partes.pdf" target="_blank" rel="noopener"><b>3. Acuerdo de partes</b><small>Se firma el día del pago</small></a>
+        </div>
+      </details>
       <a class="btn-action" href="calculadora-gastos.html" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center;line-height:1;">🧮 Calculadora gastos</a>
       <button class="btn btn-danger" type="button" id="btnBulkDelete" onclick="bulkDelete()" style="display:none;">🗑 Borrar seleccionados (0)</button>
     </div>
@@ -2563,5 +2580,6 @@
 })();
 </script>
 
+<script>document.addEventListener('click',e=>{document.querySelectorAll('details.docs-menu[open]').forEach(d=>{if(!d.contains(e.target))d.removeAttribute('open')})});</script>
 </body>
 </html>
