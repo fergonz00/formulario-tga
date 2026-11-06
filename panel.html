@@ -1065,7 +1065,21 @@
           headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' } });
       const data = await res.json();
       if (!Array.isArray(data) || data.length === 0) {
+        // login_tasador devuelve CERO FILAS por dos motivos bien distintos: la clave
+        // esta mal, o la persona agoto los intentos y quedo frenada unos minutos.
+        // Preguntamos cual de los dos fue, para no decirle "clave incorrecta" a
+        // alguien que la tiene bien. Si no se puede preguntar, va el mensaje de siempre.
         err.textContent = 'Usuario o contraseña incorrectos.';
+        try {
+          const rb = await supaFetch('/rest/v1/rpc/login_bloqueado',
+            { method: 'POST', body: JSON.stringify({ p_usuario: user }),
+              headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' } });
+          const db = rb.ok ? await rb.json() : null;
+          if (db && db[0] && db[0].bloqueado) {
+            const m = Number(db[0].minutos) || 1;
+            err.textContent = `Demasiados intentos fallidos. Esperá ${m} ${m === 1 ? 'minuto' : 'minutos'} y volvé a probar.`;
+          }
+        } catch (e2) { /* si falla la consulta, queda el mensaje generico */ }
         err.style.display = ''; return;
       }
       const role = data[0].rol || (user === 'administracion' ? 'administracion' : 'ventas');
