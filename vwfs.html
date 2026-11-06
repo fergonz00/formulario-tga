@@ -788,6 +788,22 @@
         </div>
       </div>
 
+      <!-- Solo si es Independiente: condicion fiscal -->
+      <div class="field" id="indepCondBlock" style="display:none;">
+        <label>Condición fiscal</label>
+        <div class="toggle-group">
+          <button type="button" class="toggle-btn" data-field="indepCondicion" data-value="Monotributista">Monotributista</button>
+          <button type="button" class="toggle-btn" data-field="indepCondicion" data-value="Responsable Inscripto">Resp. Inscripto</button>
+          <button type="button" class="toggle-btn" data-field="indepCondicion" data-value="Otros">Otros</button>
+        </div>
+      </div>
+
+      <!-- Solo si la condicion fiscal es Otros: especificar -->
+      <div class="field" id="indepOtrosBlock" style="display:none;">
+        <label>Especificar condición fiscal</label>
+        <input type="text" id="indepCondicionOtros" placeholder="Detallá la condición (es algo fuera de lo común)">
+      </div>
+
       <div class="row row-2">
         <div class="field">
           <label>Ocupación</label>
@@ -1221,6 +1237,8 @@
     document.querySelectorAll('.toggle-btn[data-field="' + field + '"]').forEach(b => {
       b.classList.toggle('selected', b.dataset.value === value);
     });
+    if (field === 'sitLaboral') toggleIndepCondicion();
+    if (field === 'indepCondicion') toggleIndepOtros();
   }
 
   // ═══════ TOGGLES ═══════
@@ -1229,7 +1247,8 @@
       toggleValues[btn.dataset.field] = btn.dataset.value;
       btn.parentElement.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
-      if (btn.dataset.field === 'sitLaboral') toggleEmpresaSections();
+      if (btn.dataset.field === 'sitLaboral') { toggleEmpresaSections(); toggleIndepCondicion(); }
+      if (btn.dataset.field === 'indepCondicion') toggleIndepOtros();
     });
   });
 
@@ -1240,6 +1259,27 @@
     const legal = document.getElementById('domLegalSection');
     if (empresa) empresa.classList.toggle('show', isEmpleado);
     if (legal) legal.classList.toggle('show', isEmpleado);
+  }
+
+  // Si es Independiente, aparece la condicion fiscal (Monotributista / Resp. Inscripto / Otros).
+  function toggleIndepCondicion() {
+    const isIndep = toggleValues['sitLaboral'] === 'Independiente';
+    const block = document.getElementById('indepCondBlock');
+    if (block) block.style.display = isIndep ? '' : 'none';
+    if (!isIndep) {
+      // Si deja de ser independiente, limpiamos la condicion para no arrastrar datos.
+      delete toggleValues['indepCondicion'];
+      document.querySelectorAll('.toggle-btn[data-field="indepCondicion"]').forEach(b => b.classList.remove('selected'));
+      const otros = document.getElementById('indepCondicionOtros'); if (otros) otros.value = '';
+    }
+    toggleIndepOtros();
+  }
+  // Si la condicion fiscal es "Otros", aparece el campo para especificarla.
+  function toggleIndepOtros() {
+    const show = toggleValues['sitLaboral'] === 'Independiente' &&
+                 toggleValues['indepCondicion'] === 'Otros';
+    const block = document.getElementById('indepOtrosBlock');
+    if (block) block.style.display = show ? '' : 'none';
   }
 
   function toggleConyuge() {
@@ -2216,6 +2256,11 @@
     items.push(
       ['— LABORAL —', ''],
       ['Situación laboral', toggleValues['sitLaboral'] || ''],
+      ['Condición fiscal', toggleValues['sitLaboral'] === 'Independiente'
+        ? (toggleValues['indepCondicion'] === 'Otros'
+            ? ('Otros: ' + (g('indepCondicionOtros') || '').trim())
+            : (toggleValues['indepCondicion'] || ''))
+        : ''],
       ['Ocupación', g('ocupacion')],
       ['Actividad', g('actividad')],
       ['Antigüedad', g('antiguedad')],
