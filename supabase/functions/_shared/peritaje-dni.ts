@@ -61,6 +61,7 @@ export type MRZ = {
     compuesto: boolean;
     todosOk: boolean;
   };
+  reparaciones: string[];
 };
 
 function limpiarLineaMRZ(s: string): string {
@@ -126,8 +127,37 @@ export function parseMRZ(
 
   const tipoDoc = p1.slice(0, 2).replace(/</g, "");
   const pais = p1.slice(2, 5).replace(/</g, "");
-  const campoDoc = p1.slice(5, 14); // 9 chars
-  const dvDoc = p1.slice(14, 15);
+  let campoDoc = p1.slice(5, 14); // 9 chars
+  let dvDoc = p1.slice(14, 15);
+  const reparaciones: string[] = [];
+
+  // El DNI argentino tiene 8 digitos, asi que el campo documento (9 posiciones)
+  // termina en chevron de relleno y el DV va en la posicion 15. Cuando el
+  // modelo de vision transcribe la linea sin ese chevron, todo se corre un
+  // lugar: el DV se mete adentro del campo y el campo se come el primer
+  // chevron de la cola. El numero queda con un digito de mas y el documento
+  // intacto se marcaba "DNI distinto" en rojo (caso real del 10/09/2026:
+  // 22684537 leido como 226845371, donde el 1 es el propio DV).
+  //
+  // Solo se repara si la lectura tal cual NO cierra y la corrida SI: un
+  // documento adulterado tendria que acertar el DV de casualidad ademas de
+  // coincidir con el frente. Igual queda registrado en `reparaciones` para
+  // que el peritaje lo muestre en amarillo.
+  if (!(/^\d$/.test(dvDoc) && dvICAO(campoDoc) === Number(dvDoc))) {
+    for (let k = 1; k <= 2; k++) {
+      const base = campoDoc.slice(0, 9 - k);
+      const dvCand = campoDoc.slice(9 - k, 10 - k);
+      if (!/^\d+$/.test(base) || !/^\d$/.test(dvCand)) continue;
+      const campoCand = base.padEnd(9, "<");
+      if (dvICAO(campoCand) === Number(dvCand)) {
+        campoDoc = campoCand;
+        dvDoc = dvCand;
+        reparaciones.push("documento");
+        break;
+      }
+    }
+  }
+
   const nroDocumento = campoDoc.replace(/</g, "").replace(/\D/g, "");
 
   const fNacRaw = p2.slice(0, 6);
@@ -167,6 +197,7 @@ export function parseMRZ(
     apellido,
     nombres,
     checks,
+    reparaciones,
   };
 }
 
@@ -707,6 +738,14 @@ export function peritar(e: EntradaPeritaje): ResultadoPeritaje {
         "MRZ_DV_COMPUESTO",
         "El verificador general de la MRZ no cierra",
         "Puede ser un error al transcribir la fila de chevrones. Si los demas verificadores cierran y los datos coinciden, no hay evidencia de adulteracion.",
+      );
+    }
+
+    if (mrz.reparaciones.includes("documento")) {
+      amarillo(
+        "MRZ_DOC_CORRIMIENTO",
+        "La MRZ del dorso vino transcripta con un corrimiento",
+        `Faltaba el chevron de relleno del campo documento, asi que el digito verificador quedo pegado al numero. Corregido: el numero real es ${mrz.nroDocumento}. No es evidencia de adulteracion, pero conviene mirar el dorso.`,
       );
     }
 
