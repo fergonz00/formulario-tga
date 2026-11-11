@@ -708,10 +708,11 @@
 
   <!-- ═══════ SUCCESS ═══════ -->
   <div class="success-screen" id="successScreen">
-    <div class="success-icon">✅</div>
-    <h2>¡Datos enviados!</h2>
+    <!-- 11/11/2026: el título decía "¡Datos enviados!" mientras guardaba y aunque fallara. -->
+    <div class="success-icon" id="ahIcono">⏳</div>
+    <h2 id="ahTitulo">Cargando los datos…</h2>
     <div id="uploadingState">
-      <p style="color:#5A6B7F;">Guardando datos...</p>
+      <p style="color:#5A6B7F;">Subiendo al sistema. No cierres esta pantalla.</p>
       <div style="margin:16px auto; width:40px; height:40px; border:3px solid var(--vw-new-horizon); border-top-color:var(--vw-cobalt); border-radius:50%; animation:spin 0.8s linear infinite;"></div>
       <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
     </div>
@@ -721,7 +722,10 @@
     </div>
     <div id="uploadErrorState" style="display:none;">
       <div id="uploadError" style="margin-top:12px; font-size:13px; color:var(--vw-red);"></div>
-      <p style="margin-top:16px; font-size:12px; color:#8899AA;">Reintentá o avisá al concesionario.</p>
+      <div style="margin-top:20px; max-width:320px; margin-left:auto; margin-right:auto;">
+        <button class="btn btn-send" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:16px 20px; font-size:16px;" onclick="saveAhorro()">🔄 Reintentar</button>
+      </div>
+      <p style="margin-top:16px; font-size:12px; color:#8899AA;">Los datos siguen en esta pantalla: no la cierres. Cuando vuelva la conexión se reintenta solo.</p>
     </div>
   </div>
 
@@ -890,7 +894,11 @@
   }
 
   function goHome() {
-    if (!confirm('¿Estás seguro de volver a empezar? Se perderán los datos cargados.')) return;
+    const sinCargar = envioAhorro && !envioAhorro.listo;
+    if (!confirm(sinCargar
+      ? 'La solicitud TODAVÍA NO SE CARGÓ en el sistema. Si volvés a empezar se pierde y hay que cargarla de nuevo. ¿Salir igual?'
+      : '¿Estás seguro de volver a empezar? Se perderán los datos cargados.')) return;
+    envioAhorro = null;
 
     // Reset everything
     formType = null;
@@ -921,10 +929,9 @@
     // Hide everything, show selector
     document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
     document.getElementById('successScreen').classList.remove('active');
-    document.getElementById('adminLogin').style.display = 'none';
-    document.getElementById('adminPanel').style.display = 'none';
+    // (acá se tocaban 'adminLogin', 'adminPanel' y 'uploadStatus', que en Ahorro no
+    // existen: el 🏠 se cortaba a mitad del reseteo y no volvía al inicio)
     document.getElementById('adminLink').style.display = '';
-    document.getElementById('uploadStatus').style.display = '';
     document.getElementById('uploadErrorState').style.display = 'none';
     document.getElementById('uploadingState').style.display = '';
     document.getElementById('uploadReady').style.display = 'none';
@@ -1935,11 +1942,56 @@
     document.getElementById('successScreen').classList.add('active');
     document.getElementById('navBar').classList.remove('visible');
     document.getElementById('progressBar').classList.remove('visible');
-    document.getElementById('uploadingState').style.display = '';
-    document.getElementById('uploadReady').style.display = 'none';
-    document.getElementById('uploadErrorState').style.display = 'none';
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    envioAhorro = { safe: null, timestamp: Date.now(), dniUrls: null, estatutoUrl: null, listo: false, enCurso: false };
     saveAhorro();
+  }
+
+  // 11/11/2026: estado del envío (se retoma desde donde falló) + pantalla honesta.
+  let envioAhorro = null;
+  function ahPantalla(estado, detalle) {
+    document.getElementById('uploadingState').style.display = estado === 'subiendo' ? '' : 'none';
+    document.getElementById('uploadReady').style.display = estado === 'listo' ? '' : 'none';
+    document.getElementById('uploadErrorState').style.display = estado === 'error' ? '' : 'none';
+    const icono = document.getElementById('ahIcono'), titulo = document.getElementById('ahTitulo');
+    icono.style.background = estado === 'error' ? 'var(--vw-red)' : estado === 'subiendo' ? 'var(--vw-cobalt)' : '';
+    if (estado === 'subiendo') { icono.textContent = '⏳'; titulo.textContent = 'Cargando los datos…'; }
+    if (estado === 'listo')    { icono.textContent = '✅'; titulo.textContent = '¡Datos enviados!'; }
+    if (estado === 'error')    { icono.textContent = '⚠️'; titulo.textContent = 'La solicitud NO se cargó';
+                                 document.getElementById('uploadError').textContent = detalle || ''; }
+  }
+  window.addEventListener('beforeunload', function (ev) {
+    if (envioAhorro && !envioAhorro.listo) { ev.preventDefault(); ev.returnValue = ''; return ''; }
+  });
+  window.addEventListener('online', function () {
+    if (envioAhorro && !envioAhorro.listo && !envioAhorro.enCurso) saveAhorro();
+  });
+
+  // Subir un archivo aguantando cortes de señal: hasta 4 intentos, 90 s cada uno;
+  // "Duplicate" = ya había llegado. Bytes + Content-Type (Edge Legacy).
+  async function subirArchivo(path, bytes, contentType) {
+    let ultimo = '';
+    for (let intento = 1; intento <= 4; intento++) {
+      const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      const tope = ctrl ? setTimeout(function () { ctrl.abort(); }, 90000) : null;
+      try {
+        const res = await supaFetch(path, {
+          method: 'POST',
+          headers: { 'Content-Type': contentType },
+          body: bytes,
+          signal: ctrl ? ctrl.signal : undefined
+        });
+        if (res.ok) return true;
+        const txt = (await res.text()).slice(0, 300);
+        if (/duplicate|already exists/i.test(txt)) return true;
+        ultimo = 'HTTP ' + res.status + ' ' + txt;
+        if (res.status < 500 && res.status !== 408 && res.status !== 429) break;
+      } catch (e) {
+        ultimo = (e && e.name === 'AbortError') ? 'la subida tardó demasiado' : ((e && e.message) || String(e));
+      } finally { if (tope) clearTimeout(tope); }
+      if (intento < 4) await new Promise(function (r) { setTimeout(r, 2000 * intento); });
+    }
+    throw new Error(ultimo || 'sin conexión');
   }
 
   // ═══════ SUPABASE CONFIG ═══════
@@ -2047,16 +2099,8 @@
       const ext = (img.type || '').includes('png') ? 'png' : 'jpg';
       const fileName = 'dni/F01_' + safeName + '_' + timestamp + '_' + imgKey + '.' + ext;
       try {
-        const r = await fetch(img.data);
-        const blob = await r.blob();
-        const res = await supaFetch('/storage/v1/object/formularios-f01/' + fileName, {
-          method: 'POST',
-          headers: { 'Content-Type': img.type || 'image/jpeg' },
-          body: blob
-        });
-        if (res.ok) {
-          urls[label + ' URL'] = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
-        }
+        await subirArchivo('/storage/v1/object/formularios-f01/' + fileName, dataUrlToBytes(img.data), img.type || 'image/jpeg');
+        urls[label + ' URL'] = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
       } catch (e) {
         console.error('F01 DNI upload failed', imgKey, e);
       }
@@ -2066,17 +2110,23 @@
 
   // Guarda el formulario de Plan de Ahorro (sube DNI + inserta en formularios_ahorro). Sin PDF.
   async function saveAhorro() {
+    const env = envioAhorro;
+    if (!env || env.listo || env.enCurso) return;
+    env.enCurso = true;
+    ahPantalla('subiendo');
     try {
       const nombre = (formType === 'fisica' ? g('pf-nombre') : g('pj-razonSocial')) || 'Sin nombre';
-      const timestamp = Date.now();
+      const timestamp = env.timestamp;
       const safe = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_') || 'cliente';
 
-      // 1. Subir imagenes de DNI al bucket (reutiliza el helper de F01)
-      const dniUrls = await uploadF01DniImages(safe, timestamp);
+      // 1. Subir imagenes de DNI al bucket (reutiliza el helper de F01); en un
+      //    reintento no se vuelven a subir.
+      if (!env.dniUrls) env.dniUrls = await uploadF01DniImages(safe, timestamp);
+      const dniUrls = env.dniUrls;
 
       // 1b. Subir estatuto / contrato social (solo PJ)
-      let estatutoUrl = '';
-      if (formType === 'juridica') {
+      let estatutoUrl = env.estatutoUrl || '';
+      if (formType === 'juridica' && env.estatutoUrl === null) {
         const estInput = document.getElementById('pj-estatuto');
         const file = estInput && estInput.files && estInput.files[0];
         if (file) {
@@ -2091,6 +2141,7 @@
             if (resEst.ok) estatutoUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
           } catch (e) { console.error('Estatuto upload failed', e); }
         }
+        env.estatutoUrl = estatutoUrl;
       }
 
       // 2. Armar datos
@@ -2130,14 +2181,14 @@
       });
       if (!res.ok) { const t = await res.text(); throw new Error(t); }
 
-      document.getElementById('uploadingState').style.display = 'none';
-      document.getElementById('uploadReady').style.display = '';
+      env.listo = true;
+      ahPantalla('listo');
     } catch (e) {
       console.error('Save error:', e);
-      document.getElementById('uploadingState').style.display = 'none';
-      document.getElementById('uploadErrorState').style.display = '';
-      const errEl = document.getElementById('uploadError');
-      if (errEl) errEl.textContent = 'No se pudo guardar el formulario. Intentalo de nuevo o avisa al concesionario.';
+      ahPantalla('error', 'No se pudo guardar (' + String((e && e.message) || e).slice(0, 140) + '). '
+        + 'Revisá la conexión y tocá «Reintentar». Hasta que no se guarde, la solicitud no está en el sistema.');
+    } finally {
+      env.enCurso = false;
     }
   }
 
@@ -2152,18 +2203,6 @@
         prompt('Copiá este link:', supabasePdfUrl);
       });
     }
-  }
-
-  function downloadPDFLocal() {
-    if (!generatedPDFBlob) return;
-    const name = formType === 'fisica' ? g('pf-nombre') : g('pj-razonSocial');
-    const safe = (name || 'Cliente').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
-    const tipo = formType === 'fisica' ? 'PF' : 'PJ';
-    const fileName = 'F01_' + tipo + '_' + safe + '.pdf';
-    const url = URL.createObjectURL(generatedPDFBlob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName; a.click();
-    URL.revokeObjectURL(url);
   }
 
   // ═══════ ADMIN PANEL ═══════

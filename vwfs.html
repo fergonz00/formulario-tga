@@ -1042,7 +1042,7 @@
       <div style="text-align:center; padding: 20px 0;">
         <div class="spinner"></div>
         <h3 style="font-size:16px; font-weight:700;">Enviando tu formulario…</h3>
-        <p style="font-size:13px; color:#5A6B7F; margin-top:6px;">Estamos generando el PDF y subiéndolo de forma segura.</p>
+        <p style="font-size:13px; color:#5A6B7F; margin-top:6px;">Subiendo al sistema. No cierres esta pantalla.</p>
       </div>
     </div>
 
@@ -1062,10 +1062,15 @@
     <div class="section-card" id="uploadErrorState" style="display:none;">
       <div style="text-align:center; padding: 20px 0 10px;">
         <div class="error-icon">!</div>
-        <h3 style="font-size:16px; font-weight:700;">No se pudo enviar</h3>
+        <h3 style="font-size:16px; font-weight:700;">La solicitud NO se cargó</h3>
         <p id="uploadError" style="font-size:13px; color:#5A6B7F; margin-top:6px;"></p>
       </div>
-      <button class="btn btn-primary btn-block" style="margin-top:12px;" onclick="downloadPDFLocal()">Descargar PDF (local)</button>
+      <!-- 11/11/2026: sin "Descargar PDF (local)": un PDF que el sistema no tiene no sirve
+           (8191/1). Se reintenta hasta que quede guardado. -->
+      <button id="btnReintentarVwfs" class="btn btn-primary btn-block" style="margin-top:12px;" onclick="enviarVwfs()">🔄 Reintentar</button>
+      <p style="font-size:11px; color:#8899AA; margin-top:10px; text-align:center; line-height:1.5;">
+        Los datos siguen en esta pantalla: no la cierres. Cuando vuelva la conexión se reintenta solo.
+      </p>
     </div>
   </section>
 
@@ -2189,7 +2194,11 @@
   }
 
   function goHome() {
-    if (!confirm('¿Estás seguro? Se perderán los datos cargados.')) return;
+    const sinCargar = envioVwfs && !envioVwfs.listo;
+    if (!confirm(sinCargar
+      ? 'La solicitud TODAVÍA NO SE CARGÓ en el sistema. Si volvés a empezar se pierde y hay que cargarla de nuevo. ¿Salir igual?'
+      : '¿Estás seguro? Se perderán los datos cargados.')) return;
+    envioVwfs = null; // ya confirmó: que no vuelva a preguntar el navegador
     window.location.reload();
   }
 
@@ -2394,7 +2403,6 @@
 
     await addDniPagesToPdf(doc);
 
-    generatedPDFBlob = doc.output('blob');
     goToSuccessScreen();
     const fullName = (g('apellido') + ' ' + g('nombre')).trim() || 'Cliente';
     uploadToSupabase(doc, fullName);
@@ -2479,25 +2487,82 @@
   }
 
   // ═══════ UPLOAD ═══════
+  // 11/11/2026: subir un archivo al storage aguantando cortes de señal (mismo criterio
+  // que el F01, ver 8191/1): hasta 4 intentos con espera creciente, 90 s por intento;
+  // "Duplicate" = ya había llegado en un intento anterior. Bytes + Content-Type
+  // (Edge Legacy rompe con Blob como body).
+  async function subirArchivo(path, bytes, contentType) {
+    let ultimo = '';
+    for (let intento = 1; intento <= 4; intento++) {
+      const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      const tope = ctrl ? setTimeout(function () { ctrl.abort(); }, 90000) : null;
+      try {
+        const res = await supaFetch(path, {
+          method: 'POST',
+          headers: { 'Content-Type': contentType },
+          body: bytes,
+          signal: ctrl ? ctrl.signal : undefined
+        });
+        if (res.ok) return true;
+        const txt = (await res.text()).slice(0, 300);
+        if (/duplicate|already exists/i.test(txt)) return true;
+        ultimo = 'HTTP ' + res.status + ' ' + txt;
+        if (res.status < 500 && res.status !== 408 && res.status !== 429) break;
+      } catch (e) {
+        ultimo = (e && e.name === 'AbortError') ? 'la subida tardó demasiado' : ((e && e.message) || String(e));
+      } finally { if (tope) clearTimeout(tope); }
+      if (intento < 4) await new Promise(function (r) { setTimeout(r, 2000 * intento); });
+    }
+    throw new Error(ultimo || 'sin conexión');
+  }
+
+  // Envío en curso: se retoma desde el paso que falló, con el mismo nombre de archivo.
+  let envioVwfs = null;
+  window.addEventListener('beforeunload', function (ev) {
+    if (envioVwfs && !envioVwfs.listo) { ev.preventDefault(); ev.returnValue = ''; return ''; }
+  });
+  window.addEventListener('online', function () {
+    if (envioVwfs && !envioVwfs.listo && !envioVwfs.enCurso) enviarVwfs();
+  });
+
   async function uploadToSupabase(doc, clientName) {
+    const nombre = clientName || 'Sin nombre';
+    const timestamp = Date.now();
+    // Supabase Storage rechaza (HTTP 400) nombres con caracteres no-ASCII; los
+    // nombres con tilde/ñ rompían la subida. Sacamos acentos para la clave del
+    // archivo (el nombre real con acentos se guarda igual en el registro).
+    const safe = nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
     try {
-      const blob = doc.output('blob');
-      const nombre = clientName || 'Sin nombre';
-      const timestamp = Date.now();
-      // Supabase Storage rechaza (HTTP 400) nombres con caracteres no-ASCII; los
-      // nombres con tilde/ñ rompían la subida. Sacamos acentos para la clave del
-      // archivo (el nombre real con acentos se guarda igual en el registro).
-      const safe = nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
-      const fileName = 'VWFS_' + safe + '_' + timestamp + '.pdf';
+      envioVwfs = {
+        fileName: 'VWFS_' + safe + '_' + timestamp + '.pdf',
+        pdfBytes: new Uint8Array(doc.output('arraybuffer')),
+        pdfSubido: false, listo: false, enCurso: false
+      };
+    } catch (e) {
+      console.error('Armado del PDF:', e);
+      envioVwfs = null;
+      document.getElementById('uploadingState').style.display = 'none';
+      document.getElementById('uploadErrorState').style.display = '';
+      document.getElementById('uploadError').textContent = 'No se pudo armar el PDF (' + String((e && e.message) || e).slice(0, 140) + '). Avisá a Sistemas: la solicitud no se cargó.';
+      return;
+    }
+    await enviarVwfs();
+  }
 
-      const uploadRes = await supaFetch('/storage/v1/object/formularios-vwfs/' + fileName, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/pdf' },
-        body: blob
-      });
-      if (!uploadRes.ok) throw new Error('Error subiendo PDF');
-
-      supabasePdfUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-vwfs/' + fileName;
+  async function enviarVwfs() {
+    const env = envioVwfs;
+    if (!env || env.listo || env.enCurso) return;
+    env.enCurso = true;
+    document.getElementById('uploadingState').style.display = '';
+    document.getElementById('uploadErrorState').style.display = 'none';
+    let paso = 'el PDF';
+    try {
+      if (!env.pdfSubido) {
+        await subirArchivo('/storage/v1/object/formularios-vwfs/' + env.fileName, env.pdfBytes, 'application/pdf');
+        env.pdfSubido = true;
+      }
+      supabasePdfUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-vwfs/' + env.fileName;
+      paso = 'el registro';
 
       // El DNI ya se subio al bucket vwfs-dnis en el paso 1 (analyzeDni).
       // Reutilizamos las URLs publicas que quedaron en dniFrenteUrlUploaded / dniDorsoUrlUploaded.
@@ -2551,16 +2616,20 @@
         });
       }
 
+      env.listo = true;
+      env.pdfBytes = null;
+      // El PDF que se descarga es el del servidor: si llegamos acá, existe.
       document.getElementById('uploadingState').style.display = 'none';
       document.getElementById('uploadReady').style.display = '';
       document.getElementById('btnDownloadPDF').href = supabasePdfUrl;
     } catch (e) {
-      console.error('Upload error:', e);
+      console.error('Envío VWFS (' + paso + '):', e);
       document.getElementById('uploadingState').style.display = 'none';
       document.getElementById('uploadErrorState').style.display = '';
-      document.getElementById('uploadError').textContent = supabasePdfUrl
-        ? 'La solicitud NO quedó registrada (el PDF se generó, pero el sistema no la guardó). Volvé a tocar «Enviar»; si vuelve a fallar, descargá el PDF y avisá a Administración.'
-        : 'No se pudo subir el formulario. Descargalo desde acá y envialo manualmente.';
+      document.getElementById('uploadError').textContent = 'No se pudo subir ' + paso + ' (' + String((e && e.message) || e).slice(0, 140) + '). '
+        + 'Revisá la conexión y tocá «Reintentar». Sin esto la operación no avanza: la solicitud todavía no está en el sistema.';
+    } finally {
+      env.enCurso = false;
     }
   }
 
@@ -2575,16 +2644,6 @@
         prompt('Copiá este link:', supabasePdfUrl);
       });
     }
-  }
-
-  function downloadPDFLocal() {
-    if (!generatedPDFBlob) return;
-    const name = (g('apellido') + '_' + g('nombre')).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 _]/g, '').trim() || 'Cliente';
-    const fileName = 'VWFS_' + name + '.pdf';
-    const url = URL.createObjectURL(generatedPDFBlob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName; a.click();
-    URL.revokeObjectURL(url);
   }
 
   // Default PEP=No

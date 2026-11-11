@@ -843,11 +843,16 @@
 
   <!-- ═══════ SUCCESS ═══════ -->
   <div class="success-screen" id="successScreen">
-    <div class="success-icon">📄</div>
-    <h2>¡PDF generado!</h2>
+    <!-- 11/11/2026: el PDF existe SOLO si quedó en el servidor. Antes esta pantalla
+         decía "¡PDF generado!" apenas se armaba en el celular y, si la subida fallaba,
+         ofrecía "Descargar PDF (local)": el vendedor se quedaba con un PDF que el
+         sistema no tenía (8191/1, Perez). Ahora no hay PDF local: se reintenta hasta
+         que quede guardado. -->
+    <div class="success-icon" id="f01Icono">⏳</div>
+    <h2 id="f01Titulo">Cargando el formulario…</h2>
     <!-- Uploading state -->
     <div id="uploadingState">
-      <p style="color:#5A6B7F;">Subiendo formulario...</p>
+      <p id="f01Progreso" style="color:#5A6B7F;">Subiendo al sistema. No cierres esta pantalla.</p>
       <div style="margin:16px auto; width:40px; height:40px; border:3px solid var(--vw-new-horizon); border-top-color:var(--vw-cobalt); border-radius:50%; animation:spin 0.8s linear infinite;"></div>
       <style>@keyframes spin { to { transform: rotate(360deg); } }</style>
     </div>
@@ -870,12 +875,9 @@
     <div id="uploadErrorState" style="display:none;">
       <div id="uploadError" style="margin-top:12px; font-size:13px; color:var(--vw-red);"></div>
       <div style="margin-top:20px; max-width:320px; margin-left:auto; margin-right:auto;">
-        <button id="btnReintentarF01" class="btn btn-success" style="width:100%; display:none; align-items:center; justify-content:center; gap:8px; padding:16px 20px; font-size:16px; margin-bottom:10px;" onclick="reintentarGuardadoF01()">🔄 Reintentar</button>
-        <button class="btn btn-send" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:16px 20px; font-size:16px;" onclick="downloadPDFLocal()">
-          <span style="font-size:20px">⬇️</span> Descargar PDF (local)
-        </button>
+        <button id="btnReintentarF01" class="btn btn-send" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px; padding:16px 20px; font-size:16px;" onclick="reintentarGuardadoF01()">🔄 Reintentar</button>
       </div>
-      <p style="margin-top:16px; font-size:12px; color:#8899AA;">No se pudo subir al servidor. Descargá el PDF y envialo manualmente.</p>
+      <p style="margin-top:16px; font-size:12px; color:#8899AA;">Los datos siguen en esta pantalla: no la cierres. Cuando vuelva la conexión se reintenta solo.</p>
     </div>
   </div>
 
@@ -1351,7 +1353,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   }
 
   function goHome() {
-    if (!confirm('¿Estás seguro de volver a empezar? Se perderán los datos cargados.')) return;
+    const sinCargar = envioF01 && !envioF01.listo;
+    if (!confirm(sinCargar
+      ? 'El formulario TODAVÍA NO SE CARGÓ en el sistema. Si volvés a empezar se pierde y hay que cargarlo de nuevo. ¿Salir igual?'
+      : '¿Estás seguro de volver a empezar? Se perderán los datos cargados.')) return;
+    envioF01 = null;
 
     // Reset everything
     formType = null;
@@ -2713,7 +2719,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         }
       }
 
-      generatedPDFBlob = doc.output('blob');
       document.getElementById('formContainer').querySelectorAll('.step').forEach(s => s.classList.remove('active'));
       document.getElementById('successScreen').classList.add('active');
       document.getElementById('navBar').classList.remove('visible');
@@ -2832,16 +2837,8 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       const ext = (img.type || '').includes('png') ? 'png' : 'jpg';
       const fileName = 'dni/F01_' + safeName + '_' + timestamp + '_' + imgKey + '.' + ext;
       try {
-        const r = await fetch(img.data);
-        const blob = await r.blob();
-        const res = await supaFetch('/storage/v1/object/formularios-f01/' + fileName, {
-          method: 'POST',
-          headers: { 'Content-Type': img.type || 'image/jpeg' },
-          body: blob
-        });
-        if (res.ok) {
-          urls[label + ' URL'] = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
-        }
+        await subirArchivo('/storage/v1/object/formularios-f01/' + fileName, dataUrlToBytes(img.data), img.type || 'image/jpeg');
+        urls[label + ' URL'] = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
       } catch (e) {
         console.error('F01 DNI upload failed', imgKey, e);
       }
@@ -2849,33 +2846,130 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
     return urls;
   }
 
+  // 11/11/2026: subir un archivo al storage aguantando cortes de señal. Antes se
+  // intentaba UNA vez y, si el celular perdía la conexión, el F01 no llegaba nunca
+  // (8191/1, Perez: el pedido ni siquiera salió del teléfono). Ahora: hasta 4 intentos
+  // con espera creciente, 90 s como máximo por intento, y si el archivo ya había
+  // llegado en un intento anterior (se cortó la respuesta, no la subida) el storage
+  // contesta "Duplicate": eso cuenta como subido. Se manda como bytes + Content-Type
+  // (Edge Legacy rompe con Blob como body, ver dataUrlToBytes).
+  async function subirArchivo(path, bytes, contentType) {
+    let ultimo = '';
+    for (let intento = 1; intento <= 4; intento++) {
+      const ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      const tope = ctrl ? setTimeout(function () { ctrl.abort(); }, 90000) : null;
+      try {
+        const res = await supaFetch(path, {
+          method: 'POST',
+          headers: { 'Content-Type': contentType },
+          body: bytes,
+          signal: ctrl ? ctrl.signal : undefined
+        });
+        if (res.ok) return true;
+        const txt = (await res.text()).slice(0, 300);
+        if (/duplicate|already exists/i.test(txt)) return true;
+        ultimo = 'HTTP ' + res.status + ' ' + txt;
+        if (res.status < 500 && res.status !== 408 && res.status !== 429) break;
+      } catch (e) {
+        ultimo = (e && e.name === 'AbortError') ? 'la subida tardó demasiado' : ((e && e.message) || String(e));
+      } finally { if (tope) clearTimeout(tope); }
+      if (intento < 4) await new Promise(function (r) { setTimeout(r, 2000 * intento); });
+    }
+    throw new Error(ultimo || 'sin conexión');
+  }
+
+  // Estado del envío en curso: permite retomar desde el paso que falló (no se vuelve a
+  // subir lo que ya llegó, y los reintentos usan el mismo nombre de archivo).
+  let envioF01 = null;
+
+  function f01Pantalla(estado, detalle) {
+    const icono = document.getElementById('f01Icono');
+    const titulo = document.getElementById('f01Titulo');
+    document.getElementById('uploadingState').style.display = estado === 'subiendo' ? '' : 'none';
+    document.getElementById('uploadReady').style.display = estado === 'listo' ? '' : 'none';
+    document.getElementById('uploadErrorState').style.display = estado === 'error' ? '' : 'none';
+    icono.style.background = estado === 'error' ? 'var(--vw-red)' : estado === 'subiendo' ? 'var(--vw-cobalt)' : '';
+    if (estado === 'subiendo') { icono.textContent = '⏳'; titulo.textContent = 'Cargando el formulario…'; }
+    if (estado === 'listo')    { icono.textContent = '✅'; titulo.textContent = '¡Formulario cargado!'; }
+    if (estado === 'error')    {
+      icono.textContent = '⚠️'; titulo.textContent = 'El formulario NO se cargó';
+      document.getElementById('uploadError').textContent = detalle || '';
+    }
+  }
+
+  // Mientras el formulario no esté guardado, avisar antes de cerrar o recargar la página.
+  window.addEventListener('beforeunload', function (ev) {
+    if (envioF01 && !envioF01.listo) { ev.preventDefault(); ev.returnValue = ''; return ''; }
+  });
+  // Si se había cortado la señal, al volver la conexión se reintenta solo.
+  window.addEventListener('online', function () {
+    if (envioF01 && !envioF01.listo && !envioF01.enCurso) reintentarGuardadoF01();
+  });
+
   async function uploadToSupabase(doc, clientName) {
+    const nombre = clientName || 'Sin nombre';
+    const tipo = formType === 'fisica' ? 'PF' : 'PJ';
+    const timestamp = Date.now();
+    // OJO: Supabase Storage rechaza (HTTP 400) cualquier nombre de archivo con
+    // caracteres no-ASCII. Los nombres con tilde/ñ (MARÍA, NÚÑEZ…) rompían la
+    // subida. Sacamos los acentos SOLO para la clave del archivo (el nombre real
+    // con acentos se guarda igual en el registro y en datos).
+    const safe = nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
     try {
-      const blob = doc.output('blob');
-      const nombre = clientName || 'Sin nombre';
-      const tipo = formType === 'fisica' ? 'PF' : 'PJ';
-      const timestamp = Date.now();
-      // OJO: Supabase Storage rechaza (HTTP 400) cualquier nombre de archivo con
-      // caracteres no-ASCII. Los nombres con tilde/ñ (MARÍA, NÚÑEZ…) rompían la
-      // subida. Sacamos los acentos SOLO para la clave del archivo (el nombre real
-      // con acentos se guarda igual en el registro y en datos).
-      const safe = nombre.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
-      const fileName = 'F01_' + tipo + '_' + safe + '_' + timestamp + '.pdf';
+      envioF01 = {
+        nombre: nombre, safe: safe, timestamp: timestamp,
+        fileName: 'F01_' + tipo + '_' + safe + '_' + timestamp + '.pdf',
+        pdfBytes: new Uint8Array(doc.output('arraybuffer')),
+        pdfSubido: false, dniUrls: null, body: null, listo: false, enCurso: false
+      };
+    } catch (e) {
+      console.error('Armado del PDF:', e);
+      envioF01 = null;
+      f01Pantalla('error', 'No se pudo armar el PDF (' + String((e && e.message) || e).slice(0, 140) + '). Avisá a Sistemas: el formulario no se cargó.');
+      return;
+    }
+    await enviarF01();
+  }
 
-      // 1. Upload PDF to Storage
-      const uploadRes = await supaFetch('/storage/v1/object/formularios-f01/' + fileName, {
+  async function enviarF01() {
+    const env = envioF01;
+    if (!env || env.listo || env.enCurso) return;
+    env.enCurso = true;
+    f01Pantalla('subiendo');
+    let paso = 'el PDF';
+    try {
+      // 1. PDF al storage
+      if (!env.pdfSubido) {
+        await subirArchivo('/storage/v1/object/formularios-f01/' + env.fileName, env.pdfBytes, 'application/pdf');
+        env.pdfSubido = true;
+      }
+      supabasePdfUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + env.fileName;
+
+      // 1b. Fotos del DNI (también van dentro del PDF; si alguna no sube, no traba)
+      paso = 'las fotos del DNI';
+      if (!env.dniUrls) env.dniUrls = await uploadF01DniImages(env.safe, env.timestamp);
+      if (!env.body) env.body = armarRegistroF01(env.nombre, env.dniUrls);
+
+      // 2. Registro (con reintentos; si falla, NO se muestra "listo")
+      paso = 'el registro';
+      await guardarRegistro('/rest/v1/formularios_f01', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/pdf' },
-        body: blob
+        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
+        body: env.body
       });
+      env.listo = true;
+      env.pdfBytes = null;
+      mostrarF01Listo();
+    } catch (e) {
+      console.error('Envío F01 (' + paso + '):', e);
+      f01Pantalla('error', 'No se pudo subir ' + paso + ' (' + String((e && e.message) || e).slice(0, 140) + '). '
+        + 'Revisá la conexión y tocá «Reintentar». Sin esto la operación no avanza: el formulario todavía no está en el sistema.');
+    } finally {
+      env.enCurso = false;
+    }
+  }
 
-      if (!uploadRes.ok) throw new Error('Error subiendo PDF');
-
-      supabasePdfUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
-
-      // 1b. Upload DNI images to bucket
-      const dniUrls = await uploadF01DniImages(safe, timestamp);
-
+  function armarRegistroF01(nombre, dniUrls) {
       // 2. Get form data
       const documento = formType === 'fisica' ? g('pf-tipoDoc') + ' ' + g('pf-nroDoc') : g('pj-cuit');
       const celular = formType === 'fisica' ? g('pf-celular') : g('pj-celular');
@@ -2907,9 +3001,7 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       if (t2Dni.dorsoUrl)  datosObj['DNI 2º Titular Dorso URL']  = t2Dni.dorsoUrl;
       if (t2Dni.analisis) datosObj['DNI 2º Titular análisis IA'] = JSON.stringify(t2Dni.analisis);
 
-      // 3. Insert record (con reintentos; si falla, NO se muestra "listo")
-      ultimoGuardadoF01 = { path: '/rest/v1/formularios_f01', body: null };
-      ultimoGuardadoF01.body = jsonSinNulos({
+      return jsonSinNulos({
           tipo: formType,
           nombre: nombre,
           documento: documento,
@@ -2922,53 +3014,17 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
           dni_dorso_url: dniDorsoUrlUploaded || null,
           dni_analisis: dniAnalisis || null
         });
-      await guardarRegistro(ultimoGuardadoF01.path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: ultimoGuardadoF01.body
-      });
-      ultimoGuardadoF01 = null;
-      mostrarF01Listo();
-
-    } catch (e) {
-      console.error('Upload error:', e);
-      document.getElementById('uploadingState').style.display = 'none';
-      document.getElementById('uploadErrorState').style.display = '';
-      // Si el PDF ya se subió pero el registro no se guardó, se puede reintentar solo el guardado.
-      const soloRegistro = !!(ultimoGuardadoF01 && ultimoGuardadoF01.body);
-      document.getElementById('btnReintentarF01').style.display = soloRegistro ? '' : 'none';
-      document.getElementById('uploadError').textContent = soloRegistro
-        ? 'El formulario NO quedó registrado (el PDF se generó, pero el sistema no lo guardó). Tocá «Reintentar». Si vuelve a fallar, descargá el PDF y avisá a Administración: sin el registro, la operación no avanza.'
-        : 'No se pudo subir el formulario. Descargalo desde acá y envialo manualmente.';
-    }
   }
 
-  let ultimoGuardadoF01 = null;
+  // «Reintentar» (y el reintento automático al volver la conexión): retoma desde el
+  // paso que falló, sin volver a subir lo que ya llegó.
   async function reintentarGuardadoF01() {
-    if (!ultimoGuardadoF01) return;
-    const btn = document.getElementById('btnReintentarF01');
-    btn.disabled = true; btn.textContent = 'Guardando…';
-    try {
-      await guardarRegistro(ultimoGuardadoF01.path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' },
-        body: ultimoGuardadoF01.body
-      });
-      ultimoGuardadoF01 = null;
-      document.getElementById('uploadErrorState').style.display = 'none';
-      mostrarF01Listo();
-    } catch (e) {
-      console.error('Reintento F01:', e);
-      document.getElementById('uploadError').textContent = 'Sigue sin poder guardarse. Descargá el PDF y avisá a Administración (' + String(e.message || e).slice(0, 160) + ').';
-    } finally {
-      btn.disabled = false; btn.textContent = '🔄 Reintentar';
-    }
+    await enviarF01();
   }
 
   function mostrarF01Listo() {
-      // Show ready state with Supabase link
-      document.getElementById('uploadingState').style.display = 'none';
-      document.getElementById('uploadReady').style.display = '';
+      // El PDF que se descarga es el del servidor: si llegamos acá, existe.
+      f01Pantalla('listo');
       document.getElementById('btnDownloadPDF').href = supabasePdfUrl;
 
       // Boton 'Continuar con VWFS' dentro del slot dedicado (mantiene layout 320px centrado)
@@ -2999,18 +3055,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         prompt('Copiá este link:', supabasePdfUrl);
       });
     }
-  }
-
-  function downloadPDFLocal() {
-    if (!generatedPDFBlob) return;
-    const name = formType === 'fisica' ? g('pf-nombre') : g('pj-razonSocial');
-    const safe = (name || 'Cliente').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9 ]/g, '').trim().replace(/\s+/g, '_');
-    const tipo = formType === 'fisica' ? 'PF' : 'PJ';
-    const fileName = 'F01_' + tipo + '_' + safe + '.pdf';
-    const url = URL.createObjectURL(generatedPDFBlob);
-    const a = document.createElement('a');
-    a.href = url; a.download = fileName; a.click();
-    URL.revokeObjectURL(url);
   }
 
   // ═══════ ADMIN PANEL ═══════
