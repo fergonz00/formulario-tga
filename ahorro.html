@@ -2132,14 +2132,19 @@
         if (file) {
           const ext = (file.name.match(/\.([a-zA-Z0-9]+)$/) || [null, 'pdf'])[1].toLowerCase();
           const fileName = 'estatuto/AHORRO_' + safe + '_' + timestamp + '.' + ext;
+          // 11/11/2026: en bytes (Edge viejo no manda un File/Blob como body) y con los
+          // reintentos de subirArchivo. Si lo adjuntaron, TIENE que llegar: si falla se
+          // corta acá y «Reintentar» lo vuelve a intentar (no se guarda sin el estatuto).
+          const bytes = await new Promise(function (ok, mal) {
+            const fr = new FileReader();
+            fr.onload = function () { ok(new Uint8Array(fr.result)); };
+            fr.onerror = function () { mal(new Error('no se pudo leer el archivo del estatuto')); };
+            fr.readAsArrayBuffer(file);
+          });
           try {
-            const resEst = await supaFetch('/storage/v1/object/formularios-f01/' + fileName, {
-              method: 'POST',
-              headers: { 'Content-Type': file.type || 'application/octet-stream' },
-              body: file
-            });
-            if (resEst.ok) estatutoUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
-          } catch (e) { console.error('Estatuto upload failed', e); }
+            await subirArchivo('/storage/v1/object/formularios-f01/' + fileName, bytes, file.type || 'application/octet-stream');
+          } catch (e) { throw new Error('el estatuto no se subió: ' + ((e && e.message) || e)); }
+          estatutoUrl = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + fileName;
         }
         env.estatutoUrl = estatutoUrl;
       }
