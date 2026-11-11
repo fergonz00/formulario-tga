@@ -13,7 +13,12 @@ No inventes datos: si no podes leer un campo con certeza, poner null.
 REGLA CRITICA: transcribi SIEMPRE literalmente, caracter por caracter, lo que ves.
 NUNCA "corrijas", completes ni normalices un dato que te parezca raro: justamente esas
 inconsistencias son la evidencia de que el documento fue alterado. Si el frente dice una
-fecha y el dorso dice otra, transcribi las dos como estan.`;
+fecha y el dorso dice otra, transcribi las dos como estan.
+
+NO EVALUES EL CALENDARIO: NO sabes la fecha de hoy. Nunca marques una fecha de emision o
+vencimiento como "imposible", "futura", "aun no expedida" ni sospechosa por el anio que
+tenga. Una emision o un vencimiento en 2026 o posterior es NORMAL. El vencimiento y la
+vigencia los calcula el servidor aparte: vos NO los uses como senal de sospecha_ia.`;
 
 export function buildUserPrompt(datero: Record<string, string>): string {
   return `Analiza las dos imagenes adjuntas (frente y dorso de un DNI argentino).
@@ -46,7 +51,7 @@ Devolveme un JSON con esta estructura exacta:
     "dni": string | null,            // solo digitos
     "sexo": string | null,           // "M" o "F"
     "fecha_nacimiento": string | null,  // formato DD/MM/AAAA
-    "fecha_emision": string | null,
+    "fecha_emision": string | null,     // NO juzgues si es pasada o futura (no sabes hoy); una emision 2026+ es normal
     "fecha_vencimiento": string | null,
     "nacionalidad": string | null,
     "domicilio": string | null,      // texto completo del domicilio como aparece en el DNI (calle + numero + piso/dpto si estan)
@@ -71,9 +76,14 @@ Devolveme un JSON con esta estructura exacta:
     // Peritaje visual. Respondes true si el elemento se ve CORRECTO / autentico,
     // false si esta mal reproducido, null si no podes determinarlo.
     "ghost_portrait_correcto": boolean | null,
-    // El dorso tiene un retrato fantasma del titular a la izquierda. En un DNI
-    // real es un GRABADO de lineas finas azules (tipo billete), NO una foto.
-    // Si se ve como una fotografia realista o con sombreado continuo, es false.
+    // El dorso tiene un retrato fantasma del titular a la izquierda (ventana).
+    // IMPORTANTE: en el formato NUEVO es un grabado laser en ESCALA DE GRISES que
+    // PUEDE parecer una foto de tono continuo, y al fotografiar la tarjeta el
+    // brillo/reflejo borra las lineas finas. Por eso que "parezca una foto" NO
+    // alcanza para marcarlo false.
+    // Marcalo false SOLO si hay manipulacion clara: es una foto A COLOR pegada,
+    // se ve pixelada / con halo / bordes recortados, o es OTRA persona distinta
+    // a la del frente. Ante la duda, null.
     "guilloches_coherentes": boolean | null,
     // Las guardas de seguridad (patrones de lineas entrelazadas, la roseta del
     // dorso, el mapa de fondo del frente). false si se disuelven, se cortan,
