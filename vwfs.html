@@ -804,6 +804,14 @@
         <input type="text" id="indepCondicionOtros" placeholder="Detallá la condición (es algo fuera de lo común)">
       </div>
 
+      <!-- Solo si es Monotributista o Responsable Inscripto: subir constancia de ARCA -->
+      <div class="field" id="constanciaBlock" style="display:none;">
+        <label>Constancia de ARCA — actualizada de este mes</label>
+        <input type="file" accept="image/*,application/pdf" id="constanciaFile" onchange="handleConstanciaUpload(this)">
+        <div style="font-size:12px; color:var(--vw-cobalt); margin-top:4px;">Subí la constancia de inscripción (Resp. Inscripto) o de opción al monotributo. La verificamos al toque.</div>
+        <div id="constanciaStatus" style="margin-top:10px; font-size:13px; display:none;"></div>
+      </div>
+
       <div class="row row-2">
         <div class="field">
           <label>Ocupación</label>
@@ -1170,6 +1178,10 @@
   let dniFrenteUrlUploaded = '';   // URL publica firmada del frente en bucket vwfs-dnis
   let dniDorsoUrlUploaded = '';    // idem dorso
 
+  // Constancia de ARCA (solo Monotributista / Resp. Inscripto): resultado de analizar-constancia.
+  // { url, declarado, ok, veredicto, condicion_detectada, categoria_monotributo, vigencia_desde, mensaje, ... }
+  let constanciaState = null;
+
   // ═══════ HELPERS ═══════
   function g(id) { const el = document.getElementById(id); return el ? (el.value || '') : ''; }
 
@@ -1285,6 +1297,85 @@
                  toggleValues['indepCondicion'] === 'Otros';
     const block = document.getElementById('indepOtrosBlock');
     if (block) block.style.display = show ? '' : 'none';
+    toggleConstancia();
+  }
+
+  // Monotributista o Resp. Inscripto => pedimos la constancia de ARCA y la verificamos.
+  function toggleConstancia() {
+    const cond = toggleValues['indepCondicion'];
+    const pide = toggleValues['sitLaboral'] === 'Independiente' &&
+                 (cond === 'Monotributista' || cond === 'Responsable Inscripto');
+    const block = document.getElementById('constanciaBlock');
+    if (block) block.style.display = pide ? '' : 'none';
+    if (!pide) {
+      // Dejo de necesitarla: limpio para no arrastrar una constancia vieja.
+      limpiarConstancia();
+    } else if (constanciaState && constanciaState.declarado && constanciaState.declarado !== cond) {
+      // Cambió la condición declarada (ej: Mono -> RI): la constancia anterior ya no aplica.
+      limpiarConstancia();
+      renderConstanciaStatus({ veredicto: 'pendiente', mensaje: 'Cambiaste la condición: subí la constancia de nuevo.' });
+    }
+  }
+
+  function limpiarConstancia() {
+    constanciaState = null;
+    const f = document.getElementById('constanciaFile'); if (f) f.value = '';
+    const s = document.getElementById('constanciaStatus'); if (s) { s.style.display = 'none'; s.innerHTML = ''; }
+  }
+
+  function renderConstanciaStatus(d) {
+    const el = document.getElementById('constanciaStatus');
+    if (!el) return;
+    el.style.display = '';
+    const ok = d.veredicto === 'ok';
+    const neutral = d.veredicto === 'cargando' || d.veredicto === 'pendiente';
+    const bg = ok ? '#e8f5e9' : (neutral ? '#eef2f7' : '#fdecea');
+    const bd = ok ? '#2e7d32' : (neutral ? '#90a4ae' : '#c62828');
+    const icon = ok ? '✓' : (neutral ? '⏳' : '✗');
+    let extra = '';
+    if (d.condicion_detectada && !neutral) {
+      extra = '<div style="font-size:12px; color:#556; margin-top:4px;">Detectado: <strong>' + d.condicion_detectada + '</strong>' +
+        (d.categoria_monotributo ? ' · Categoría ' + d.categoria_monotributo : '') +
+        (d.vigencia_desde ? ' · Vigencia desde ' + d.vigencia_desde : '') + '</div>';
+    }
+    el.innerHTML = '<div style="background:' + bg + '; border-left:4px solid ' + bd + '; padding:10px 12px; border-radius:6px;">' +
+      '<strong style="color:' + bd + ';">' + icon + ' ' + (d.mensaje || '') + '</strong>' + extra + '</div>';
+  }
+
+  async function handleConstanciaUpload(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const cond = toggleValues['indepCondicion'] || '';
+    renderConstanciaStatus({ veredicto: 'cargando', mensaje: 'Analizando la constancia…' });
+    try {
+      // A bytes (Edge viejo no manda File/Blob como body; mismo criterio que DNI/estatuto).
+      const bytes = await new Promise(function (ok, bad) {
+        const fr = new FileReader();
+        fr.onload = function () { ok(new Uint8Array(fr.result)); };
+        fr.onerror = function () { bad(new Error('no se pudo leer el archivo')); };
+        fr.readAsArrayBuffer(file);
+      });
+      const mime = file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : 'image/jpeg');
+      const extn = mime.indexOf('pdf') >= 0 ? 'pdf' : (mime.indexOf('png') >= 0 ? 'png' : 'jpg');
+      const safe = (g('apellido') + '_' + g('nombre')).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 40) || 'cliente';
+      const path = 'constancias/CONST_' + safe + '_' + Date.now() + '.' + extn;
+      await subirArchivo('/storage/v1/object/vwfs-dnis/' + path, bytes, mime);
+      const url = SUPABASE_URL + '/storage/v1/object/public/vwfs-dnis/' + path;
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-constancia', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ constancia_url: url, declarado: cond })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'No se pudo analizar la constancia.');
+      data.url = url;
+      data.declarado = cond;
+      constanciaState = data;
+      renderConstanciaStatus(data);
+    } catch (e) {
+      constanciaState = null;
+      renderConstanciaStatus({ veredicto: 'error', mensaje: 'No se pudo procesar la constancia: ' + ((e && e.message) || e) + '. Probá de nuevo.' });
+    }
   }
 
   function toggleConyuge() {
@@ -2140,6 +2231,24 @@
         }
       }
     }
+    // Paso 4 (Laboral): Monotributista / Resp. Inscripto exigen constancia de ARCA verificada.
+    if (currentStep === 4) {
+      const cond = toggleValues['indepCondicion'];
+      const pideConst = toggleValues['sitLaboral'] === 'Independiente' &&
+                        (cond === 'Monotributista' || cond === 'Responsable Inscripto');
+      if (pideConst) {
+        if (!constanciaState) {
+          alert('Subí la constancia de ARCA (actualizada de este mes) para ' + cond + '.');
+          const b = document.getElementById('constanciaBlock'); if (b) b.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+        if (!constanciaState.ok) {
+          alert('No se puede avanzar: ' + (constanciaState.mensaje || 'la constancia no coincide con lo declarado o no es del mes corriente.'));
+          const s = document.getElementById('constanciaStatus'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          return;
+        }
+      }
+    }
     if (currentStep === 2) {
       if (!validateBcoFrances()) {
         document.getElementById('bcoError').scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -2276,6 +2385,15 @@
       ['Razón social empresa', g('empresa')],
       ['Tel. comercial', g('telComercial')],
     );
+
+    // Constancia de ARCA verificada (solo Monotributista / Resp. Inscripto).
+    if (toggleValues['sitLaboral'] === 'Independiente' &&
+        (toggleValues['indepCondicion'] === 'Monotributista' || toggleValues['indepCondicion'] === 'Responsable Inscripto') &&
+        constanciaState && constanciaState.ok) {
+      items.push(['Constancia ARCA', 'Verificada: ' + (constanciaState.condicion_detectada || '') +
+        (constanciaState.categoria_monotributo ? ' (cat ' + constanciaState.categoria_monotributo + ')' : '') +
+        (constanciaState.vigencia_desde ? ' · vig. ' + constanciaState.vigencia_desde : '')]);
+    }
 
     if (g('legalCalle') || g('legalNro')) {
       items.push(
@@ -2579,6 +2697,13 @@
       // DNI del conyuge (heredado del F01 matcheado): queda adjunto para el panel.
       if (conyDniFrenteUrlFromF01) datosObj['DNI Cónyuge Frente URL'] = conyDniFrenteUrlFromF01;
       if (conyDniDorsoUrlFromF01)  datosObj['DNI Cónyuge Dorso URL']  = conyDniDorsoUrlFromF01;
+      // Constancia de ARCA verificada (Monotributista / Resp. Inscripto): URL + condición detectada.
+      if (constanciaState && constanciaState.url) {
+        datosObj['Constancia ARCA URL'] = constanciaState.url;
+        datosObj['Constancia ARCA condición'] = (constanciaState.condicion_detectada || '') +
+          (constanciaState.categoria_monotributo ? ' (cat ' + constanciaState.categoria_monotributo + ')' : '') +
+          (constanciaState.vigencia_desde ? ' · vig. ' + constanciaState.vigencia_desde : '');
+      }
 
       const basePayload = {
         nombre: (g('apellido') + ', ' + g('nombre')).trim(),
