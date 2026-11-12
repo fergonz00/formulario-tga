@@ -679,6 +679,13 @@
           <button type="button" class="toggle-btn" data-field="pf-iva" data-value="Exento">Exento</button>
         </div>
       </div>
+      <!-- Solo si es Resp. Inscripto o Monotributista: subir constancia de ARCA -->
+      <div class="field" id="pfConstanciaBlock" style="display:none;">
+        <label>Constancia de ARCA — actualizada de este mes</label>
+        <input type="file" accept="image/*,application/pdf" id="pfConstanciaFile" onchange="handlePfConstanciaUpload(this)">
+        <div style="font-size:12px; color:var(--vw-cobalt, #1a3b8a); margin-top:4px;">Subí la constancia de inscripción (Resp. Inscripto) o de opción al monotributo. La verificamos al toque.</div>
+        <div id="pfConstanciaStatus" style="margin-top:10px; font-size:13px; display:none;"></div>
+      </div>
       <div class="field">
         <label>Uso de la unidad</label>
         <div class="toggle-group">
@@ -1315,6 +1322,9 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
   const dniImages = {};         // { frente: {dataUrl, file, w, h}, dorso: {...} }
   let dniAnalisis = null;       // resultado de la Edge Function
   let dniAnalisisOk = false;    // true si calidad.ok_global, permite avanzar
+
+  // Constancia de ARCA (Persona Física Resp. Inscripto / Monotributista): analizar-constancia.
+  let pfConstanciaState = null;
   let dniFrenteUrlUploaded = '';
   let dniDorsoUrlUploaded = '';
   // Sin mínimo de resolución: aunque sea baja, si el DNI es legible la IA decide.
@@ -1329,8 +1339,85 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       toggleValues[btn.dataset.field] = btn.dataset.value;
       btn.parentElement.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
+      if (btn.dataset.field === 'pf-iva') togglePfConstancia();
     });
   });
+
+  // ═══════ CONSTANCIA DE ARCA (PF Resp. Inscripto / Monotributista) ═══════
+  // Resp. Inscripto o Monotributista => pedimos la constancia de ARCA y la verificamos.
+  function togglePfConstancia() {
+    const iva = toggleValues['pf-iva'];
+    const pide = iva === 'Resp. Inscripto' || iva === 'Monotributista';
+    const block = document.getElementById('pfConstanciaBlock');
+    if (block) block.style.display = pide ? '' : 'none';
+    if (!pide) {
+      limpiarPfConstancia();
+    } else if (pfConstanciaState && pfConstanciaState.declarado && pfConstanciaState.declarado !== iva) {
+      // Cambió la condición declarada: la constancia anterior ya no aplica.
+      limpiarPfConstancia();
+      renderPfConstanciaStatus({ veredicto: 'pendiente', mensaje: 'Cambiaste la condición: subí la constancia de nuevo.' });
+    }
+  }
+
+  function limpiarPfConstancia() {
+    pfConstanciaState = null;
+    const f = document.getElementById('pfConstanciaFile'); if (f) f.value = '';
+    const s = document.getElementById('pfConstanciaStatus'); if (s) { s.style.display = 'none'; s.innerHTML = ''; }
+  }
+
+  function renderPfConstanciaStatus(d) {
+    const el = document.getElementById('pfConstanciaStatus');
+    if (!el) return;
+    el.style.display = '';
+    const ok = d.veredicto === 'ok';
+    const neutral = d.veredicto === 'cargando' || d.veredicto === 'pendiente';
+    const bg = ok ? '#e8f5e9' : (neutral ? '#eef2f7' : '#fdecea');
+    const bd = ok ? '#2e7d32' : (neutral ? '#90a4ae' : '#c62828');
+    const icon = ok ? '✓' : (neutral ? '⏳' : '✗');
+    let extra = '';
+    if (d.condicion_detectada && !neutral) {
+      extra = '<div style="font-size:12px; color:#556; margin-top:4px;">Detectado: <strong>' + d.condicion_detectada + '</strong>' +
+        (d.categoria_monotributo ? ' · Categoría ' + d.categoria_monotributo : '') +
+        (d.vigencia_desde ? ' · Vigencia desde ' + d.vigencia_desde : '') + '</div>';
+    }
+    el.innerHTML = '<div style="background:' + bg + '; border-left:4px solid ' + bd + '; padding:10px 12px; border-radius:6px;">' +
+      '<strong style="color:' + bd + ';">' + icon + ' ' + (d.mensaje || '') + '</strong>' + extra + '</div>';
+  }
+
+  async function handlePfConstanciaUpload(input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const iva = toggleValues['pf-iva'] || '';
+    renderPfConstanciaStatus({ veredicto: 'cargando', mensaje: 'Analizando la constancia…' });
+    try {
+      const bytes = await new Promise(function (ok, bad) {
+        const fr = new FileReader();
+        fr.onload = function () { ok(new Uint8Array(fr.result)); };
+        fr.onerror = function () { bad(new Error('no se pudo leer el archivo')); };
+        fr.readAsArrayBuffer(file);
+      });
+      const mime = file.type || (/\.pdf$/i.test(file.name) ? 'application/pdf' : 'image/jpeg');
+      const extn = mime.indexOf('pdf') >= 0 ? 'pdf' : (mime.indexOf('png') >= 0 ? 'png' : 'jpg');
+      const safe = (g('pf-apellido') + '_' + g('pf-nombre')).normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-zA-Z0-9_]/g, '').slice(0, 40) || 'cliente';
+      const path = 'constancias/CONST_' + safe + '_' + Date.now() + '.' + extn;
+      await subirArchivo('/storage/v1/object/formularios-f01/' + path, bytes, mime);
+      const url = SUPABASE_URL + '/storage/v1/object/public/formularios-f01/' + path;
+      const resp = await fetch(SUPABASE_URL + '/functions/v1/analizar-constancia', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + SUPABASE_KEY, 'apikey': SUPABASE_KEY, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ constancia_url: url, declarado: iva })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'No se pudo analizar la constancia.');
+      data.url = url;
+      data.declarado = iva;
+      pfConstanciaState = data;
+      renderPfConstanciaStatus(data);
+    } catch (e) {
+      pfConstanciaState = null;
+      renderPfConstanciaStatus({ veredicto: 'error', mensaje: 'No se pudo procesar la constancia: ' + ((e && e.message) || e) + '. Probá de nuevo.' });
+    }
+  }
 
   function startForm(type) {
     formType = type;
@@ -1484,6 +1571,23 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         if (badDates.length) {
           alert('Revisá estas fechas, tienen que ser DD/MM/AAAA completo:\n\n• ' + badDates.join('\n• '));
           return;
+        }
+        // pf-step4 (operación): Resp. Inscripto / Monotributista exigen constancia de ARCA verificada.
+        if (stepEl.id === 'pf-step4') {
+          const iva = toggleValues['pf-iva'];
+          const pideConst = iva === 'Resp. Inscripto' || iva === 'Monotributista';
+          if (pideConst) {
+            if (!pfConstanciaState) {
+              alert('Subí la constancia de ARCA (actualizada de este mes) para ' + iva + '.');
+              const b = document.getElementById('pfConstanciaBlock'); if (b) b.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              return;
+            }
+            if (!pfConstanciaState.ok) {
+              alert('No se puede avanzar: ' + (pfConstanciaState.mensaje || 'la constancia no coincide con lo declarado o no es del mes corriente.'));
+              const s = document.getElementById('pfConstanciaStatus'); if (s) s.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              return;
+            }
+          }
         }
       }
     }
@@ -2542,6 +2646,11 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         ['Localidad', g('pf-t2localidad')], ['Provincia', g('pf-t2provincia')], ['CP', g('pf-t2cp')]);
     }
     items.push(['— OPERACIÓN —',''], ['Cond. IVA', toggleValues['pf-iva']||''], ['Uso unidad', toggleValues['pf-uso']||'']);
+    if ((toggleValues['pf-iva'] === 'Resp. Inscripto' || toggleValues['pf-iva'] === 'Monotributista') && pfConstanciaState && pfConstanciaState.ok) {
+      items.push(['Constancia ARCA', 'Verificada: ' + (pfConstanciaState.condicion_detectada || '') +
+        (pfConstanciaState.categoria_monotributo ? ' (cat ' + pfConstanciaState.categoria_monotributo + ')' : '') +
+        (pfConstanciaState.vigencia_desde ? ' · vig. ' + pfConstanciaState.vigencia_desde : '')]);
+    }
     return items;
   }
 
@@ -3000,6 +3109,14 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
       if (t2Dni.frenteUrl) datosObj['DNI 2º Titular Frente URL'] = t2Dni.frenteUrl;
       if (t2Dni.dorsoUrl)  datosObj['DNI 2º Titular Dorso URL']  = t2Dni.dorsoUrl;
       if (t2Dni.analisis) datosObj['DNI 2º Titular análisis IA'] = JSON.stringify(t2Dni.analisis);
+
+      // Constancia de ARCA verificada (Resp. Inscripto / Monotributista): URL + condición detectada.
+      if (pfConstanciaState && pfConstanciaState.url) {
+        datosObj['Constancia ARCA URL'] = pfConstanciaState.url;
+        datosObj['Constancia ARCA condición'] = (pfConstanciaState.condicion_detectada || '') +
+          (pfConstanciaState.categoria_monotributo ? ' (cat ' + pfConstanciaState.categoria_monotributo + ')' : '') +
+          (pfConstanciaState.vigencia_desde ? ' · vig. ' + pfConstanciaState.vigencia_desde : '');
+      }
 
       return jsonSinNulos({
           tipo: formType,
