@@ -221,7 +221,9 @@ async function autoVendedorOversoft(tabla: string, rows: any[]): Promise<void> {
   if (!base) return;
   const desde = Date.now() - AUTO_VEND_DIAS * DIA_MS;
   const pend = rows
-    .filter((r) => !r.vendedor && !r.eliminado && new Date(r.created_at).getTime() >= desde)
+    // Sin vendedor, o auto-asignado por el propio vendedor ("reclamado") y aún sin
+    // confirmar por Oversoft: a esos los corrobora y, si no coincide, los corrige.
+    .filter((r) => (!r.vendedor || r.vendedor_origen === "reclamado") && !r.eliminado && new Date(r.created_at).getTime() >= desde)
     .map((r) => ({ r, ...clavesForm(r) }))
     .filter((p) => p.dnis.size || p.cuits.size);
   if (!pend.length) return;
@@ -286,14 +288,27 @@ async function autoVendedorOversoft(tabla: string, rows: any[]): Promise<void> {
   }
 
   for (const [vend, ids] of Object.entries(porVendedor)) {
-    // vendedor=is.null: si alguien lo asignó a mano mientras tanto, no se pisa.
-    const r = await svc(`${tabla}?id=in.(${ids.join(",")})&vendedor=is.null`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
-      body: JSON.stringify({ vendedor: vend }),
-    });
+    // Pisa solo los que están sin vendedor o los que un vendedor se auto-asignó
+    // ("reclamado") y Oversoft todavía no confirmó. Una asignación manual de
+    // administración (vendedor cargado, origen distinto de "reclamado") NO se toca.
+    // Al confirmar queda vendedor_origen='oversoft' y deja de re-consultarse.
+    // El vendedor_reclamado_por se conserva: si Oversoft puso otro, queda auditable
+    // quién se había auto-asignado mal.
+    const r = await svc(
+      `${tabla}?id=in.(${ids.join(",")})&or=(vendedor.is.null,vendedor_origen.eq.reclamado)`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Prefer: "return=minimal" },
+        body: JSON.stringify({ vendedor: vend, vendedor_origen: "oversoft" }),
+      },
+    );
     if (!r.ok) continue;
-    for (const row of rows) if (ids.includes(row.id) && !row.vendedor) row.vendedor = vend;
+    for (const row of rows) {
+      if (ids.includes(row.id) && (!row.vendedor || row.vendedor_origen === "reclamado")) {
+        row.vendedor = vend;
+        row.vendedor_origen = "oversoft";
+      }
+    }
   }
 }
 
@@ -460,6 +475,60 @@ Deno.serve(async (req: Request) => {
         });
         if (!r.ok) return json({ error: await r.text() }, 502);
         return json({ ok: true });
+      }
+      // Buscar formularios SIN vendedor por DNI del titular (para que el vendedor
+      // se los auto-asigne). Solo vendedores de salón; devuelve datos básicos.
+      case "buscar-sin-vendedor": {
+        const role = await panelRole(usuario);
+        if (!role) return json({ error: "Sin acceso al panel" }, 403);
+        const propio = await vendedorPropio(usuario);
+        if (!propio) return json({ error: "Solo los vendedores pueden buscar y reclamar formularios." }, 403);
+        const dni = soloDigitos(body?.dni).replace(/^0+/, "");
+        if (dni.length < 6) return json({ error: "Ingresá un DNI válido." }, 400);
+        const matches: any[] = [];
+        for (const [tab, tabla] of Object.entries(FORM_TABLES)) {
+          const r = await svc(
+            `${tabla}?vendedor=is.null&eliminado=eq.false&documento=ilike.*${encodeURIComponent(dni)}*` +
+              `&select=id,nombre,documento,datos,created_at&order=created_at.desc&limit=20`,
+          );
+          const rows = await r.json().catch(() => []);
+          if (!Array.isArray(rows)) continue;
+          for (const row of rows) {
+            // Confirmación por DNI real (el ilike podría traer coincidencias parciales).
+            if (!clavesForm(row).dnis.has(dni)) continue;
+            matches.push({ tabla: tab, id: row.id, nombre: row.nombre || "", documento: row.documento || "", created_at: row.created_at });
+          }
+        }
+        return json({ matches, vendedor: propio });
+      }
+      // El vendedor reclama un formulario sin vendedor para sí mismo. El servidor
+      // le pone SU nombre (no lo elige el cliente) y solo si sigue sin asignar.
+      case "reclamar-form": {
+        const role = await panelRole(usuario);
+        if (!role) return json({ error: "Sin acceso al panel" }, 403);
+        const propio = await vendedorPropio(usuario);
+        if (!propio) return json({ error: "Solo los vendedores pueden reclamar un formulario." }, 403);
+        const tabla = FORM_TABLES[String(body?.tabla || "")];
+        if (!tabla) return json({ error: "Tabla inválida" }, 400);
+        const id = Number(body?.id);
+        if (!Number.isFinite(id)) return json({ error: "id inválido" }, 400);
+        // Guard vendedor=is.null: si otro lo tomó o ya tenía vendedor, no se pisa.
+        const r = await svc(`${tabla}?id=eq.${id}&vendedor=is.null&eliminado=eq.false`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+          body: JSON.stringify({
+            vendedor: propio,
+            vendedor_origen: "reclamado",
+            vendedor_reclamado_por: usuario,
+            vendedor_reclamado_at: new Date().toISOString(),
+          }),
+        });
+        if (!r.ok) return json({ error: await r.text() }, 502);
+        const upd = await r.json().catch(() => []);
+        if (!Array.isArray(upd) || !upd.length) {
+          return json({ error: "Ese formulario ya no está disponible (ya tiene vendedor o lo tomó otro)." }, 409);
+        }
+        return json({ ok: true, vendedor: propio });
       }
       default:
         return json({ error: "Acción desconocida" }, 400);

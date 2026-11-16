@@ -406,9 +406,29 @@
       <button class="btn btn-danger" type="button" id="btnBulkDelete" onclick="bulkDelete()" style="display:none;">🗑 Borrar seleccionados (0)</button>
     </div>
 
-    <div style="margin-bottom:10px;">
+    <div style="margin-bottom:10px; display:flex; gap:8px; align-items:center;">
       <input type="text" id="searchBox" placeholder="🔍 Buscar por nombre, apellido o DNI..." oninput="setSearch(this.value)"
-        style="width:100%;padding:10px 14px;border:1.5px solid var(--vw-new-horizon);border-radius:var(--radius-sm);font-family:inherit;font-size:14px;">
+        style="flex:1 1 50%; min-width:0; padding:10px 14px;border:1.5px solid var(--vw-new-horizon);border-radius:var(--radius-sm);font-family:inherit;font-size:14px;">
+      <button type="button" id="btnBuscarDni" onclick="abrirBuscarDni()" title="Buscar un formulario sin vendedor por DNI y asignártelo"
+        style="display:none; flex:0 0 auto; padding:10px 16px; border:none; border-radius:var(--radius-sm); background:var(--vw-cobalt, #1a3b8a); color:#fff; font-weight:700; font-size:14px; cursor:pointer; white-space:nowrap;">🔎 Buscar por DNI</button>
+    </div>
+
+    <!-- Modal: buscar formulario SIN vendedor por DNI y auto-asignárselo -->
+    <div id="buscarDniOverlay" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:9999; align-items:flex-start; justify-content:center; padding:48px 16px; overflow:auto;">
+      <div style="background:#fff; border-radius:12px; max-width:540px; width:100%; padding:22px; box-shadow:0 20px 60px rgba(0,0,0,.3); font-family:inherit;">
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; margin-bottom:14px;">
+          <h3 style="margin:0; font-size:18px;">Buscar por DNI y asignarme</h3>
+          <button type="button" onclick="cerrarBuscarDni()" style="background:none;border:none;font-size:24px;line-height:1;cursor:pointer;color:#888;">×</button>
+        </div>
+        <div style="display:flex; gap:8px; margin-bottom:10px;">
+          <input type="text" id="buscarDniInput" inputmode="numeric" autocomplete="off" placeholder="DNI del titular (solo números)"
+            onkeydown="if(event.key==='Enter')buscarPorDni()"
+            style="flex:1; min-width:0; padding:11px 14px; border:1.5px solid var(--vw-new-horizon); border-radius:var(--radius-sm); font-size:15px; font-family:inherit;">
+          <button type="button" onclick="buscarPorDni()" style="padding:11px 18px;border:none;border-radius:var(--radius-sm);background:var(--vw-cobalt,#1a3b8a);color:#fff;font-weight:700;cursor:pointer;">Buscar</button>
+        </div>
+        <div style="font-size:12px; color:#667; margin-bottom:12px;">Solo muestra formularios que todavía <strong>no tienen vendedor</strong>. Al asignarlo, queda tuyo.</div>
+        <div id="buscarDniResult"></div>
+      </div>
     </div>
 
     <div class="row-filters" id="rowFilters">
@@ -936,6 +956,7 @@
   const archivosCache = {};      // { vwfsId: [row,...] }
   let filter = 'all';
   let currentDetailId = null;
+  let vendedorPropioPanel = null; // nombre de vendedor del usuario logueado (si es vendedor de salón)
 
   const TAB_CONFIG = {
     vwfs:   { table: 'formularios_vwfs',  editUrl: 'vwfs.html?edit=',  label: 'VWFS' },
@@ -1256,6 +1277,9 @@
       const data = await res.json();
       rowsCache[tab] = Array.isArray(data.rows) ? data.rows : [];
       // Un vendedor solo recibe sus formularios: el filtro por vendedor sobra.
+      vendedorPropioPanel = data.vendedorPropio || null;
+      const btnDni = document.getElementById('btnBuscarDni');
+      if (btnDni) btnDni.style.display = vendedorPropioPanel ? '' : 'none';
       if (data.vendedorPropio) {
         const vf = document.getElementById('vendedorFilter');
         if (vf && vf.closest('.rf-item')) vf.closest('.rf-item').style.display = 'none';
@@ -1266,6 +1290,61 @@
       renderList();
     } catch (e) {
       list.innerHTML = '<div class="error-banner">Error cargando formularios ' + cfg.label + '.</div>';
+    }
+  }
+
+  // ═══════ BUSCAR POR DNI (auto-asignación de formularios sin vendedor) ═══════
+  function abrirBuscarDni() {
+    const inp = document.getElementById('buscarDniInput');
+    const res = document.getElementById('buscarDniResult');
+    if (inp) inp.value = '';
+    if (res) res.innerHTML = '';
+    document.getElementById('buscarDniOverlay').style.display = 'flex';
+    setTimeout(function () { if (inp) inp.focus(); }, 50);
+  }
+  function cerrarBuscarDni() {
+    document.getElementById('buscarDniOverlay').style.display = 'none';
+  }
+  async function buscarPorDni() {
+    const dni = (document.getElementById('buscarDniInput').value || '').replace(/\D/g, '');
+    const box = document.getElementById('buscarDniResult');
+    if (dni.length < 6) { box.innerHTML = '<div style="color:#c62828;padding:4px 0;">Ingresá un DNI válido (solo números).</div>'; return; }
+    box.innerHTML = '<div class="loading">Buscando…</div>';
+    try {
+      const res = await gatewayFetch('buscar-sin-vendedor', { dni: dni });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      const m = Array.isArray(data.matches) ? data.matches : [];
+      if (!m.length) {
+        box.innerHTML = '<div style="padding:12px 14px;background:#fdecea;border-left:4px solid #c62828;border-radius:6px;color:#333;">No hay ningún formulario <strong>sin asignar</strong> con ese DNI.</div>';
+        return;
+      }
+      box.innerHTML = m.map(function (x) {
+        const label = TAB_CONFIG[x.tabla] ? TAB_CONFIG[x.tabla].label : x.tabla;
+        const fecha = x.created_at ? new Date(x.created_at).toLocaleDateString('es-AR') : '';
+        return '<div style="border:1px solid #e3e6ea;border-radius:8px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;gap:10px;">'
+          + '<div style="min-width:0;"><div style="font-weight:700;">' + escapeHtml(x.nombre || '(sin nombre)') + '</div>'
+          + '<div style="font-size:13px;color:#556;">' + escapeHtml(x.documento || '') + ' · ' + escapeHtml(label) + (fecha ? ' · ' + fecha : '') + '</div></div>'
+          + '<button type="button" onclick="reclamarForm(\'' + x.tabla + '\',' + x.id + ',this)" style="flex:0 0 auto;padding:9px 14px;border:none;border-radius:6px;background:#2e7d32;color:#fff;font-weight:700;cursor:pointer;white-space:nowrap;">Es mío</button>'
+          + '</div>';
+      }).join('');
+    } catch (e) {
+      box.innerHTML = '<div style="color:#c62828;padding:4px 0;">Error: ' + escapeHtml(String((e && e.message) || e)) + '</div>';
+    }
+  }
+  async function reclamarForm(tabla, id, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Asignando…'; }
+    try {
+      const res = await gatewayFetch('reclamar-form', { tabla: tabla, id: id });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+      if (btn) { btn.textContent = '✓ Asignado a vos'; btn.style.background = '#2e7d32'; btn.style.opacity = '.7'; btn.disabled = true; }
+      // Invalidar cache y refrescar si estás parado en ese tab, para que aparezca entre los tuyos.
+      rowsCache[tabla] = null;
+      if (currentTab === tabla) loadTab(tabla);
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = 'Es mío'; }
+      alert('No se pudo asignar: ' + ((e && e.message) || e));
     }
   }
 
