@@ -2094,7 +2094,9 @@
     // Estado civil y cónyuge
     if (d['Estado civil']) {
       const ec = document.getElementById('estadoCivil');
-      const val = [...ec.options].find(o => o.value === d['Estado civil'] || o.value.startsWith(d['Estado civil']));
+      // F01 dice "Unión convivencial"; en VWFS la opción equivalente es "Concubino/a Conviviente".
+      const ecF01 = d['Estado civil'] === 'Unión convivencial' ? 'Concubino/a Conviviente' : d['Estado civil'];
+      const val = [...ec.options].find(o => o.value === ecF01 || o.value.startsWith(ecF01));
       if (val) { ec.value = val.value; ec.classList.add('prefilled'); }
       toggleConyuge();
     }

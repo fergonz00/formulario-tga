@@ -450,15 +450,15 @@
       <div class="row row-2">
         <div class="field">
           <label>Estado civil</label>
-          <select id="pf-estadoCivil" onchange="document.getElementById('pf-conyugeBlock').classList.toggle('show', this.value==='Casado/a')"><option value="">Seleccionar</option><option>Soltero/a</option><option>Casado/a</option><option>Divorciado/a</option><option>Viudo/a</option><option>Unión convivencial</option></select>
+          <select id="pf-estadoCivil" onchange="document.getElementById('pf-conyugeBlock').classList.toggle('show', this.value==='Casado/a' || this.value==='Unión convivencial')"><option value="">Seleccionar</option><option>Soltero/a</option><option>Casado/a</option><option>Divorciado/a</option><option>Viudo/a</option><option>Unión convivencial</option></select>
         </div>
         <div class="field"><label>Ocupación</label><input type="text" id="pf-ocupacion" placeholder="Ej: Empleado"></div>
       </div>
       <div class="field"><label>Profesión / Actividad</label><input type="text" id="pf-profesion" placeholder="Ej: Comerciante, Abogado, Empleado..."></div>
-      <!-- Cónyuge inline (solo si Casado/a) -->
+      <!-- Cónyuge / conviviente inline (Casado/a o Unión convivencial) -->
       <div class="conditional" id="pf-conyugeBlock">
         <div class="divider"></div>
-        <div class="section-title"><div class="icon">💍</div> Datos del cónyuge</div>
+        <div class="section-title"><div class="icon">💍</div> Datos del cónyuge / conviviente</div>
 
         <!-- PRIMERO el DNI. De ahí autocompletamos nombre + CUIL. -->
         <div class="info-callout" style="background: rgba(0,64,193,0.06); border-left-color: #0040C1; font-size:13px;">
@@ -1545,10 +1545,10 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var n,r,i,a,
         // Si esta casado/a, el DNI del conyuge tiene que estar analizado OK antes de avanzar.
         if (formType === 'fisica') {
           const ec = document.getElementById('pf-estadoCivil');
-          const isCasado = ec && ec.value === 'Casado/a';
+          const isCasado = ec && (ec.value === 'Casado/a' || ec.value === 'Unión convivencial');
           const conyBlockVisible = document.getElementById('pf-conyugeBlock')?.classList.contains('show');
           if (isCasado && conyBlockVisible && !conyDni.ok) {
-            alert('Primero subí y analizá el DNI del cónyuge antes de avanzar.\n\n(Está marcado como Casado/a pero el DNI del cónyuge aún no fue validado.)');
+            alert('Primero subí y analizá el DNI del cónyuge antes de avanzar.\n\n(Está marcado como Casado/a o Unión convivencial pero el DNI del cónyuge/conviviente aún no fue validado.)');
             const resultEl = document.getElementById('conyDniAnalysisResult') || document.getElementById('pf-conyugeLockMsg');
             if (resultEl) resultEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
             return;
