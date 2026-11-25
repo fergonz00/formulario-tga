@@ -770,11 +770,34 @@ export function peritar(e: EntradaPeritaje): ResultadoPeritaje {
 
     const vencFrente = normFecha(ext.fecha_vencimiento);
     if (vencFrente && mrz.fechaVencimiento && vencFrente !== mrz.fechaVencimiento) {
-      rojo(
-        "MRZ_VENCIMIENTO_DISTINTO",
-        "La fecha de vencimiento del frente no coincide con la del dorso",
-        `Frente: ${vencFrente} - MRZ del dorso: ${mrz.fechaVencimiento}.`,
-      );
+      // Excepcion del HOLOGRAMA DEL SOL: en el DNI argentino el sello holografico
+      // del sol cae justo encima del DIA de la fecha de emision/vencimiento del
+      // frente. Con reflejo tapa el digito y la IA lee mal el dia (ej: el 19 lo
+      // lee como 13 o 09). Si la diferencia es SOLO en el dia (mismo mes y mismo
+      // anio) y la MRZ del dorso cierra su digito verificador de vencimiento (que
+      // es la fuente confiable), NO es una adulteracion: el sol tapa el dia.
+      // Lo dejamos amarillo confiando en la MRZ. Si difiere el mes o el anio, si
+      // es una discrepancia real -> sigue rojo (ahi se estira la validez).
+      const [dvF, mvF, yvF] = vencFrente.split("/");
+      const [dvM, mvM, yvM] = mrz.fechaVencimiento.split("/");
+      const soloElDia = mvF === mvM && yvF === yvM && dvF !== dvM;
+      if (soloElDia && mrz.checks.fechaVencimiento) {
+        amarillo(
+          "MRZ_VENCIMIENTO_DIA_ILEGIBLE",
+          "El dia del vencimiento del frente no se lee bien (holograma del sol)",
+          `Frente: ${vencFrente} - MRZ del dorso: ${mrz.fechaVencimiento}. En el DNI argentino ` +
+            `el sello holografico del sol cae sobre el dia de la fecha y con el reflejo lo tapa, ` +
+            `por eso el dia del frente puede leerse mal. Coinciden mes y anio, y la MRZ del dorso ` +
+            `cierra su verificador, asi que la fecha real es la de la MRZ (${mrz.fechaVencimiento}). ` +
+            `NO indica adulteracion: aprobado como excepcion.`,
+        );
+      } else {
+        rojo(
+          "MRZ_VENCIMIENTO_DISTINTO",
+          "La fecha de vencimiento del frente no coincide con la del dorso",
+          `Frente: ${vencFrente} - MRZ del dorso: ${mrz.fechaVencimiento}.`,
+        );
+      }
     }
 
     const sexoFrente = String(ext.sexo ?? "").toUpperCase().slice(0, 1);
@@ -858,7 +881,12 @@ export function peritar(e: EntradaPeritaje): ResultadoPeritaje {
   if (em && ve) {
     const [de, me, ye] = em.split("/").map(Number);
     const [dv2, mv, yv] = ve.split("/").map(Number);
-    if (!(de === dv2 && me === mv && yv - ye === 15)) {
+    // No exigimos que coincida el DIA: en el frente el holograma del sol cae
+    // sobre el dia de la emision y del vencimiento, y la IA suele leer mal uno u
+    // otro, lo que disparaba este amarillo sin que el documento tenga nada malo.
+    // El mes y los 15 anios alcanzan para la coherencia; el cruce fuerte contra
+    // la MRZ ya cubre el vencimiento.
+    if (!(me === mv && yv - ye === 15)) {
       amarillo(
         "EMISION_VENCIMIENTO_INCOHERENTE",
         "Emision y vencimiento no guardan la distancia de 15 anios",
